@@ -1,3 +1,4 @@
+import { MalformedResponseError, requireString } from '@/api/narrowing';
 import type { components } from '@/api/schema';
 
 /**
@@ -32,27 +33,6 @@ export interface Session {
 }
 
 /**
- * Raised when a response of the backend does not carry the fields the client relies on.
- *
- * The generated types mark every property as optional, because the specification does not declare
- * required fields. Narrowing happens here so that the rest of the application works with values
- * that are known to be present.
- */
-export class MalformedResponseError extends Error {
-  constructor(field: string) {
-    super(`The response is missing the field "${field}"`);
-    this.name = 'MalformedResponseError';
-  }
-}
-
-function required(value: string | undefined, field: string): string {
-  if (value === undefined || value === '') {
-    throw new MalformedResponseError(field);
-  }
-  return value;
-}
-
-/**
  * Narrows the token pair of a backend response into its client side form.
  */
 export function toTokenPair(tokens: components['schemas']['TokenPairResponse'] | undefined): TokenPair {
@@ -60,11 +40,11 @@ export function toTokenPair(tokens: components['schemas']['TokenPairResponse'] |
     throw new MalformedResponseError('tokens');
   }
   return {
-    tokenType: required(tokens.tokenType, 'tokens.tokenType'),
-    accessToken: required(tokens.accessToken, 'tokens.accessToken'),
-    accessTokenExpiresAt: required(tokens.accessTokenExpiresAt, 'tokens.accessTokenExpiresAt'),
-    refreshToken: required(tokens.refreshToken, 'tokens.refreshToken'),
-    refreshTokenExpiresAt: required(tokens.refreshTokenExpiresAt, 'tokens.refreshTokenExpiresAt'),
+    tokenType: requireString(tokens.tokenType, 'tokens.tokenType'),
+    accessToken: requireString(tokens.accessToken, 'tokens.accessToken'),
+    accessTokenExpiresAt: requireString(tokens.accessTokenExpiresAt, 'tokens.accessTokenExpiresAt'),
+    refreshToken: requireString(tokens.refreshToken, 'tokens.refreshToken'),
+    refreshTokenExpiresAt: requireString(tokens.refreshTokenExpiresAt, 'tokens.refreshTokenExpiresAt'),
   };
 }
 
@@ -76,12 +56,12 @@ export function toUser(user: components['schemas']['AuthenticatedUser'] | undefi
     throw new MalformedResponseError('user');
   }
   return {
-    id: required(user.id, 'user.id'),
-    username: required(user.username, 'user.username'),
-    firstName: required(user.firstName, 'user.firstName'),
-    lastName: required(user.lastName, 'user.lastName'),
-    registeredAt: required(user.registeredAt, 'user.registeredAt'),
-    lastLoginAt: required(user.lastLoginAt, 'user.lastLoginAt'),
+    id: requireString(user.id, 'user.id'),
+    username: requireString(user.username, 'user.username'),
+    firstName: requireString(user.firstName, 'user.firstName'),
+    lastName: requireString(user.lastName, 'user.lastName'),
+    registeredAt: requireString(user.registeredAt, 'user.registeredAt'),
+    lastLoginAt: requireString(user.lastLoginAt, 'user.lastLoginAt'),
   };
 }
 

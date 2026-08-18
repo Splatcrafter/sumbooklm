@@ -22,6 +22,22 @@ public final class PayloadTypes {
     public static final TypeReference USER_ACCOUNT = new TypeReference("user_account");
 
     /**
+     * Payload of a notebook, holding the title, the pin state and the topic icon.
+     */
+    public static final TypeReference NOTEBOOK = new TypeReference("notebook");
+
+    /**
+     * Payload of a source document, holding its name and everything the ingestion pipeline
+     * determined about it.
+     */
+    public static final TypeReference SOURCE_DOCUMENT = new TypeReference("source_document");
+
+    /**
+     * Payload of a chat session, holding what a list of conversations displays about it.
+     */
+    public static final TypeReference CHAT_SESSION = new TypeReference("chat_session");
+
+    /**
      * Prevents instantiation of this constant holder.
      */
     private PayloadTypes() {

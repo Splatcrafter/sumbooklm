@@ -7,23 +7,24 @@ sumbooklm-parent                 (pom, aggregator + dependency and plugin manage
 ├── sumbooklm-domain             no dependencies
 ├── sumbooklm-persistence        -> domain
 ├── sumbooklm-security           -> domain, persistence
+├── sumbooklm-workspace          -> domain, persistence
 ├── sumbooklm-ingestion          -> domain
 ├── sumbooklm-ai                 -> domain
-├── sumbooklm-api                -> domain, persistence, security, ingestion, ai
+├── sumbooklm-api                -> domain, persistence, security, workspace, ingestion, ai
 ├── sumbooklm-frontend           no Java, produces static/ resources
 └── sumbooklm-app                -> api, frontend
 ```
 
 The graph is acyclic and one directional. `domain` is a leaf and must stay framework free.
 `persistence`, `ingestion` and `ai` are siblings and must not reference each other; anything that
-needs two of them belongs in `api` or above. `security` is the one sibling that is allowed to depend
-on `persistence`, because it owns two tables of its own; see ADR-012.
+needs two of them belongs in `api` or above. `security` and `workspace` are the two siblings that are
+allowed to depend on `persistence`, because each owns tables of its own; see ADR-012 and ADR-024.
 
 ## Module responsibilities
 
 **`sumbooklm-domain`** — Notebooks, sources, chunks, chat interactions as plain Java. No JPA, no
-Jackson, no Spring, no LangChain4j. Currently populated with the user account model; the notebook
-side of the model is still only a package declaration.
+Jackson, no Spring, no LangChain4j. Holds the user account model and the workspace model; the source
+and chunk side of the model joins it with the ingestion pipeline.
 
 **`sumbooklm-persistence`** — Spring Data JPA, the CBOR payload codec, and the Aether Datafixers
 integration. Holds `PayloadSchemaVersion`. Carries the H2 and PostgreSQL drivers at runtime scope.
@@ -33,6 +34,11 @@ This is the only module that depends on Jackson 2.
 cleanup of invalidated tokens, the derivation of the client cookie encryption parameters, and the
 `@SensitiveOperation` marker with its aspect. Knows nothing about HTTP: it takes commands and returns
 objects. Owns the `user_account` and `refresh_token` data through the persistence module.
+
+**`sumbooklm-workspace`** — The lifecycle of a notebook and of everything below it: creating,
+listing, renaming, pinning and removing, including the removal of the sources and chat sessions a
+notebook holds. Like `security` it takes commands and returns domain objects and knows nothing about
+HTTP. Every one of its methods carries the account it acts for; see ADR-025.
 
 **`sumbooklm-ingestion`** — jsoup for fetching and cleaning web sources, the LangChain4j Apache Tika
 document parser for extracting text from PDF, Markdown, HTML and plain text uploads. Produces domain
@@ -63,13 +69,18 @@ de.pfoertner.assessment.sumbooklm
 ├── SumbookLmApplication
 ├── config
 │   ├── SinglePageApplicationConfiguration
+│   ├── TimeConfiguration                       the shared Clock, see ADR-024
 │   └── H2ConsoleSecurityConfiguration          (dev profile only)
 ├── domain
-│   └── user                                    UserAccount, UserProfile, AccountActivity
+│   ├── user                                    UserAccount, UserProfile, AccountActivity
+│   └── workspace                               Notebook, DocumentStatus
 ├── persistence
 │   ├── schema.PayloadSchemaVersion
 │   ├── payload                                 PayloadTypes, PayloadCodec, PayloadDataFixerBootstrap
 │   ├── user                                    entity, repository, payload record and codec, mapper
+│   ├── notebook                                entity, repository, payload record and codec, mapper
+│   ├── document                                entity, repository, payload record and codec, count projection
+│   ├── chat                                    entity, repository, payload record and codec
 │   └── token                                   refresh token entity and repository
 ├── security
 │   ├── config                                  SecurityProperties, bean and scheduling configuration
@@ -77,15 +88,19 @@ de.pfoertner.assessment.sumbooklm
 │   ├── token                                   issuer, refresh token service, cleanup job, claims
 │   ├── cookie                                  cookie key derivation and its parameters
 │   └── access                                  SensitiveOperation and its aspect
+├── workspace
+│   └── notebook                                NotebookService, update command, failure
 ├── ingestion
 ├── ai
 └── api
     ├── ApiPaths
     ├── config                                  OpenApiConfiguration, SecurityConfiguration
     ├── error                                   ApiExceptionHandler
-    ├── support                                 ClientAddressResolver, KeyHandleCookieFactory
+    ├── support                                 ClientAddressResolver, KeyHandleCookieFactory,
+    │                                            AuthenticatedUserResolver
     └── v1
         ├── auth                                controller and payloads of the token lifecycle
+        ├── notebook                            controller and payloads of notebook management
         └── security                            cookie parameter endpoint and its payload
 ```
 
@@ -109,12 +124,18 @@ sumbooklm-frontend
     ├── index.css         Tailwind v4 CSS-first, shadcn tokens
     ├── api
     │   ├── schema.d.ts   generated from the live OpenAPI document
+    │   ├── narrowing.ts  turns the all-optional generated types into required ones
     │   └── client.ts     openapi-fetch client bound to those types
     ├── assets
     │   └── account-background.png   still background, generated, not hand made
     ├── components
     │   ├── background   wave shader, its renderer, the deciding component
-    │   └── ui           shadcn components: button, input, label, field, separator
+    │   └── ui           shadcn: button, input, label, field, separator, card,
+    │                    dropdown-menu, dialog, alert-dialog
+    ├── notebooks
+    │   ├── notebook.ts       client side type and its narrowing
+    │   ├── notebooksApi.ts   the four calls of /api/v1/notebooks
+    │   └── useNotebooks.ts   the list and the actions that change it
     ├── auth
     │   ├── authContext.ts    context, failure type, status
     │   ├── AuthProvider.tsx  session restore, login, register, refresh, logout
@@ -125,9 +146,11 @@ sumbooklm-frontend
     │   ├── index.ts      i18next + language detector, de / en / ja
     │   └── locales/{de,en,ja}/common.json
     ├── lib/utils.ts      cn()
-    └── routes            AppLayout, HomePage, NotFoundPage
-        └── account       AccountLayout, AuthCard, BrandMark, authFormStyles,
-                          LoginPage, RegisterPage
+    └── routes            AppLayout (the signed-in shell), NotFoundPage
+        ├── account       AccountLayout, AuthCard, BrandMark, authFormStyles,
+        │                 LoginPage, RegisterPage
+        └── dashboard     DashboardPage, NotebookCard, NotebookCreateCard,
+                          NotebookTitleDialog, NotebookDeleteDialog, NotebookMeta
 ```
 
 The account routes are a second top level branch of the router rather than children of `AppLayout`.

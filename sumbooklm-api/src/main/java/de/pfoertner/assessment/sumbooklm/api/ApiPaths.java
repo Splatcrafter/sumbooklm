@@ -50,6 +50,16 @@ public final class ApiPaths {
     public static final String V1_LOGOUT = V1 + "/logout";
 
     /**
+     * Collection of the notebooks of the authenticated account.
+     */
+    public static final String V1_NOTEBOOKS = V1 + "/notebooks";
+
+    /**
+     * One notebook of the authenticated account, addressed by its identifier.
+     */
+    public static final String V1_NOTEBOOK = V1_NOTEBOOKS + "/{notebookId}";
+
+    /**
      * Endpoint that hands a client the parameters its stored token pair is encrypted with. The
      * trailing slash is part of the published path.
      */

@@ -1,7 +1,6 @@
 package de.pfoertner.assessment.sumbooklm.security.config;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
 import java.util.List;
 
 import javax.crypto.SecretKey;
@@ -67,16 +66,6 @@ public class SecurityBeansConfiguration {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-    }
-
-    /**
-     * Provides the source of the current time used across the security module.
-     *
-     * @return a clock in UTC
-     */
-    @Bean
-    public Clock clock() {
-        return Clock.systemUTC();
     }
 
     /**

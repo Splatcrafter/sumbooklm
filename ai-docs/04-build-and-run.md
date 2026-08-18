@@ -71,8 +71,9 @@ environment; the production profile does not, and a missing secret fails the sta
 
 `mvn verify` runs `maven-javadoc-plugin` with `show=private`, `doclint=all` and
 `failOnWarnings=true` over main and test sources, so an undocumented element fails the build. The
-gate runs in `sumbooklm-persistence`, `sumbooklm-api` and `sumbooklm-app`; the remaining modules are
-skipped for the reason given in finding 12.
+gate runs in every module that has types, currently `sumbooklm-domain`, `sumbooklm-persistence`,
+`sumbooklm-security`, `sumbooklm-workspace`, `sumbooklm-api` and `sumbooklm-app`; `sumbooklm-ingestion`
+and `sumbooklm-ai` are skipped for the reason given in finding 12.
 
 ```bash
 mvn verify -Dfrontend.skip=true            # runs the gate without the Node toolchain
@@ -231,3 +232,41 @@ glslang shader.frag     # exit code 0 and no diagnostics means it compiles
 
 That covers compilation, not appearance. For appearance, the CPU renderer in
 `scripts/accountBackground.mjs` produces the identical field as a PNG that can be looked at.
+
+## Verification of the workspace module on 2026-08-18
+
+Full `mvn clean install` on JDK 25 / Maven 3.9.15: all ten modules green, 28 tests, JavaDoc gate
+active in every module that has types.
+
+`NotebookApiIntegrationTest` drives the assembled application over HTTP on a random port, nine cases:
+creation returning the notebook and its location, a whitespace title rejected before the service is
+reached, every endpoint refusing a request without an access token, the overview ordered by activity
+and carrying the pin state, an account never seeing a notebook of another account, a change carrying
+only one field leaving the other alone, renaming refreshing the activity timestamp while pinning does
+not, a foreign or unknown notebook answered as missing, removal emptying the overview and refusing a
+second attempt, and removal refused once the session behind the access token has been closed.
+
+The same flow was driven against the packaged jar with `curl`, which confirmed the parts a test
+asserts on indirectly:
+
+| Request | Result |
+| --- | --- |
+| `POST /api/v1/notebooks` with `"  Thermodynamics  "` | `201`, title stored trimmed, `topicIcon` empty, `sourceCount` 0 |
+| `PATCH` with `{"pinned": true}` | `200`, title unchanged, `lastActivityAt` unchanged |
+| `PATCH` with a new title | `200`, pin state unchanged, `lastActivityAt` refreshed |
+| `GET /api/v1/notebooks` | `200`, most recently active first |
+| `DELETE` then `DELETE` again | `204`, then `404` |
+| `GET /api/v1/notebooks` without a token | `401` |
+| `POST` with a whitespace title | `400` |
+
+`npm run api:generate` against that instance regenerated `src/api/schema.d.ts` with the notebook
+paths, and `npm run build` type checked the dashboard against it.
+
+The dashboard itself was verified the way the account screens were, by rendering it through Vite's
+SSR loader and asserting on the markup, in all three languages: no unresolved translation key, the
+create card present, both section headings present, the topic icon rendered as the characters it is,
+the fallback icon used exactly where the topic icon is empty, one separator per card, the activity
+date formatted for the locale (`Oct 24, 2026`, `24. Okt. 2026`, `2026年10月24日`), the singular, plural
+and zero forms of the source count, a shared minimum card height, and no character above `U+2000` in
+the markup other than the topic icon and the separator. The script lives outside the repository; see
+open question 17.

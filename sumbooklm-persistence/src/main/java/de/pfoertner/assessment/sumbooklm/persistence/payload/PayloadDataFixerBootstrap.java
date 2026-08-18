@@ -1,6 +1,9 @@
 package de.pfoertner.assessment.sumbooklm.persistence.payload;
 
 import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
+import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionPayload;
+import de.pfoertner.assessment.sumbooklm.persistence.document.DocumentPayload;
+import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookPayload;
 import de.pfoertner.assessment.sumbooklm.persistence.user.UserAccountPayload;
 import de.splatgames.aether.datafixers.api.DataVersion;
 import de.splatgames.aether.datafixers.api.bootstrap.DataFixerBootstrap;
@@ -55,6 +58,9 @@ public class PayloadDataFixerBootstrap implements DataFixerBootstrap {
     public void registerSchemas(final SchemaRegistry schemas) {
         final TypeRegistry initialTypes = new SimpleTypeRegistry();
         initialTypes.register(new SimpleType<>(PayloadTypes.USER_ACCOUNT, UserAccountPayload.CODEC));
+        initialTypes.register(new SimpleType<>(PayloadTypes.NOTEBOOK, NotebookPayload.CODEC));
+        initialTypes.register(new SimpleType<>(PayloadTypes.SOURCE_DOCUMENT, DocumentPayload.CODEC));
+        initialTypes.register(new SimpleType<>(PayloadTypes.CHAT_SESSION, ChatSessionPayload.CODEC));
         schemas.register(new Schema(new DataVersion(PayloadSchemaVersion.V1_0_0), initialTypes));
     }
 

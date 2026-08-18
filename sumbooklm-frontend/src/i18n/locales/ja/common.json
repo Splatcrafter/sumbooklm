@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "SumbookLM",
-    "tagline": "資料を根拠のある回答に変えましょう。"
+    "restoring": "セッションを復元しています ..."
   },
   "account": {
     "login": {
@@ -34,6 +34,54 @@
       "usernameTaken": "このユーザー名はすでに使用されています。",
       "invalidInput": "入力内容を確認してください。",
       "unexpected": "問題が発生しました。もう一度お試しください。"
+    }
+  },
+  "dashboard": {
+    "title": "Sumbook",
+    "subtitle": "Sumbook ごとに資料と会話が保存されます。",
+    "loading": "Sumbook を読み込んでいます ...",
+    "sections": {
+      "pinned": "ピン留めした Sumbook",
+      "recent": "最近開いた Sumbook"
+    },
+    "card": {
+      "meta": "{{date}} • {{sources}}",
+      "sources_other": "{{count}} 件の資料"
+    },
+    "menu": {
+      "open": "{{title}} の操作",
+      "editTitle": "タイトルを編集",
+      "pin": "Sumbook をピン留め",
+      "unpin": "ピン留めを解除",
+      "delete": "Sumbook を削除"
+    },
+    "fields": {
+      "title": "タイトル",
+      "titlePlaceholder": "例: 熱力学"
+    },
+    "create": {
+      "card": "新しい Sumbook を作成",
+      "heading": "新しい Sumbook",
+      "description": "タイトルを入力してください。あとから変更できます。",
+      "confirm": "Sumbook を作成"
+    },
+    "rename": {
+      "heading": "タイトルを編集",
+      "description": "この Sumbook の新しいタイトルを入力してください。",
+      "confirm": "タイトルを保存"
+    },
+    "delete": {
+      "heading": "Sumbook を削除しますか？",
+      "description": "「{{title}}」はすべての資料と会話とともに削除されます。この操作は取り消せません。",
+      "confirm": "Sumbook を削除"
+    },
+    "actions": {
+      "cancel": "キャンセル",
+      "retry": "再試行"
+    },
+    "errors": {
+      "load": "Sumbook を読み込めませんでした。",
+      "action": "処理できませんでした。もう一度お試しください。"
     }
   },
   "errors": {

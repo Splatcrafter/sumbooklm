@@ -14,8 +14,14 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 
-State as of 2026-08-18: build green across nine modules, 19 tests. The scaffold is complete and the
-authentication module is implemented: registration, login, token rotation, logout, the weekly
-cleanup of invalidated refresh tokens, the client cookie encryption parameters, and the login and
-registration views bound to the generated OpenAPI client. The notebook side of the application does
-not exist yet.
+State as of 2026-08-18: build green across ten modules, 28 tests. The scaffold is complete and two
+feature modules are implemented.
+
+Authentication: registration, login, token rotation, logout, the weekly cleanup of invalidated
+refresh tokens, the client cookie encryption parameters, and the login and registration views bound
+to the generated OpenAPI client.
+
+Workspace: the notebook, source document and chat session tables with their CBOR payloads, notebook
+management over `/api/v1/notebooks` scoped to the account of the presented access token, and the
+dashboard that lists, creates, renames, pins and removes them. Sources and conversations exist as
+storage only; nothing writes them yet, and no route opens a single notebook.

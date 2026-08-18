@@ -16,6 +16,7 @@
         <module>sumbooklm-domain</module>
         <module>sumbooklm-persistence</module>
         <module>sumbooklm-security</module>
+        <module>sumbooklm-workspace</module>
         <module>sumbooklm-ingestion</module>
         <module>sumbooklm-ai</module>
         <module>sumbooklm-api</module>
@@ -99,6 +100,11 @@
             </dependency>
             <dependency>
                 <groupId>${project.groupId}</groupId>
+                <artifactId>sumbooklm-workspace</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
                 <artifactId>sumbooklm-ingestion</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -127,6 +133,12 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <!-- Keeps formal parameter names in the class files. Spring reads them
+                             wherever a binding annotation carries no explicit name, and without the
+                             flag such a binding fails at runtime rather than at compile time. -->
+                        <parameters>true</parameters>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

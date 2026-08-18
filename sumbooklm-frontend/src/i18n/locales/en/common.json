@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "SumbookLM",
-    "tagline": "Turn your sources into grounded answers."
+    "restoring": "Restoring your session ..."
   },
   "account": {
     "login": {
@@ -34,6 +34,55 @@
       "usernameTaken": "This username is already taken.",
       "invalidInput": "Please check the entered values.",
       "unexpected": "Something went wrong. Please try again."
+    }
+  },
+  "dashboard": {
+    "title": "Sumbooks",
+    "subtitle": "Every Sumbook keeps its own sources and conversations.",
+    "loading": "Loading your Sumbooks...",
+    "sections": {
+      "pinned": "Pinned Sumbooks",
+      "recent": "Recently opened Sumbooks"
+    },
+    "card": {
+      "meta": "{{date}} • {{sources}}",
+      "sources_one": "{{count}} Source",
+      "sources_other": "{{count}} Sources"
+    },
+    "menu": {
+      "open": "Actions for {{title}}",
+      "editTitle": "Edit title",
+      "pin": "Pin Sumbook",
+      "unpin": "Unpin Sumbook",
+      "delete": "Delete Sumbook"
+    },
+    "fields": {
+      "title": "Title",
+      "titlePlaceholder": "For example: Thermodynamics"
+    },
+    "create": {
+      "card": "Create new Sumbook",
+      "heading": "New Sumbook",
+      "description": "Give it a title. You can change it at any time.",
+      "confirm": "Create Sumbook"
+    },
+    "rename": {
+      "heading": "Edit title",
+      "description": "Choose a new title for this Sumbook.",
+      "confirm": "Save title"
+    },
+    "delete": {
+      "heading": "Delete Sumbook?",
+      "description": "“{{title}}” is removed together with all of its sources and conversations. This cannot be undone.",
+      "confirm": "Delete Sumbook"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "retry": "Try again"
+    },
+    "errors": {
+      "load": "Your Sumbooks could not be loaded.",
+      "action": "That did not work. Please try again."
     }
   },
   "errors": {

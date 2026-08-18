@@ -44,6 +44,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notebooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the notebooks of the authenticated account
+         * @description Returns every notebook of the account, ordered by its activity timestamp descending. Pinned and unpinned notebooks are returned in one list; the pin state of each notebook is part of its representation.
+         */
+        get: operations["list"];
+        put?: never;
+        /**
+         * Create a notebook
+         * @description Creates an empty notebook owned by the authenticated account.
+         */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/logout": {
         parameters: {
             query?: never;
@@ -82,6 +106,30 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a notebook
+         * @description Removes the notebook together with its sources and chat sessions. The session of the presented access token has to be open, which is verified against the database.
+         */
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a notebook
+         * @description Changes the title, the pin state or both. An omitted field keeps its stored value.
+         */
+        patch: operations["update"];
         trace?: never;
     };
     "/api/v1/security/cookie-iv/": {
@@ -195,6 +243,46 @@ export interface components {
             /** @description Account the token pair belongs to. */
             user?: components["schemas"]["AuthenticatedUser"];
         };
+        /** @description Data required to create a notebook. */
+        NotebookCreationRequest: {
+            /**
+             * @description Name the notebook is created under.
+             * @example Thermodynamics
+             */
+            title: string;
+        };
+        /** @description A notebook of the authenticated account. */
+        NotebookResponse: {
+            /**
+             * Format: uuid
+             * @description Stable identifier of the notebook.
+             */
+            id?: string;
+            /**
+             * @description Name the user gave the notebook.
+             * @example Thermodynamics
+             */
+            title?: string;
+            /** @description Whether the notebook is pinned to the top of the overview. */
+            pinned?: boolean;
+            /** @description Characters standing for the subject of the notebook, empty while unknown. */
+            topicIcon?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the notebook was created.
+             */
+            createdAt?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the notebook was last opened or changed.
+             */
+            lastActivityAt?: string;
+            /**
+             * Format: int64
+             * @description Number of sources currently belonging to the notebook.
+             */
+            sourceCount?: number;
+        };
         /** @description Credentials of an existing account. */
         LoginRequest: {
             /**
@@ -204,6 +292,16 @@ export interface components {
             username: string;
             /** @description Clear text password of the account. */
             password: string;
+        };
+        /** @description Fields of a notebook to change. An omitted field keeps its stored value. */
+        NotebookUpdateRequest: {
+            /**
+             * @description Name to store, omitted to keep the current one.
+             * @example Thermodynamics
+             */
+            title?: string;
+            /** @description Pin state to store, omitted to keep the current one. */
+            pinned?: boolean;
         };
         /** @description Parameters for encrypting and decrypting the client side token store. */
         CookieCryptographyResponse: {
@@ -318,6 +416,71 @@ export interface operations {
             };
         };
     };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notebooks were returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotebookResponse"][];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotebookCreationRequest"];
+            };
+        };
+        responses: {
+            /** @description The notebook was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotebookResponse"];
+                };
+            };
+            /** @description The request body is not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -381,6 +544,94 @@ export interface operations {
             };
             /** @description The credentials were rejected. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notebook was removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The session of the access token is closed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotebookUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The notebook was changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotebookResponse"];
+                };
+            };
+            /** @description The request body is not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

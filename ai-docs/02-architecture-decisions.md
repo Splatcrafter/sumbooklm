@@ -417,3 +417,90 @@ routed screens without one. A translation that wraps a line where the current on
 it, at which point that screen grows and the constant needs raising. The failure mode is deliberately
 a growing card rather than clipped content, which is why the property is a minimum height and not a
 fixed one.
+
+## ADR-024: Notebook management is a module of its own
+
+**Decision.** Creating, listing, changing and removing notebooks lives in `sumbooklm-workspace`, a new
+module that depends on `domain` and `persistence` and on nothing else of the application. The API
+module gained a dependency on it. The shared `Clock` bean moved out of the security module into
+`sumbooklm-app`.
+
+**Reason.** The two places it could otherwise have gone are both worse. Putting the service into the
+API module would make the transport layer the owner of the rules, which is exactly what the auth flow
+avoids by keeping `AuthenticationService` outside it. Putting it into `persistence` would give the
+persistence module a service layer and make it the largest module in the build.
+
+`security` already established the shape: a module that owns tables through `persistence`, takes
+commands, returns domain objects and knows nothing about HTTP. `workspace` is the same shape for a
+different aggregate, so the graph gains a sibling rather than a new kind of node.
+
+**The clock.** Two modules now stamp timestamps, and they have to agree on what now is. A bean defined
+in whichever module needed it first would leave the second one depending on a bean it does not
+declare, so it moved to the composition root. Both modules ask for a `Clock` and neither supplies one.
+
+**Cost.** One more module in the reactor, and the notebook aggregate is now spread over three of them:
+the record in `domain`, the row and the payload in `persistence`, the rules in `workspace`. That is the
+same spread the user account already has.
+
+## ADR-025: Ownership is part of every query, never a check afterwards
+
+**Decision.** Every repository method and every service method of the workspace module takes the
+account it acts for, and the account is a parameter of the query. There is no method that loads a
+notebook by identifier alone. A notebook of another account produces the same `NotebookNotFoundException`
+as a notebook that does not exist, which the API answers with `404`.
+
+**Reason.** The two ways to enforce ownership are to filter on it or to load first and compare
+afterwards. The second one works until somebody adds a method that forgets the comparison, and the row
+has already been read at that point, so a mistake leaks data rather than failing closed. Filtering
+cannot be forgotten silently: a query without the owner does not compile against these repositories,
+because no such method exists.
+
+Answering `404` rather than `403` follows from the same reasoning. `403` on a foreign notebook tells
+the caller that a notebook with that identifier exists, which is information they are not entitled to.
+
+**Cost.** Every signature carries a user identifier, including the ones where it looks redundant next
+to an identifier that is already unique. That redundancy is the point.
+
+## ADR-026: What is a column of a notebook and what is payload
+
+**Decision.** The `notebook` row carries the identifier, `user_id`, `created_at`, `last_activity_at`
+and the payload envelope. The title, the pin state and the topic icon live in the CBOR payload. The
+same split applies to `source_document` and `chat_session`: identifiers, owner, notebook and the
+timestamps a list is ordered by are columns, everything else is payload.
+
+**Reason.** A column is what a query has to reach without decoding, and the only queries the overview
+performs are "the notebooks of this account, most recently active first" and "how many sources does
+each of them hold". Nothing else is filtered or ordered on, so nothing else needs to be a column.
+Everything a user edits is therefore in the half that a data fixer can change, which is what the
+payload mechanism exists for.
+
+**Consequence for the pin state.** Pinning is a user-visible flag stored in the payload, so the two
+sections of the overview are produced by grouping in memory after reading every notebook of the
+account, not by two queries. That is acceptable at the number of notebooks one person keeps, and it
+avoids making the first user-visible flag the first reason to migrate a table.
+
+**Consequence for the document hash.** The hash that identifies the content of a source is likewise in
+the payload, so duplicate detection will compare decoded payloads inside one notebook rather than
+asking the database. Detection across notebooks would need the hash promoted to an indexed column; see
+the open questions.
+
+**Cost.** Neither the title nor the pin state can appear in a `WHERE` clause. The first feature that
+needs one, a search across notebooks being the obvious candidate, forces the decision to be revisited
+for that field.
+
+## ADR-027: The overview is two sections, and creating is a card
+
+**Decision.** The dashboard shows pinned notebooks in a first section and everything else in a second
+one. A notebook appears in exactly one of them. The pinned section is not rendered at all while
+nothing is pinned. The first cell of the second section is always the card that creates a notebook.
+
+**Reason.** A pinned notebook that also appears under the recent ones reads as two notebooks, and the
+duplicate is worse than the completeness it buys. An empty section with a heading is worse than no
+section, because it occupies the top of the screen with nothing.
+
+The create action is a card rather than a button in the header because that is where the eye already
+is, and because as a card it keeps its position as notebooks are added: it is the first cell of the
+grid, not the cell after the last notebook.
+
+**Cost.** A user who pins everything sees a second section holding only the create card. That is
+correct but looks thin, and it is the price of not showing the same notebook twice.

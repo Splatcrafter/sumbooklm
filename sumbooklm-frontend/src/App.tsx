@@ -2,11 +2,11 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 
 import { AuthProvider } from '@/auth/AuthProvider';
 import { AppLayout } from '@/routes/AppLayout';
-import { HomePage } from '@/routes/HomePage';
 import { NotFoundPage } from '@/routes/NotFoundPage';
 import { AccountLayout } from '@/routes/account/AccountLayout';
 import { LoginPage } from '@/routes/account/LoginPage';
 import { RegisterPage } from '@/routes/account/RegisterPage';
+import { DashboardPage } from '@/routes/dashboard/DashboardPage';
 
 const router = createBrowserRouter([
   {
@@ -21,7 +21,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: <HomePage /> },
+      { index: true, element: <DashboardPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

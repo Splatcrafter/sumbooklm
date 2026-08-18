@@ -411,3 +411,35 @@ and reconstructs to plausible pixel values.
 
 The asset is only fetched by the devices that use it. The image element exists in the DOM solely when
 the capability check chose the still background, so a desktop that runs the shader never downloads it.
+
+### 28. Spring Boot 4 does not enable `-parameters` unless the build says so
+
+This project does not inherit from `spring-boot-starter-parent`, and `maven-compiler-plugin` does not
+keep formal parameter names on its own. Every Spring binding that carries no explicit name relies on
+those names, so `@PathVariable final UUID notebookId` compiled cleanly, deployed cleanly and then
+failed on the first request with `Name for argument of type [java.util.UUID] not specified`.
+
+Two things were changed rather than one. `<parameters>true</parameters>` is now set in the parent, so
+the class of failure disappears for every module. The path variables are additionally named in their
+annotations, because a binding that depends on a compiler flag is a binding that breaks when someone
+builds the module in another way.
+
+### 29. A timestamp taken at nanosecond precision does not survive the round trip
+
+`Instant.now()` on this JDK produces nanoseconds; the timestamp column keeps microseconds. The
+creation endpoint therefore returned `...513260260Z` while every later read of the same notebook
+returned `...513260Z`, so the response of a write disagreed with the response of the next read.
+
+The service now truncates to microseconds before it stores anything, which is the precision the column
+actually keeps. The alternative, re-reading the row after the write, would have hidden the mismatch
+behind an extra query instead of removing it.
+
+### 30. Aether Datafixers codecs for enums
+
+`Codecs` publishes no enum codec. The stage of a source document is encoded through
+`Codecs.STRING.comapFlatMap(name -> DataResult, DocumentStatus::name)`, which writes the constant by
+name and turns an unknown name into a `DataResult` failure rather than an exception, so a payload
+written by a future version fails the migration with a message instead of crashing the decoder.
+
+Encoding by name rather than by ordinal is what keeps a constant inserted into the middle of the enum
+from silently changing the meaning of stored rows.

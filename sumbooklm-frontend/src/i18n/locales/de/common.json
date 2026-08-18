@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "SumbookLM",
-    "tagline": "Verwandle deine Quellen in belegte Antworten."
+    "restoring": "Deine Sitzung wird wiederhergestellt ..."
   },
   "account": {
     "login": {
@@ -34,6 +34,55 @@
       "usernameTaken": "Dieser Benutzername ist bereits vergeben.",
       "invalidInput": "Bitte überprüfe die eingegebenen Werte.",
       "unexpected": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+    }
+  },
+  "dashboard": {
+    "title": "Sumbooks",
+    "subtitle": "Jedes Sumbook hat eigene Quellen und eigene Unterhaltungen.",
+    "loading": "Deine Sumbooks werden geladen ...",
+    "sections": {
+      "pinned": "Angepinnte Sumbooks",
+      "recent": "Zuletzt geöffnete Sumbooks"
+    },
+    "card": {
+      "meta": "{{date}} • {{sources}}",
+      "sources_one": "{{count}} Quelle",
+      "sources_other": "{{count}} Quellen"
+    },
+    "menu": {
+      "open": "Aktionen für {{title}}",
+      "editTitle": "Titel bearbeiten",
+      "pin": "Sumbook anpinnen",
+      "unpin": "Sumbook lösen",
+      "delete": "Sumbook löschen"
+    },
+    "fields": {
+      "title": "Titel",
+      "titlePlaceholder": "Zum Beispiel: Thermodynamik"
+    },
+    "create": {
+      "card": "Neues Sumbook erstellen",
+      "heading": "Neues Sumbook",
+      "description": "Gib ihm einen Titel. Du kannst ihn jederzeit ändern.",
+      "confirm": "Sumbook erstellen"
+    },
+    "rename": {
+      "heading": "Titel bearbeiten",
+      "description": "Wähle einen neuen Titel für dieses Sumbook.",
+      "confirm": "Titel speichern"
+    },
+    "delete": {
+      "heading": "Sumbook löschen?",
+      "description": "„{{title}}“ wird mit allen Quellen und Unterhaltungen entfernt. Das lässt sich nicht rückgängig machen.",
+      "confirm": "Sumbook löschen"
+    },
+    "actions": {
+      "cancel": "Abbrechen",
+      "retry": "Erneut versuchen"
+    },
+    "errors": {
+      "load": "Deine Sumbooks konnten nicht geladen werden.",
+      "action": "Das hat nicht geklappt. Bitte versuche es erneut."
     }
   },
   "errors": {

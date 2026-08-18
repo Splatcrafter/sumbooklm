@@ -111,3 +111,34 @@ so an unauthenticated request to a path that does not exist is rejected before r
 deliberate as long as the API is small, because it does not reveal which endpoints exist. It becomes
 confusing once authenticated clients call unknown paths, which will read as an authorization problem
 in their logs rather than a routing mistake.
+
+## 15. A notebook card cannot be opened yet
+
+The overview renders the notebooks and their actions, but nothing happens when a card itself is
+clicked, because there is no route below `/` that shows one notebook. That is deliberate for this
+step: inventing a detail route would have meant inventing what a notebook view contains. It has to be
+answered before the dashboard is shown to anyone, since a grid of cards that do not open reads as
+broken rather than as unfinished.
+
+## 16. The document hash cannot be queried
+
+`DocumentPayload.documentHash` is where the specification asked for it, in the payload. Duplicate
+detection inside one notebook can therefore decode the sources of that notebook and compare, which is
+cheap enough. Detection across all sources of an account cannot be expressed as a query at all and
+would need the hash as an indexed column next to the payload. The choice belongs to the ingestion
+step, which is the first code that will actually need it.
+
+## 17. The frontend has no test runner
+
+The account screens and the dashboard were both verified by rendering them through Vite's SSR loader
+and asserting on the produced markup, with the scripts kept outside the repository. That catches
+missing translation keys, wrong plural forms and structural regressions, but it is not part of
+`npm run build` and nothing runs it in a pipeline. Adding Vitest plus Testing Library would turn those
+scripts into real tests; it also adds a toolchain the project does not otherwise have.
+
+## 18. `last_activity_at` is only written by the application
+
+The timestamp the overview is ordered by is refreshed when a notebook is created and when it is
+renamed. Opening a notebook does not refresh it, because there is no endpoint that opens one yet, and
+adding a source does not either. Both have to write it once the corresponding endpoints exist, or the
+section titled "recently opened" will be ordered by something else than what it claims.

@@ -3,6 +3,7 @@ package de.pfoertner.assessment.sumbooklm.api.error;
 import de.pfoertner.assessment.sumbooklm.security.authentication.InvalidCredentialsException;
 import de.pfoertner.assessment.sumbooklm.security.authentication.UsernameAlreadyTakenException;
 import de.pfoertner.assessment.sumbooklm.security.token.InvalidRefreshTokenException;
+import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * <h2>Inherited Behaviour</h2>
  * Extending the framework handler keeps the responses for binding and validation failures, which
  * already produce problem details, and only adds the cases this application introduces.
+ *
+ * <h2>Wording of Missing Resources</h2>
+ * A notebook that belongs to another account is reported as missing rather than as forbidden. The
+ * distinction would tell a caller that a notebook with that identifier exists, which is information
+ * the caller is not entitled to.
  *
  * <h2>Wording of Authentication Failures</h2>
  * Both rejected credentials and rejected refresh tokens answer with the same generic detail. A more
@@ -72,6 +78,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         final ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNAUTHORIZED, "The presented refresh token is not valid");
         problem.setTitle("Authentication failed");
+        return problem;
+    }
+
+    /**
+     * Reports a notebook the requesting account does not own.
+     *
+     * @param exception failure raised by the workspace module
+     * @return a problem detail with status {@code 404}
+     */
+    @ExceptionHandler(NotebookNotFoundException.class)
+    public ProblemDetail handleNotebookNotFound(final NotebookNotFoundException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, "The requested notebook does not exist");
+        problem.setTitle("Notebook not found");
         return problem;
     }
 }

@@ -250,3 +250,23 @@ and compiles. This hits every byte array handed to `crypto.subtle`.
 touched nothing else: no `package.json` change, no `index.css` change, no reformatting of
 `components.json`. The `field` component pulls in `separator` as a dependency, which is why five
 files appear for four requested components.
+
+### 21. `core.autocrlf=true` would break the shell scripts
+
+The development container has `core.autocrlf=true` in its Git configuration, which converts every
+file Git considers text to CRLF on checkout. For a `.sh` file that is fatal rather than cosmetic: the
+shebang becomes `#!/usr/bin/env bash\r` and the kernel reports the interpreter as not found.
+
+A `.gitattributes` pins the endings per type instead of leaving them to a per-user setting:
+
+```
+* text=auto
+
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+```
+
+Repository content is already normalised to LF by the existing setting, so the file changes nothing
+about what is stored; it only fixes what lands in a working tree, on any machine and independently of
+how the person cloning has configured Git.

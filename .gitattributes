@@ -1,0 +1,7 @@
+* text=auto
+
+# Launch scripts have to keep the line endings of the platform they run on: a shell script with
+# carriage returns fails on its shebang, and a batch file is only reliable with them.
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

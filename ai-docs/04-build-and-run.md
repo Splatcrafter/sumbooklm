@@ -1,5 +1,32 @@
 # Build and Run
 
+## Launch scripts
+
+Three tasks, one script per task and platform, all in the repository root:
+
+| Task | Windows | Linux and macOS |
+| --- | --- | --- |
+| build everything | `local-compile.bat` | `./local-compile.sh` |
+| run the packaged artifact on 8080 | `local-start.bat` | `./local-start.sh` |
+| run the Vite dev server on 5173 | `local-dev-server.bat` | `./local-dev-server.sh` |
+
+All three forward their arguments: `local-compile` to Maven, so `-Dfrontend.skip=true` works, and
+`local-start` to Spring Boot, so a later `--server.port` overrides the 8080 the script sets. Each one
+checks its prerequisites first and fails with a sentence naming what is missing, rather than letting
+Maven, Java or npm produce the error further down.
+
+Two details worth knowing:
+
+* `local-dev-server` prefers the Node toolchain the Maven build installed under
+  `sumbooklm-frontend/target/node` over whatever is on the PATH, so the dev server runs on the same
+  Node and npm versions as the packaged build. It falls back to the PATH when that directory does not
+  exist yet.
+* It passes `--strictPort`, because Vite otherwise moves to the next free port silently, and the
+  dev proxy of the frontend as well as the scripts both assume 5173.
+
+The dev server proxies `/api` and `/v3/api-docs` to the backend, so `local-start` has to be running
+in parallel for anything beyond static views.
+
 ## Commands
 
 ```bash

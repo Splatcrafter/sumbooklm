@@ -1,0 +1,57 @@
+Wir beginnen mit der Implementierung des Authentifizierungs- und Autorisierungs-Moduls. Das System basiert auf einem JSON Web Token (JWT) Ansatz mit einer strikten Trennung von Access- und Refresh-Tokens.
+
+Implementiere das Modul nach folgenden Vorgaben:
+
+1. API-Design & Versionierung (Backend)
+
+  - Die REST-Controller sind im Package-Pfad ...web.v1... abzulegen.
+
+  - Die Endpunkte folgen dem /api/v1/... Namensschema.
+
+  - Erstelle die Endpunkte /api/v1/login und /api/v1/register.
+
+  - Bereite Aether Datafixers vor, ein Spring Boot Starter Module existiert in Aether Datafixers bereits und nutze dieses entsprechend dann für wichtige Informationen auch.
+
+2. Registrierung (/api/v1/register)
+
+  - Payload: Erwartet username (muss unique sein), firstName, lastName und password.
+
+  - Verarbeitung: Das Passwort muss sicher gehasht und salted werden (nutze etablierte Spring Security Standards wie BCrypt oder Argon2id).
+
+  - Metadaten: Bei der Registrierung müssen zusätzliche Metadaten in der Datenbank erfasst werden: Registrierungsdatum, Datum des letzten Logins (wird bei Registrierung initial gesetzt) sowie die IP-Adresse des Nutzers.
+
+  - Auto-Login: Nach erfolgreicher Registrierung wird der Nutzer direkt serverseitig eingeloggt und das Token-Paar (Refresh- und Access-Token) als JSON-Body (HTTP 200 OK) zurückgegeben. Das Token-Paar wird wieder gespeichert.
+
+3. Login (/api/v1/login)
+
+  - Payload: Erwartet username und password.
+
+  - Verarbeitung: Validiert die Credentials, generiert ein neues Token-Paar und speichert den Refresh-Token zur Verwaltung und Rotation in einer eigenen Datenbanktabelle.
+
+  - Response: Gibt das Refresh- und Access-Token im JSON-Body zurück.
+
+4. Token-Lifecycle & Sicherheit
+
+  - Access Token: Hat eine sehr kurze Gültigkeit (max. 5 Minuten) oder ist für Single-Use-Szenarien konzipiert.
+
+  - Refresh Token: Hat eine Gültigkeit von 90 Tagen. Bei kritischen / sensiblen API-Operationen muss zusätzlich zur Access-Token-Validierung geprüft werden, ob der dazugehörige Refresh-Token in der Datenbank existiert und valide ist.
+
+  - Datenbanksäuberung: Jede Woche Sonntag um 0 Uhr geht ein Scheduler durch die Token-Liste und schmeißt invalidierte Token aus der Tabelle raus um Datenmüll zu reduzieren.
+
+5. Clientseitige Token-Speicherung & Cookie-Flow
+
+  - Nach Erhalt der Tokens verschlüsselt der Client diese und legt sie lokal als Cookie ab.
+
+  - Sicherheits-Endpunkt: Stelle einen Endpunkt /api/v1/security/cookie-iv/ bereit. Dieser liefert dem Client den Initialisierungsvektor (IV) bzw. die notwendigen kryptografischen Parameter.
+
+  - Flow: Der Client holt sich über diesen Endpunkt den IV, entschlüsselt damit lokal den Cookie, um an die JWTs zu gelangen, und reicht den Access-Token als Bearer-Auth an die geschützten Backend-Requests weiter.
+
+6. Frontend-Routing (React / Vite)
+
+  - Lege im Frontend die entsprechenden React-Routen und Basis-Views für /account/login und /account/register an.
+
+  - Binde die UI an die generierten OpenAPI-Clients an.
+
+Berücksichtige bei der Umsetzung weiterhin die "Zero-Emoji-Policy", englischsprachigen Code, keine Meta-Kommentare im Code und speichere deine konzeptionellen Erkenntnisse separat im /ai-docs Verzeichnis.
+
+Weitere unklare Details erarbeite sie dir uns setze daraus das Modul dann zusammen. WebSearch, WebFetch sind wie immer erlaubt bei Detailfragen.

@@ -278,3 +278,71 @@ filter chain and the controllers from drifting apart, since both read the same v
 
 **Cost.** A version segment is a commitment: once `v2` exists, `v1` has to be maintained or
 deliberately retired.
+
+## ADR-019: The account screens leave the application theme
+
+**Decision.** The login and registration screens do not use the semantic theme tokens of the
+application. They are always dark, they use the grayscale of the JetBrains website directly through
+a `jb-*` colour namespace, and they place their content on the left instead of centring it.
+
+**Reason.** Everything else in the application follows the shadcn tokens so it can be themed. The
+account screens are the only screens with no application content behind them, which makes them the
+one place where a deliberate composition costs nothing: there is no data whose colour coding has to
+survive, and no layout that has to hold at arbitrary widths. Treating them as a themed page produced
+the sign-in form every framework produces.
+
+Left alignment is the part that carries the most. A centred card divides the screen symmetrically and
+leaves the background as decoration behind it. Moving the card off centre gives the screen a
+direction and turns the remaining space into something worth rendering.
+
+**Cost.** Two divergences to maintain. The `jb-*` palette is a second colour system next to the
+shadcn tokens, and the shadcn primitives need explicit overrides on these screens, which is why
+those overrides are collected in one module instead of being repeated per form. If the application
+ever gains a light theme for signed-in users, these screens will not follow it, which is intended
+but has to stay a conscious choice rather than an oversight.
+
+## ADR-020: The background is generated, in two forms
+
+**Decision.** The account background is a WebGL 2 fragment shader: a second order domain warp over
+fractional Brownian motion, squashed on one axis so it reads as sedimentary layers, with contour
+lines on top and the same grayscale as the cards. Where it cannot run, an SVG filter chain produces a
+still image in the same visual language.
+
+**Alternatives considered.** A bitmap for the fallback, which would have added a binary asset that no
+longer matches when the shader changes. An inline SVG element instead of a background image, which
+re-runs its filter on every resize, on exactly the devices that get the fallback. A gradient, which
+would have been visibly a different design rather than the same one held still.
+
+**Reason.** The motif is not decoration picked for looks: layers that compact into something readable
+is what the application does to sources. Generating it rather than shipping it means the still image
+and the animation are the same construction expressed twice, and the palette is shared with the
+cards, so the background cannot drift out of the design.
+
+The fallback uses `feTurbulence` with `fractalNoise`, which is fBm in the SVG filter specification,
+displaced by a second turbulence through `feDisplacementMap`, which is the domain warp. A transfer
+table maps the result into the grey ramp, with a deliberate staircase in the table so the layering
+shows. It is exposed as a data URI and used as a CSS background image, so the browser rasterises the
+filter once and only scales it afterwards.
+
+**Cost.** Two implementations of one image that have to be kept recognisably alike by hand, and a
+shader whose visual result cannot be verified in this environment; see finding 24.
+
+## ADR-021: The shader lowers its own quality before it gives up
+
+**Decision.** The renderer measures the interval between the frames it renders. Sustained intervals
+above its target walk a quality ladder down, first the octave count of the noise, then the resolution
+the shader renders at. Only when the lowest level is still too slow does it hand over to the still
+image. Small touch devices and browsers without WebGL 2 skip the shader from the start.
+
+**Reason.** A capability check made up front is a guess about a device. A frame time is a measurement
+of it. Guessing wrongly in one direction denies the animation to a machine that could run it; in the
+other it leaves a phone rendering a full screen shader until the battery notices. Measuring gets both
+right, and the ladder means the answer is a smaller version of the same image rather than a different
+one.
+
+A phone is exempted from the measurement on purpose. It could pass, and running a full screen
+procedural shader behind a login form is still the wrong trade there.
+
+**Cost.** The ladder is calibrated against one target frame rate, and the thresholds are judgement
+rather than measurement across a device fleet. A visitor who asked for reduced motion gets a single
+rendered frame instead of the animation, which keeps the image and drops the movement.

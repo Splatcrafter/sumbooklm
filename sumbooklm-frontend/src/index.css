@@ -5,6 +5,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Grayscale of the JetBrains website design system, read from its own stylesheet, where the ramp
+   is defined as --rs-color-black, --rs-color-grey-* and --rs-color-white. The steps are linear:
+   every grey is 23 higher per channel than the previous one. Only the black carries a slight blue
+   cast, the greys are neutral. */
+@theme {
+  --color-jb-black: #19191c;
+  --color-jb-grey-95: #252528;
+  --color-jb-grey-90: #303033;
+  --color-jb-grey-80: #474749;
+  --color-jb-grey-70: #5e5e60;
+  --color-jb-grey-60: #757577;
+  --color-jb-grey-50: #8c8c8e;
+  --color-jb-grey-40: #a3a3a4;
+  --color-jb-grey-30: #bababb;
+  --color-jb-grey-20: #d1d1d2;
+  --color-jb-grey-10: #e8e8e8;
+  --color-jb-grey-5: #f4f4f4;
+
+  /* The one non-grey the website keeps for failures, --rs-color-danger. */
+  --color-jb-danger: #f45c4a;
+
+  /* The website rounds cards at 16px and larger blocks above that. */
+  --radius-jb-card: 16px;
+  --radius-jb-block: 24px;
+}
+
 @layer base {
   html,
   body,

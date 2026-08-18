@@ -5,9 +5,16 @@ import { Link, Navigate, useNavigate } from 'react-router';
 import { AuthFailure } from '@/auth/authContext';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { AccountShell } from '@/routes/account/AccountShell';
+import { AuthCard } from '@/routes/account/AuthCard';
+import {
+  authErrorClasses,
+  authInputClasses,
+  authLabelClasses,
+  authLinkClasses,
+  authSubmitClasses,
+} from '@/routes/account/authFormStyles';
 
 /**
  * Minimum password length, mirroring the constraint the backend validates against.
@@ -50,26 +57,29 @@ export function RegisterPage() {
   }
 
   return (
-    <AccountShell
+    <AuthCard
       title={t('account.register.title')}
       subtitle={t('account.register.subtitle')}
       footer={
         <>
           {t('account.register.hasAccount')}{' '}
-          <Link className="underline underline-offset-4" to="/account/login">
+          <Link className={authLinkClasses} to="/account/login">
             {t('account.register.toLogin')}
           </Link>
         </>
       }
     >
       <form className="flex flex-col gap-6" onSubmit={(event) => void submit(event)} noValidate>
-        <FieldGroup>
+        <FieldGroup className="gap-4">
           <Field>
-            <FieldLabel htmlFor="username">{t('account.fields.username')}</FieldLabel>
+            <FieldLabel className={authLabelClasses} htmlFor="username">
+              {t('account.fields.username')}
+            </FieldLabel>
             <Input
               id="username"
               name="username"
               autoComplete="username"
+              className={authInputClasses}
               required
               value={form.username}
               onChange={(event) => update('username', event.target.value)}
@@ -77,22 +87,28 @@ export function RegisterPage() {
           </Field>
           <Field orientation="responsive">
             <Field>
-              <FieldLabel htmlFor="firstName">{t('account.fields.firstName')}</FieldLabel>
+              <FieldLabel className={authLabelClasses} htmlFor="firstName">
+                {t('account.fields.firstName')}
+              </FieldLabel>
               <Input
                 id="firstName"
                 name="firstName"
                 autoComplete="given-name"
+                className={authInputClasses}
                 required
                 value={form.firstName}
                 onChange={(event) => update('firstName', event.target.value)}
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="lastName">{t('account.fields.lastName')}</FieldLabel>
+              <FieldLabel className={authLabelClasses} htmlFor="lastName">
+                {t('account.fields.lastName')}
+              </FieldLabel>
               <Input
                 id="lastName"
                 name="lastName"
                 autoComplete="family-name"
+                className={authInputClasses}
                 required
                 value={form.lastName}
                 onChange={(event) => update('lastName', event.target.value)}
@@ -100,27 +116,34 @@ export function RegisterPage() {
             </Field>
           </Field>
           <Field>
-            <FieldLabel htmlFor="password">{t('account.fields.password')}</FieldLabel>
+            <FieldLabel className={authLabelClasses} htmlFor="password">
+              {t('account.fields.password')}
+            </FieldLabel>
             <Input
               id="password"
               name="password"
               type="password"
               autoComplete="new-password"
+              className={authInputClasses}
               minLength={MINIMUM_PASSWORD_LENGTH}
               required
               value={form.password}
               onChange={(event) => update('password', event.target.value)}
             />
-            <FieldDescription>
+            <FieldDescription className="text-jb-grey-60">
               {t('account.hints.password', { length: MINIMUM_PASSWORD_LENGTH })}
             </FieldDescription>
           </Field>
-          {failure ? <FieldError>{failure}</FieldError> : null}
+          {failure ? (
+            <p className={authErrorClasses} role="alert">
+              {failure}
+            </p>
+          ) : null}
         </FieldGroup>
-        <Button type="submit" size="lg" disabled={submitting}>
+        <Button type="submit" className={authSubmitClasses} disabled={submitting}>
           {t('account.register.submit')}
         </Button>
       </form>
-    </AccountShell>
+    </AuthCard>
   );
 }

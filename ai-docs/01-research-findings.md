@@ -270,3 +270,86 @@ A `.gitattributes` pins the endings per type instead of leaving them to a per-us
 Repository content is already normalised to LF by the existing setting, so the file changes nothing
 about what is stored; it only fixes what lands in a working tree, on any machine and independently of
 how the person cloning has configured Git.
+
+### 22. The JetBrains website grayscale, read from its own stylesheet
+
+The greys of the JetBrains IDEs and the greys of the JetBrains website are two different systems, and
+the website one is the one used here. It could not be found in written documentation, so it was read
+out of `https://www.jetbrains.com/_assets/common.*.css` and `default-page.*.css`, where it is defined
+under an `--rs-color-*` namespace:
+
+| Token | Value |
+| --- | --- |
+| `--rs-color-black` | `#19191c` |
+| `--rs-color-grey-95` | `#252528` |
+| `--rs-color-grey-90` | `#303033` |
+| `--rs-color-grey-80` | `#474749` |
+| `--rs-color-grey-70` | `#5e5e60` |
+| `--rs-color-grey-60` | `#757577` |
+| `--rs-color-grey-50` | `#8c8c8e` |
+| `--rs-color-grey-40` | `#a3a3a4` |
+| `--rs-color-grey-30` | `#bababb` |
+| `--rs-color-grey-20` | `#d1d1d2` |
+| `--rs-color-grey-10` | `#e8e8e8` |
+| `--rs-color-grey-5` | `#f4f4f4` |
+| `--rs-color-white` | `#fff` |
+
+Three properties of the ramp are worth keeping in mind. It is exactly linear: every step is 23 higher
+per channel than the previous one, from 25 at the black end. The greys are neutral, and only the black
+carries a slight blue cast, `rgb(25, 25, 28)`. And the site does most of its layering not with the
+greys at all but with alpha steps over black and white, `--rs-color-black-t5` through `-t95` and the
+same for white, which is why translucent surfaces rather than solid greys were used for the cards.
+
+Two further values were taken from the same source: `--rs-card-border-radius: 16px`, which is the
+rounding the cards use, and `--rs-color-danger: #f45c4a`, the single non-grey the site keeps for
+failures and therefore the only colour in the form.
+
+The website sets `JetBrains Sans` as its typeface. It is not used here, because it is not freely
+licensed; the project keeps Geist, which is close in character.
+
+### 23. Domain warping, and the one change that makes it read as layers
+
+The background is built on Inigo Quilez's domain warping, verified against
+`https://iquilezles.org/articles/warp/` rather than from memory. The second order form is:
+
+```
+q = vec2(fbm(p), fbm(p + vec2(5.2, 1.3)))
+r = vec2(fbm(p + 4q + vec2(1.7, 9.2)), fbm(p + 4q + vec2(8.3, 2.8)))
+pattern = fbm(p + 4r)
+```
+
+Applied to an isotropic domain this produces the familiar marbled clouds. The one change that turns
+it into something else is squashing the sample domain on the vertical axis before evaluating, here by
+a factor of about three: the features stretch horizontally and the marbling reads as sedimentary
+layers. Time enters through the two warp vectors rather than by translating `p`, so the layers slide
+against each other instead of the whole field drifting past.
+
+Two implementation notes. The octave loop folds the domain with `mat2(1.6, 1.2, -1.2, 1.6)`, a
+rotation combined with a scale of two, because summing octaves on the same axes leaves a visible grid.
+And the contour lines use `fwidth` to derive their width from the local gradient, which keeps them one
+pixel wide everywhere instead of dissolving where the field is flat; `fwidth` is core in GLSL ES 3.00
+and needs an extension in 1.00, which is one of the reasons the renderer requires WebGL 2 rather than
+falling back to WebGL 1.
+
+### 24. What could not be verified in this environment
+
+The container has no browser and no GPU, so the parts of the account screens that only exist at
+runtime were verified as far as they can be and no further. This is recorded so a later session does
+not mistake the build passing for the visuals being checked.
+
+Verified:
+
+* Both shaders parse, checked with `@shaderfrog/glsl-parser` after stripping the version pragma. The
+  parser reports the built-in globals as unknown identifiers, which is expected of a parser without a
+  symbol table for GLSL ES 3.00.
+* The fallback SVG is well formed and every `url(#id)` reference resolves, checked with an XML parser.
+  The data URI is about three kilobytes.
+* Both account pages render without error through Vite's server side module loader with
+  `renderToStaticMarkup`, which exercises the component tree, the router and the still image branch,
+  since `window` is absent there and the capability check therefore chooses the fallback.
+* The palette reaches the built stylesheet and the rounding utilities resolve to the theme variables.
+
+Not verified: whether the shader compiles on a real driver, and what either background actually looks
+like. The renderer is built so that a shader that fails to compile, a context that is refused and a
+context that is lost all end in the still image rather than in a blank screen, which bounds the damage
+of the first case but does not remove the need to look at it.

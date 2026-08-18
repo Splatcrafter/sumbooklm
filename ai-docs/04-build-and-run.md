@@ -181,3 +181,25 @@ Routing of the packaged artifact, checked against the running jar:
 Note the one behaviour that changed against the scaffold: an unknown path below `/api` now answers
 `401` instead of `404`, because authentication is required before routing happens. See open
 question 14.
+
+## Account screens
+
+The login and registration screens sit at `/account/login` and `/account/register` and are their own
+router branch, not children of the application layout. They are always dark, they use the JetBrains
+website grayscale from finding 22 through the `jb-*` Tailwind namespace defined in `src/index.css`,
+and they place two stacked cards on the left over a generated background.
+
+The background has two forms and picks between them at runtime:
+
+| Condition | Result |
+| --- | --- |
+| WebGL 2 available, pointer not coarse or viewport large | animated shader |
+| Small touch device, or more than two cores unavailable | still image |
+| No WebGL 2, shader rejected, or context lost | still image |
+| Sustained slow frames | quality steps down, then still image |
+| `prefers-reduced-motion: reduce` | shader, one frame, no loop |
+
+To see the still image on a capable machine, the quickest route is a browser with WebGL disabled, or
+emulating a mobile device with a coarse pointer in the developer tools. The animated path renders at
+a reduced backing store and targets thirty frames per second, so a low reported frame rate is by
+design rather than a symptom.

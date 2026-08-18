@@ -5,9 +5,16 @@ import { Link, Navigate, useNavigate } from 'react-router';
 import { AuthFailure } from '@/auth/authContext';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { AccountShell } from '@/routes/account/AccountShell';
+import { AuthCard } from '@/routes/account/AuthCard';
+import {
+  authErrorClasses,
+  authInputClasses,
+  authLabelClasses,
+  authLinkClasses,
+  authSubmitClasses,
+} from '@/routes/account/authFormStyles';
 
 /**
  * Signs an existing user in and stores the issued token pair.
@@ -42,49 +49,59 @@ export function LoginPage() {
   }
 
   return (
-    <AccountShell
+    <AuthCard
       title={t('account.login.title')}
       subtitle={t('account.login.subtitle')}
       footer={
         <>
           {t('account.login.noAccount')}{' '}
-          <Link className="underline underline-offset-4" to="/account/register">
+          <Link className={authLinkClasses} to="/account/register">
             {t('account.login.toRegister')}
           </Link>
         </>
       }
     >
       <form className="flex flex-col gap-6" onSubmit={(event) => void submit(event)} noValidate>
-        <FieldGroup>
+        <FieldGroup className="gap-4">
           <Field>
-            <FieldLabel htmlFor="username">{t('account.fields.username')}</FieldLabel>
+            <FieldLabel className={authLabelClasses} htmlFor="username">
+              {t('account.fields.username')}
+            </FieldLabel>
             <Input
               id="username"
               name="username"
               autoComplete="username"
+              className={authInputClasses}
               required
               value={username}
               onChange={(event) => setUsername(event.target.value)}
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="password">{t('account.fields.password')}</FieldLabel>
+            <FieldLabel className={authLabelClasses} htmlFor="password">
+              {t('account.fields.password')}
+            </FieldLabel>
             <Input
               id="password"
               name="password"
               type="password"
               autoComplete="current-password"
+              className={authInputClasses}
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
           </Field>
-          {failure ? <FieldError>{failure}</FieldError> : null}
+          {failure ? (
+            <p className={authErrorClasses} role="alert">
+              {failure}
+            </p>
+          ) : null}
         </FieldGroup>
-        <Button type="submit" size="lg" disabled={submitting}>
+        <Button type="submit" className={authSubmitClasses} disabled={submitting}>
           {t('account.login.submit')}
         </Button>
       </form>
-    </AccountShell>
+    </AuthCard>
   );
 }

@@ -4,17 +4,24 @@ import { AuthProvider } from '@/auth/AuthProvider';
 import { AppLayout } from '@/routes/AppLayout';
 import { HomePage } from '@/routes/HomePage';
 import { NotFoundPage } from '@/routes/NotFoundPage';
+import { AccountLayout } from '@/routes/account/AccountLayout';
 import { LoginPage } from '@/routes/account/LoginPage';
 import { RegisterPage } from '@/routes/account/RegisterPage';
 
 const router = createBrowserRouter([
   {
+    path: '/account',
+    element: <AccountLayout />,
+    children: [
+      { path: 'login', element: <LoginPage /> },
+      { path: 'register', element: <RegisterPage /> },
+    ],
+  },
+  {
     path: '/',
     element: <AppLayout />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'account/login', element: <LoginPage /> },
-      { path: 'account/register', element: <RegisterPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

@@ -108,6 +108,9 @@ sumbooklm-frontend
     ├── api
     │   ├── schema.d.ts   generated from the live OpenAPI document
     │   └── client.ts     openapi-fetch client bound to those types
+    ├── components
+    │   ├── background   strata shader, its renderer, the still fallback, the deciding component
+    │   └── ui           shadcn components: button, input, label, field, separator
     ├── auth
     │   ├── authContext.ts    context, failure type, status
     │   ├── AuthProvider.tsx  session restore, login, register, refresh, logout
@@ -118,10 +121,14 @@ sumbooklm-frontend
     │   ├── index.ts      i18next + language detector, de / en / ja
     │   └── locales/{de,en,ja}/common.json
     ├── lib/utils.ts      cn()
-    ├── components/ui     shadcn components: button, input, label, field, separator
     └── routes            AppLayout, HomePage, NotFoundPage
-        └── account       AccountShell, LoginPage, RegisterPage
+        └── account       AccountLayout, AuthCard, BrandMark, authFormStyles,
+                          LoginPage, RegisterPage
 ```
+
+The account routes are a second top level branch of the router rather than children of `AppLayout`.
+They need the full viewport without the application header, and they carry their own dark palette, so
+sharing a layout with the signed-in application would have meant undoing that layout inside them.
 
 Build output goes to `target/dist` rather than `dist` so that `mvn clean` removes it and so the
 frontend module obeys the same directory conventions as the Java modules.

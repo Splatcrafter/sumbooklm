@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router';
 import { useTranslation } from 'react-i18next';
 
-import { StrataBackground } from '@/components/background/StrataBackground';
+import { WaveBackground } from '@/components/background/WaveBackground';
 import { BrandMark } from '@/routes/account/BrandMark';
 
 /**
@@ -15,7 +15,7 @@ export function AccountLayout() {
 
   return (
     <div className="dark relative isolate min-h-svh w-full overflow-hidden bg-jb-black text-jb-grey-10">
-      <StrataBackground />
+      <WaveBackground />
       <div className="relative flex min-h-svh flex-col justify-center px-6 py-14 sm:px-10 lg:px-24">
         <div className="w-full max-w-[27rem]">
           <div className="mb-7 flex items-center gap-3 text-jb-grey-20">

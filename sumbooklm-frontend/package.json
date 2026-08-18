@@ -11,7 +11,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "api:generate": "openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts"
+    "api:generate": "openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts",
+    "background:generate": "node scripts/accountBackground.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

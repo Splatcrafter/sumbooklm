@@ -301,7 +301,11 @@ those overrides are collected in one module instead of being repeated per form. 
 ever gains a light theme for signed-in users, these screens will not follow it, which is intended
 but has to stay a conscious choice rather than an oversight.
 
-## ADR-020: The background is generated, in two forms
+## ADR-020: The background is generated, in two forms (superseded by ADR-022)
+
+**Status.** Superseded. The construction described here produced crumpled marble rather than waves,
+and the SVG fallback did not resemble it. Kept because the reasoning about why the fallback is
+generated rather than shipped still holds, and because the failure is instructive.
 
 **Decision.** The account background is a WebGL 2 fragment shader: a second order domain warp over
 fractional Brownian motion, squashed on one axis so it reads as sedimentary layers, with contour
@@ -346,3 +350,29 @@ procedural shader behind a login form is still the wrong trade there.
 **Cost.** The ladder is calibrated against one target frame rate, and the thresholds are judgement
 rather than measurement across a device fleet. A visitor who asked for reduced motion gets a single
 rendered frame instead of the animation, which keeps the image and drops the movement.
+
+## ADR-022: The background is warped sine bands, and the fallback is the same field pre-rendered
+
+**Decision.** The background is a stack of sine bands bent by low frequency fractal noise. The still
+version is a PNG rendered from the same construction on the CPU by
+`sumbooklm-frontend/scripts/accountBackground.mjs` and committed as
+`src/assets/account-background.png`.
+
+**What was wrong before.** ADR-020 warped fractional noise with the canonical amplitude of four over a
+domain barely a few units wide. At that ratio the high octaves dominate and the image is a crumpled
+marble texture at pixel scale, not waves. Combined with a colour ramp that spanned only the darkest
+greys, the result had neither structure nor tonal range. Reversing the order fixes it: warping bands
+gives waves, warping noise gives marble.
+
+**Why a PNG and not the SVG filter chain.** The SVG version was an approximation of the shader by a
+different mechanism, which is why it did not look like it. Rendering the actual field on the CPU
+removes the resemblance problem entirely: the fallback is the same image, evaluated once at build
+time. The cost is a 190 kB asset in the repository and an algorithm that exists twice, in GLSL and in
+the generator script. That duplication is deliberate and is guarded by naming the constants
+identically on both sides, so a divergence is visible by comparing two lists.
+
+**Why a colour ramp at all.** The cards use the JetBrains website grayscale, which was the request.
+The background was never part of that request, and forcing it into the same near-black greys is what
+made the screen look dead. It now runs a six stop ramp from near black through indigo and violet to a
+muted rose, which keeps the neutral grey cards reading as neutral while giving the screen tonal range.
+The palette is one array in each of the two implementations.

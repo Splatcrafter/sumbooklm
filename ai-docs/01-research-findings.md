@@ -353,3 +353,47 @@ Not verified: whether the shader compiles on a real driver, and what either back
 like. The renderer is built so that a shader that fails to compile, a context that is refused and a
 context that is lost all end in the still image rather than in a blank screen, which bounds the damage
 of the first case but does not remove the need to look at it.
+
+### 25. The background failure was design, not plumbing
+
+The first version of the account background looked like grey concrete. The instinct was to suspect the
+pipeline: a shader that failed to compile would fall back to the still image, and the still image was
+also poor, so both paths would have looked wrong. That instinct was wrong, and the way it was settled
+is worth keeping.
+
+`glslang` was installed to `~/.local/bin` from the Khronos prebuilt release and both shaders validated
+clean as OpenGL ES 3.00, exit code zero, no diagnostics. So the shader compiled and ran; what the
+browser showed was what the shader computed.
+
+The construction itself was the fault, in two ways:
+
+* **Warp amplitude against domain size.** Domain warping multiplies the displacement by four. That is
+  calibrated for a domain of several units. The shader mapped the whole viewport into roughly four
+  units wide and then folded the domain by two per octave across five octaves, so the highest octave
+  ran at pixel frequency and the displacement scrambled it. The result is crumpled marble. Warping a
+  sine stack instead of warping the noise puts the structure back: the bands are the structure and the
+  noise only bends them.
+* **A hash that degrades at scale.** `fract(sin(dot(p, k)) * 43758.5453)` loses its usefulness once
+  the folded coordinates reach the thousands, because the argument of the sine exhausts the mantissa
+  and the pattern turns into grain. It was replaced with a bit mixing hash over the integer lattice,
+  which GLSL ES 3.00 supports through `uint` arithmetic with defined wraparound. There is no scale at
+  which it degrades.
+
+### 26. Rendering the shader on the CPU is what made the design reviewable
+
+The container has no browser and no GPU, so the visual result could not be looked at, and the first
+attempt was therefore shipped unseen. The way out was to implement the field in Node, write the result
+as a PNG with a small encoder over `zlib`, and read the image back. From there the design could be
+judged and iterated: the marble was visible immediately, the switch to warped bands was visible
+immediately, and the palettes could be compared side by side.
+
+Two details made it useful rather than merely possible. Drawing a rectangle where the card sits, at
+roughly the card's opacity, showed whether the form would stay readable instead of leaving it to be
+guessed. And once the design was settled, the same renderer became the generator for the production
+still image, so the throwaway harness turned into the fallback.
+
+The remaining gap is that agreement between the GLSL and the CPU implementation rests on reading them
+side by side. The named constants and the colour ramp were compared programmatically and match; the
+control flow was checked by hand. The one trap found that way was the fold matrix: `mat2` takes its
+arguments in column order, so writing the rotation as it reads on paper produces the mirror image of
+the intended one.

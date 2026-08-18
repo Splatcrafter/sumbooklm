@@ -1,4 +1,4 @@
-import { strataFragmentShader, strataVertexShader } from '@/components/background/strataShader';
+import { waveFragmentShader, waveVertexShader } from '@/components/background/waveShader';
 
 /**
  * One step of the quality ladder. The renderer starts at the first entry and walks down while the
@@ -10,10 +10,10 @@ interface QualityLevel {
 }
 
 const QUALITY_LEVELS: readonly QualityLevel[] = [
-  { resolutionScale: 0.85, octaves: 5 },
-  { resolutionScale: 0.7, octaves: 4 },
-  { resolutionScale: 0.55, octaves: 4 },
-  { resolutionScale: 0.4, octaves: 3 },
+  { resolutionScale: 1, octaves: 3 },
+  { resolutionScale: 0.75, octaves: 3 },
+  { resolutionScale: 0.55, octaves: 2 },
+  { resolutionScale: 0.4, octaves: 2 },
 ];
 
 /** Frames per second the loop aims for. The motion is slow, so more would only cost battery. */
@@ -41,14 +41,14 @@ const FROZEN_TIME_SECONDS = 12;
 /**
  * A running background render loop.
  */
-export interface StrataRenderer {
+export interface WaveRenderer {
   dispose: () => void;
 }
 
 /**
- * Options of {@link createStrataRenderer}.
+ * Options of {@link createWaveRenderer}.
  */
-export interface StrataRendererOptions {
+export interface WaveRendererOptions {
   /**
    * Called when the background cannot be rendered, either because the context or the shader was
    * rejected, because the context was lost, or because the device stayed too slow at the lowest
@@ -75,8 +75,8 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
 }
 
 function createProgram(gl: WebGL2RenderingContext): WebGLProgram | null {
-  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, strataVertexShader);
-  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, strataFragmentShader);
+  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, waveVertexShader);
+  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, waveFragmentShader);
   if (!vertexShader || !fragmentShader) {
     return null;
   }
@@ -113,10 +113,10 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram | null {
  * shows the still image. Once running, the renderer lowers its own quality before it gives up, so a
  * weak device degrades in steps instead of dropping to the fallback at the first slow frame.
  */
-export function createStrataRenderer(
+export function createWaveRenderer(
   canvas: HTMLCanvasElement,
-  options: StrataRendererOptions,
-): StrataRenderer | null {
+  options: WaveRendererOptions,
+): WaveRenderer | null {
   const gl = canvas.getContext('webgl2', {
     alpha: false,
     antialias: false,

@@ -101,6 +101,8 @@ sumbooklm-frontend
 ├── tsconfig.node.json    vite.config.ts
 ├── components.json       shadcn, style "base-nova", icon library lucide
 ├── index.html
+├── scripts
+│   └── accountBackground.mjs  renders src/assets/account-background.png
 └── src
     ├── main.tsx          bootstrap, imports ./index.css and @/i18n
     ├── App.tsx           createBrowserRouter + RouterProvider
@@ -108,8 +110,10 @@ sumbooklm-frontend
     ├── api
     │   ├── schema.d.ts   generated from the live OpenAPI document
     │   └── client.ts     openapi-fetch client bound to those types
+    ├── assets
+    │   └── account-background.png   still background, generated, not hand made
     ├── components
-    │   ├── background   strata shader, its renderer, the still fallback, the deciding component
+    │   ├── background   wave shader, its renderer, the deciding component
     │   └── ui           shadcn components: button, input, label, field, separator
     ├── auth
     │   ├── authContext.ts    context, failure type, status

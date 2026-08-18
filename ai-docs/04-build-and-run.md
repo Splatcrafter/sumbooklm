@@ -187,7 +187,9 @@ question 14.
 The login and registration screens sit at `/account/login` and `/account/register` and are their own
 router branch, not children of the application layout. They are always dark, they use the JetBrains
 website grayscale from finding 22 through the `jb-*` Tailwind namespace defined in `src/index.css`,
-and they place two stacked cards on the left over a generated background.
+and they place two stacked cards on the left over a generated background. The background is not part
+of that grayscale: it runs a six stop ramp from near black through indigo and violet, because forcing
+it into the same near-black greys left the screen without tonal range (ADR-022).
 
 The background has two forms and picks between them at runtime:
 
@@ -199,7 +201,30 @@ The background has two forms and picks between them at runtime:
 | Sustained slow frames | quality steps down, then still image |
 | `prefers-reduced-motion: reduce` | shader, one frame, no loop |
 
-To see the still image on a capable machine, the quickest route is a browser with WebGL disabled, or
-emulating a mobile device with a coarse pointer in the developer tools. The animated path renders at
-a reduced backing store and targets thirty frames per second, so a low reported frame rate is by
-design rather than a symptom.
+Which of the two is on screen can be read off the element rather than guessed: the background
+container carries `data-background="shader"` or `data-background="still"`. To force the still image on
+a capable machine, disable WebGL in the browser or emulate a mobile device with a coarse pointer. The
+animated path renders at a reduced backing store and targets thirty frames per second, so a low
+reported frame rate is by design rather than a symptom.
+
+The still image is generated, not drawn:
+
+```bash
+npm run background:generate     # rewrites src/assets/account-background.png
+```
+
+It has to be regenerated whenever the field or the palette in the shader changes, because it is the
+same construction evaluated on the CPU. The constants are named identically in
+`src/components/background/waveShader.ts` and in `scripts/accountBackground.mjs` so the two can be
+compared.
+
+## Verifying the shader
+
+`glslang` from the Khronos prebuilt release validates the shaders as OpenGL ES 3.00 without a GPU:
+
+```bash
+glslang shader.frag     # exit code 0 and no diagnostics means it compiles
+```
+
+That covers compilation, not appearance. For appearance, the CPU renderer in
+`scripts/accountBackground.mjs` produces the identical field as a PNG that can be looked at.

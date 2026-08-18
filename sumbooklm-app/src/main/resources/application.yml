@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: sumbooklm
+    version: 0.1.0
+  profiles:
+    default: dev
+  jpa:
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 32MB
+      max-request-size: 64MB
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    de.pfoertner.assessment.sumbooklm: INFO

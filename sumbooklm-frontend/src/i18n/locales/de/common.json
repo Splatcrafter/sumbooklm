@@ -1,0 +1,9 @@
+{
+  "app": {
+    "name": "SumbookLM",
+    "tagline": "Verwandle deine Quellen in belegte Antworten."
+  },
+  "errors": {
+    "routeNotFound": "Diese Seite existiert nicht."
+  }
+}

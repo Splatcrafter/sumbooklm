@@ -1,0 +1,9 @@
+{
+  "app": {
+    "name": "SumbookLM",
+    "tagline": "Turn your sources into grounded answers."
+  },
+  "errors": {
+    "routeNotFound": "This page does not exist."
+  }
+}

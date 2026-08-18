@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: ${SUMBOOKLM_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sumbooklm}
+    username: ${SUMBOOKLM_DATASOURCE_USERNAME:sumbooklm}
+    password: ${SUMBOOKLM_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+springdoc:
+  swagger-ui:
+    enabled: false

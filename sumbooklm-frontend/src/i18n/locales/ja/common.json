@@ -1,0 +1,9 @@
+{
+  "app": {
+    "name": "SumbookLM",
+    "tagline": "資料を根拠のある回答に変えましょう。"
+  },
+  "errors": {
+    "routeNotFound": "このページは存在しません。"
+  }
+}

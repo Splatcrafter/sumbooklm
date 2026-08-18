@@ -1,0 +1,51 @@
+Das Workspace-Management (Sumbooks) ist abgeschlossen. Der nächste entscheidende Schritt ist die "Document Ingestion"-Pipeline sowie die Detailansicht eines Sumbooks. In dieser Phase ermöglichen wir das Hochladen von Dokumenten, das Parsen via Apache Tika/Jsoup und die Vektorisierung für die spätere RAG-Pipeline.
+
+Setze folgende Anforderungen um:
+
+1. Backend: Upload & Source Controller (/api/v1/notebooks/{notebookId}/sources)
+
+  - Erstelle Endpunkte zum Hinzufügen von Quellen. Unterstütze zwei Arten:
+    a) MultipartFile Upload (für PDF, TXT, MD).
+    b) URL-Submission (als JSON-Body) für Webseiten.
+
+  - Stelle zwingend sicher, dass der Nutzer über sein JWT auch wirklich Eigentümer der notebookId ist!
+
+  - Speichere die Datei temporär/lokal ab oder halte den puren extrahierten Text. Erstelle den SourceDocument JPA-Eintrag.
+
+  - Setze den anfänglichen status in der CBOR-Payload auf "UPLOADED" und generiere einen documentHash (z.B. SHA-256 über den File-Content), um Duplikate im selben Sumbook abzulehnen.
+
+2. Asynchrone Parsing- & Embedding-Pipeline (LangChain4j)
+
+  - Erstelle einen @Async Service, der die Verarbeitung übernimmt, und setze den Status im CBOR-Payload sofort auf "INDEXING".
+
+  - Parsing: Nutze langchain4j-document-parser-apache-tika für Dateien. Für URLs nutze jsoup, um den Text sauber zu extrahieren, bevor er an die LangChain4j-Pipeline geht.
+
+  - Chunking: Zerlege das extrahierte Document in semantisch sinnvolle TextSegments (z.B. via DocumentByParagraphSplitter mit etwas Overlap).
+
+  - Metadata-Tagging (Kritisch!): Jedes TextSegment MUSS zwingend als Metadatum die notebookId und sourceDocumentId angehängt bekommen. Dies ist für das spätere Vector-Retrieval essenziell, um Dataleaks zwischen Sumbooks zu verhindern!
+
+  - Embedding: Generiere die Embeddings der Chunks über das lokale Modell langchain4j-embeddings-all-minilm-l6-v2.
+
+  - Speicherung: Speichere die Segmente und Embeddings im langchain4j-in-memory Vector Store.
+
+  - Abschluss: Speichere die finale tokenCount im CBOR-Payload ab und setze den Status auf "READY" (bzw. "ERROR" bei Exceptions).
+
+3. Frontend: Sumbook Detail View (/dashboard/sumbook/{id})
+
+  - Generiere die aktuellen OpenAPI-Clients via openapi-typescript.
+
+  - Erstelle eine neue View für das geöffnete Sumbook.
+
+  - Layout (Split-Screen):
+
+    - Linke Sidebar (Sources Panel): Eine Liste aller hinzugefügten Quellen für dieses Sumbook, gerendert als kleine Cards oder Listen-Items mit Icon (Web-Icon für URL, File-Icon für PDFs). Zeige hier den Status an (z.B. Ladespinning bei "INDEXING", Häkchen bei "READY").
+
+    - Oben in der Sidebar: Ein "Add Source" Button, der einen ShadCN-Dialog öffnet. In diesem Dialog gibt es zwei Tabs: "File Upload" (mit Dropzone/File-Input) und "Website URL" (Textfeld).
+
+    - Rechter Hauptbereich: Vorerst ein Placeholder für das zukünftige Chat-/Studio-Interface (z.B. "Select a source or start chatting...").
+
+    - Mitte: Ein Placeholder für unseren Chat. Linksbündig steht ganz oben das Icon, darunter der Titel, darunter klein wieder unsere Quellen (Counter) und mit einem Dot-Separator wieder das Datum. Mittig davon steht dann der später generierte Erstsummary Text der Quellen des Sumbooks. Darunter ein Copy Button Links unten. Ganz unten mittig steht ein Textfeld, rechts "N Quellen" und ganz Rechts ein Pfeil in einem Kreis um die Frage abzusenden. Ausgegraut, wenn kein Text beinhaltet oder nur Whitespaces, Blau als Hintergrund und Weißer Pfeil, wenn Text drin. ENTER sendet den Text später an das Modell, SHIFT + ENTER fügt eine Zeile hinzu.
+
+    - Nutze ShadCN/ui und Tailwind v4.3 für das Styling. Die i18n-Regel für Texte gilt weiterhin.
+
+Es gelten weiterhin strikt die bekannten Projektregeln: Zero-Emoji-Policy im Quellcode/Variablen, ausschließlich englischer Code/Docs, keine Learnings oder Meta-Kommentare in der Codebase. Dokumentiere Architektur-Entscheidungen zu Chunk-Größen oder Async-Konfiguration in /ai-docs.

@@ -4,20 +4,18 @@ Hardened reproducible dev environment for the SumbookLM project. Bakes
 Temurin JDK 25 + Maven 3.9.15 + Python 3.12 + Node LTS + native Claude Code
 (with MCP servers, plugin marketplaces, plugins and user-scope skills) into a
 single image, locks the runtime down with capability drops + an egress-only
-firewall, persists the user's `~/.claude` directory across rebuilds, and ships
-a ready-to-use Writerside documentation builder on the side.
+firewall, persists the user's `~/.claude` directory across rebuilds it on the side.
 
 ## Files
 
-| File                                                      | Purpose                                                                                                                                                                         |
-|-----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Dockerfile`                                              | Multi-stage image: clones third-party skill/marketplace repos, then layers them onto the Java devcontainer base, plus the Writerside builder and user-scope Claude Code skills. |
-| `devcontainer.json`                                       | Devcontainer spec: features, security flags, port forwarding, post-create hook.                                                                                                 |
-| `post-create.sh`                                          | One-shot provisioning run on first container start. Installs Claude Code, writes MCP/plugin config, pre-populates the plugin cache, then enables the egress firewall.           |
-| `refresh-firewall.sh`                                     | Idempotent rebuild of the egress allowlist from a fresh DNS lookup. Called by `post-create.sh` at create time and by `postStartCommand` on every container start.               |
-| `writerside.sh`                                           | Wrapper around JetBrains' headless Writerside builder (`helpbuilderinspect`). Starts an Xvfb display on demand and forwards arguments. Available on `$PATH` as `writerside`.    |
-| `claude/skills/`                                          | User-scope Claude Code skills, staged into `/opt/aether-skills/skills/` at image build and synced into `~/.claude/skills/` on every `post-create.sh` run.                       |
-| `claude/marketplaces/java-dev-assistant/marketplace.json` | Local wrapper marketplace pointing at the cloned `pluginagentmarketplace/custom-plugin-java` plugin.                                                                            |
+| File                                                      | Purpose                                                                                                                                                               |
+|-----------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Dockerfile`                                              | Multi-stage image: clones third-party skill/marketplace repos, then layers them onto the Java devcontainer base and user-scope Claude Code skills.                    |
+| `devcontainer.json`                                       | Devcontainer spec: features, security flags, port forwarding, post-create hook.                                                                                       |
+| `post-create.sh`                                          | One-shot provisioning run on first container start. Installs Claude Code, writes MCP/plugin config, pre-populates the plugin cache, then enables the egress firewall. |
+| `refresh-firewall.sh`                                     | Idempotent rebuild of the egress allowlist from a fresh DNS lookup. Called by `post-create.sh` at create time and by `postStartCommand` on every container start.     |
+| `claude/skills/`                                          | User-scope Claude Code skills, staged into `/opt/aether-skills/skills/` at image build and synced into `~/.claude/skills/` on every `post-create.sh` run.             |
+| `claude/marketplaces/java-dev-assistant/marketplace.json` | Local wrapper marketplace pointing at the cloned `pluginagentmarketplace/custom-plugin-java` plugin.                                                                  |
 
 ## Image build
 
@@ -31,10 +29,9 @@ Two stages:
       is intermittently flaky for back-to-back clones, and Alpine's musl libc
       makes that worse than glibc.
 2. **Runtime stage** (`mcr.microsoft.com/devcontainers/java:1-21-bookworm`):
-   adds curl/jq/Xvfb/font libs (Writerside dependencies), promotes Temurin
+   adds curl/jq/Xvfb/font libs, promotes Temurin
    JDK 25 + Maven 3.9.15 to the SDKMAN defaults, installs Node LTS via
    NodeSource, bakes Eclipse JDT.LS and JetBrains Kotlin LSP onto `$PATH`,
-   copies the Writerside builder from `jetbrains/writerside-builder`,
    stages skills under `/opt/aether-skills/skills/` (post-create.sh syncs
    them into `~/.claude/skills/` on every start — see *Persistence* below),
    and stages the three plugin marketplaces under `/opt/claude-marketplaces/`.
@@ -58,7 +55,6 @@ ghcr.io's anonymous auth scope (the token request goes out as
 | `jdtls`                      | snapshot           | Eclipse JDT Language Server tarball, symlinked into `/usr/local/bin/`                                      |
 | `kotlin-lsp`                 | 262.2310.0         | JetBrains standalone Kotlin LSP, symlinked into `/usr/local/bin/`                                          |
 | `typescript-language-server` | latest             | Global npm install in `post-create.sh`                                                                     |
-| `writerside`                 | 2026.04.8711       | Wrapper around JetBrains' headless `helpbuilderinspect`                                                    |
 
 The base image still ships Microsoft's OpenJDK 21 in `/usr/local/sdkman/candidates/java/`
 as a second candidate; `sdk use java 21.x.x-ms` (or `sdk default …`) switches
@@ -341,23 +337,6 @@ which they are synced into `~/.claude/skills/` at every container start):
 
 To pin a specific revision, change the `git clone --depth 1 …` line in the
 `skill-sources` stage to `git clone … && git -C … checkout <ref>`.
-
-## Writerside documentation builder
-
-The image embeds JetBrains' headless Writerside builder
-(`jetbrains/writerside-builder`). Use the `writerside` wrapper:
-
-```bash
-# Convenience mode: <module>/<instance> [output-dir]
-writerside Writerside/hi "$WORKSPACE_DIR/artifacts/help"
-
-# Pass-through mode: forward flags directly to helpbuilderinspect
-writerside --source-dir "$WORKSPACE_DIR" --product Writerside/hi --output-dir /tmp/out --runner other
-```
-
-`writerside.sh` starts an Xvfb display on demand
-(`DISPLAY=:99`, fallback can be set by exporting `DISPLAY` beforehand),
-which is why `xvfb` and the X11 client libs are in the runtime stage.
 
 ## Forwarded ports
 

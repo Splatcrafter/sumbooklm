@@ -27,7 +27,6 @@ public class SumbookLmApplication {
      * Starts the Spring application context and the embedded web server.
      *
      * @param args command line arguments forwarded to Spring Boot, never {@code null}
-     * @since 0.1.0
      */
     public static void main(final String[] args) {
         SpringApplication.run(SumbookLmApplication.class, args);

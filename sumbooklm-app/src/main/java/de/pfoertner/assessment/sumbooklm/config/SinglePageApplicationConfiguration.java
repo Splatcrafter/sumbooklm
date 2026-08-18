@@ -73,7 +73,6 @@ public class SinglePageApplicationConfiguration implements WebMvcConfigurer {
          * @return the requested asset, the application shell when the path is a client side route,
          *         or {@code null} when the path belongs to the REST API or the shell is not packaged
          * @throws IOException if the underlying resource cannot be inspected
-         * @since 0.1.0
          */
         @Override
         protected @Nullable Resource getResource(final String resourcePath, final Resource location) throws IOException {

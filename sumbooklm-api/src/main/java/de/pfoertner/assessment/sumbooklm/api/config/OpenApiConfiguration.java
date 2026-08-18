@@ -33,7 +33,6 @@ public class OpenApiConfiguration {
      * @param applicationVersion version reported in the specification, resolved from the
      *                           {@code spring.application.version} property and defaulting to
      *                           {@code 0.1.0} when the property is absent
-     * @since 0.1.0
      */
     public OpenApiConfiguration(@Value("${spring.application.version:0.1.0}") final String applicationVersion) {
         this.applicationVersion = applicationVersion;
@@ -43,7 +42,6 @@ public class OpenApiConfiguration {
      * Builds the descriptive part of the OpenAPI specification.
      *
      * @return an {@link OpenAPI} instance carrying title, version, description and license of the API
-     * @since 0.1.0
      */
     @Bean
     public OpenAPI sumbookLmOpenApi() {

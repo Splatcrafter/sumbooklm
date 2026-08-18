@@ -21,8 +21,6 @@ class SumbookLmApplicationTests {
 
     /**
      * Starts the application context and fails when any bean cannot be created.
-     *
-     * @since 0.1.0
      */
     @Test
     void contextLoads() {

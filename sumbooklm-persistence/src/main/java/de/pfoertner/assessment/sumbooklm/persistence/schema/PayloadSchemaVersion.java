@@ -26,15 +26,11 @@ public final class PayloadSchemaVersion {
 
     /**
      * Initial payload schema version {@code 1.0.0}.
-     *
-     * @since 0.1.0
      */
     public static final int V1_0_0 = 100;
 
     /**
      * Payload schema version written by the running application.
-     *
-     * @since 0.1.0
      */
     public static final int CURRENT = V1_0_0;
 

@@ -16,8 +16,6 @@ public final class ApiPaths {
 
     /**
      * Prefix below which all REST endpoints of the application are exposed, without a trailing slash.
-     *
-     * @since 0.1.0
      */
     public static final String BASE = "/api";
 

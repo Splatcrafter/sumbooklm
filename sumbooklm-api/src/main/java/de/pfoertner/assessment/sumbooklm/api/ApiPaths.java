@@ -60,6 +60,26 @@ public final class ApiPaths {
     public static final String V1_NOTEBOOK = V1_NOTEBOOKS + "/{notebookId}";
 
     /**
+     * Collection of the sources of one notebook.
+     */
+    public static final String V1_NOTEBOOK_SOURCES = V1_NOTEBOOK + "/sources";
+
+    /**
+     * Endpoint that adds an uploaded file to a notebook.
+     */
+    public static final String V1_NOTEBOOK_SOURCE_FILES = V1_NOTEBOOK_SOURCES + "/files";
+
+    /**
+     * Endpoint that adds a web page to a notebook.
+     */
+    public static final String V1_NOTEBOOK_SOURCE_LINKS = V1_NOTEBOOK_SOURCES + "/links";
+
+    /**
+     * One source of one notebook, addressed by its identifier.
+     */
+    public static final String V1_NOTEBOOK_SOURCE = V1_NOTEBOOK_SOURCES + "/{sourceId}";
+
+    /**
      * Endpoint that hands a client the parameters its stored token pair is encrypted with. The
      * trailing slash is part of the published path.
      */

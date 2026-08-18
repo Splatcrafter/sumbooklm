@@ -504,3 +504,114 @@ grid, not the cell after the last notebook.
 
 **Cost.** A user who pins everything sees a second section holding only the create card. That is
 correct but looks thin, and it is the price of not showing the same notebook twice.
+
+## ADR-028: Indexing happens after the commit, on an executor of its own
+
+**Decision.** Adding a source stores it and answers. The storing transaction publishes a
+`SourceAddedEvent`, and an `@Async @TransactionalEventListener(AFTER_COMMIT)` runs the pipeline on a
+bounded pool of two threads declared by the composition root.
+
+**Reason.** Three properties are wanted at once, and each of the three parts buys one of them. The
+event decouples the request from the work. The after-commit phase guarantees that the row exists
+before anything reads it, which a direct call could not. The separate executor keeps a run that takes
+a minute off the threads the web server answers requests with.
+
+The pool is small on purpose: the work is computing embeddings, which already saturates the cores it
+is given, so more threads would not index faster. The queue is bounded and full queues make the
+caller run the task, which slows an upload down rather than dropping it.
+
+**Alternatives.** Calling `@Async` from the storing method races the transaction. Doing the work in
+the request holds a connection and a server thread for as long as the document is long. A queue in
+the database would survive a restart, which the vector store does not, so it would add durability to
+the one half of the pipeline that cannot use it.
+
+**Cost.** A restart during a run leaves a source stuck in `INDEXING` for ever, because nothing picks
+it up again. See open question 19.
+
+## ADR-029: Segments are cut on paragraphs, at a thousand characters with a fifth of that as overlap
+
+**Decision.** `DocumentByParagraphSplitter(1000, 200)`. Paragraph boundaries first, sentence
+boundaries inside a paragraph that does not fit, and two hundred characters of the previous segment
+repeated at the start of the next one.
+
+**Reason.** The size is chosen against the model rather than against the sources. all-MiniLM-L6-v2
+degrades beyond roughly two hundred and fifty tokens, and ordinary prose runs about four characters
+to the token, which is where the thousand comes from. Larger segments dilute the vector that stands
+for them, so they win more comparisons and answer fewer of them.
+
+Paragraphs are the unit an author already used to separate one thought from the next, so cutting on
+them costs nothing and keeps segments that mean something on their own. The overlap exists for the
+statement that straddles a boundary: without it that statement is in neither segment completely.
+
+**Cost.** The overlap is stored and embedded twice, so both the index and the reported token count are
+about a fifth larger than the text. That is visible to the user as a token count that exceeds what
+they would get by counting the document.
+
+## ADR-030: One vector store for everything, kept apart by metadata
+
+**Decision.** A single `InMemoryEmbeddingStore` holds the segments of every notebook of every
+account. Each segment carries `notebookId` and `sourceDocumentId` as metadata, and the only method
+that writes to the store takes both as parameters.
+
+**Reason.** The separation has to be impossible to forget, not merely documented. Tagging at the call
+site would allow an untagged segment, and an untagged segment is one that every notebook of every
+account can retrieve. Making both identifiers parameters of the single write path means a segment
+without them cannot be produced.
+
+A store per notebook was the alternative. It separates by construction, but it moves the problem to
+managing the lifetime of one store per notebook, and it makes the eventual switch to a real vector
+database harder, since those separate by metadata filter exactly as this does.
+
+**Cost.** Correct separation now depends on every read passing a filter. Nothing reads yet, so the
+first retrieval is where that has to be established.
+
+## ADR-031: A file and an address are two endpoints, not one
+
+**Decision.** `POST /sources/files` takes `multipart/form-data`, `POST /sources/links` takes JSON.
+The collection itself stays at `/sources`.
+
+**Reason.** One operation accepting both media types is described in the OpenAPI document as a body
+that is sometimes one shape and sometimes another, and the generated client then offers a body type
+that is honest about neither. Two operations keep the generated client able to say what it is
+sending.
+
+**Cost.** The two paths read as sub-resources of the collection although they are actions on it. The
+alternative spellings, a query parameter selecting the kind or a single operation with two content
+types, were worse in the specification rather than in the URL.
+
+## ADR-032: An upload is stored, a page is not, and they are compared differently
+
+**Decision.** The bytes of an uploaded file are stored in a `content` column next to the payload. A
+web source stores only its address. Duplicate detection hashes the bytes of a file and the normalised
+address of a page.
+
+**Reason.** A file has no other home: the user's copy is not reachable from the server, so losing the
+bytes means the source can never be parsed again. A page does have one, and a copy taken at upload
+time would silently become a different document than the address resolves to.
+
+That asymmetry decides the comparison as well. A file can be compared by content because the content
+is in hand. A page cannot, because it has not been retrieved yet while the request is being answered,
+and retrieving it first would make the caller wait for a foreign server before learning whether their
+source was even accepted. Comparing addresses is the honest approximation, and normalising the case
+of scheme and host and dropping the fragment covers the spellings that are the same address.
+
+**Cost.** Two addresses serving the same page count as two sources. See open question 16 for the
+other half of this trade, which is that the hash is in the payload rather than in a column.
+
+## ADR-033: An opened Sumbook is three panels, and only the middle one grows
+
+**Decision.** Sources on the left, the conversation in the middle, the studio on the right. The two
+outer panels have fixed widths; the middle one takes what is left. Below the extra large breakpoint
+the studio disappears, and below the large one the panels stack.
+
+**Reason.** The two outer panels are lists, and a list has a width beyond which it only gets emptier.
+The middle panel holds prose and a summary, which is the content whose readability actually depends
+on width, so it is the one that should absorb the space.
+
+The studio is the panel that disappears first because it is the one with nothing in it yet. It is
+still rendered at full width rather than added later, so that the layout does not rearrange itself the
+moment the first studio feature lands.
+
+**Cost.** On a laptop at the large breakpoint the studio is not visible at all, which will be wrong
+once it holds something the user needs. That is a breakpoint to revisit rather than a structure to
+change.

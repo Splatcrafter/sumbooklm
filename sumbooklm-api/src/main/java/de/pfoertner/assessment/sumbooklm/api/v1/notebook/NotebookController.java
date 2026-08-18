@@ -94,6 +94,31 @@ public class NotebookController {
     }
 
     /**
+     * Reads one notebook of the authenticated account.
+     *
+     * @param notebookId  identifier of the notebook to read
+     * @param accessToken access token of the caller, injected from the security context
+     * @return the notebook
+     */
+    @Operation(summary = "Read a notebook",
+            description = "Returns one notebook of the account. The view of a single notebook loads it "
+                    + "through this endpoint rather than searching the collection, so that opening it "
+                    + "directly by its address works.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "The notebook was returned."),
+            @ApiResponse(responseCode = "401", description = "No valid access token was presented.",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "The account owns no such notebook.",
+                    content = @Content)
+    })
+    @GetMapping(ApiPaths.V1_NOTEBOOK)
+    public NotebookResponse read(@PathVariable("notebookId") final UUID notebookId,
+                                 @AuthenticationPrincipal final Jwt accessToken) {
+        return NotebookResponse.from(this.notebookService.get(
+                this.authenticatedUserResolver.requireUserId(accessToken), notebookId));
+    }
+
+    /**
      * Creates a notebook for the authenticated account.
      *
      * @param body        name the notebook is created under

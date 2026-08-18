@@ -16,13 +16,6 @@
     <name>SumbookLM :: AI</name>
     <description>Chat model access, embedding computation and vector storage based on LangChain4j.</description>
 
-    <properties>
-        <!-- The module currently carries a package-info only. Javadoc aborts on a source set
-             without any type, so the gate is disabled here and has to be re-enabled together
-             with the first type added to this module. -->
-        <maven.javadoc.skip>true</maven.javadoc.skip>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>de.pfoertner.assessment.sumbooklm</groupId>

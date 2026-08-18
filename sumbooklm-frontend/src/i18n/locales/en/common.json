@@ -85,6 +85,76 @@
       "action": "That did not work. Please try again."
     }
   },
+  "sumbook": {
+    "loading": "Opening your Sumbook...",
+    "header": {
+      "meta": "{{sources}} • {{date}}",
+      "sources_one": "{{count}} Source",
+      "sources_other": "{{count}} Sources"
+    },
+    "sources": {
+      "heading": "Sources",
+      "count_one": "{{count}} Source",
+      "count_other": "{{count}} Sources",
+      "add": "Add source",
+      "loading": "Loading sources...",
+      "empty": "No sources yet. Add a document or a web page to ground this Sumbook in.",
+      "remove": "Remove {{name}}",
+      "kind": {
+        "file": "Uploaded file",
+        "web": "Web page"
+      },
+      "status": {
+        "uploaded": "Waiting to be indexed",
+        "indexing": "Indexing...",
+        "ready_one": "Indexed, {{count}} token",
+        "ready_other": "Indexed, {{count}} tokens",
+        "error": "Could not be read"
+      }
+    },
+    "add": {
+      "heading": "Add source",
+      "description": "Upload a document or name a web page. It is indexed in the background.",
+      "tabs": {
+        "file": "File upload",
+        "url": "Website URL"
+      },
+      "dropzone": "Choose a file or drop it here",
+      "dropzoneHint": "PDF, TXT and Markdown",
+      "fields": {
+        "url": "Address",
+        "urlPlaceholder": "https://example.org/article"
+      },
+      "confirm": "Add source"
+    },
+    "summary": {
+      "pending": "The summary of these sources is not written yet. It appears here once a Sumbook can summarise itself.",
+      "noSources": "This Sumbook has nothing to summarise yet. Add a source and it will be indexed for you.",
+      "copy": "Copy summary"
+    },
+    "chat": {
+      "placeholder": "Ask something about your sources",
+      "sources_one": "{{count}} Source",
+      "sources_other": "{{count}} Sources",
+      "send": "Send question",
+      "notAvailable": "Answering is not available yet. Your question was not sent anywhere."
+    },
+    "studio": {
+      "heading": "Studio",
+      "placeholder": "Select a source or start chatting. What is generated from this Sumbook will appear here."
+    },
+    "actions": {
+      "backToOverview": "All Sumbooks",
+      "cancel": "Cancel",
+      "retry": "Try again"
+    },
+    "errors": {
+      "load": "This Sumbook could not be loaded.",
+      "missing": "This Sumbook does not exist.",
+      "add": "The source could not be added. Please try again.",
+      "duplicate": "This source is already part of the Sumbook."
+    }
+  },
   "errors": {
     "routeNotFound": "This page does not exist."
   }

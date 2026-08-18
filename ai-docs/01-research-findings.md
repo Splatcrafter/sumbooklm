@@ -443,3 +443,72 @@ written by a future version fails the migration with a message instead of crashi
 
 Encoding by name rather than by ordinal is what keeps a constant inserted into the middle of the enum
 from silently changing the meaning of stored rows.
+
+### 31. Background work after a commit is `@Async` plus `@TransactionalEventListener`
+
+Indexing must not start before the row describing the source is visible to other transactions. A
+plain `@Async` call from the storing method races its own transaction and intermittently finds
+nothing, which is the kind of failure that passes locally and fails under load.
+
+Both annotations on one listener method solve it: the listener is invoked after the commit, and the
+async interceptor moves it onto the ingestion executor. The listener then calls back into the service
+for the short state transitions, because a `@Transactional` method invoked on `this` bypasses the
+proxy and would silently run without a transaction.
+
+One consequence worth remembering: `@TransactionalEventListener` does not fire at all when the
+publisher runs outside a transaction. That is correct here, since the only publisher is a
+`@Transactional` method, but it makes a plain unit test of the publisher look as if nothing happened.
+
+### 32. The embedding model reports its own token count
+
+`AbstractInProcessEmbeddingModel.embedAll` returns `Response<List<Embedding>>` whose `TokenUsage`
+carries the input token count, summed over the segments and with the two special tokens per segment
+already subtracted. No separate tokenizer, and no estimate next to the model, is needed for the
+`tokenCount` the payload stores.
+
+`langchain4j-embeddings` also publishes `HuggingFaceTokenCountEstimator`, which was not needed. The
+tokenizer it would want is present: `langchain4j-embeddings-all-minilm-l6-v2` ships both
+`all-minilm-l6-v2.onnx` (90 MB) and `all-minilm-l6-v2-tokenizer.json` (712 kB) as classpath
+resources, loaded by a static field on first use of the model class.
+
+### 33. `ResponseEntityExceptionHandler` already maps an oversized upload
+
+Adding an `@ExceptionHandler(MaxUploadSizeExceededException.class)` next to the inherited one does
+not override it, it collides with it, and the context fails to build with
+`Ambiguous @ExceptionHandler method mapped for`. The inherited mapping answers 413 already, so the
+correct action was to delete the addition rather than to reorder it.
+
+The failure is worth knowing because it appears at startup rather than at the request that would have
+triggered either handler, so it is loud and immediate but points at `handlerExceptionResolver` rather
+than at the class that caused it.
+
+### 34. `MultipartBodyBuilder` pulls in Reactive Streams
+
+Building a multipart request for `RestClient` with `MultipartBodyBuilder` fails with
+`NoClassDefFoundError: org/reactivestreams/Publisher` in a module that carries no reactive stack. The
+builder supports publisher parts, and merely loading the class resolves the type.
+
+A plain `LinkedMultiValueMap<String, Object>` holding a `Resource` per part goes through
+`FormHttpMessageConverter` instead and needs nothing extra. The resource has to override
+`getFilename()`, because that is what becomes the submitted file name.
+
+### 35. openapi-typescript describes a binary part as a string
+
+An OpenAPI `format: binary` property is generated as `file: string`, so the generated body type of a
+multipart operation cannot hold a `File`. openapi-fetch is still usable: the `bodySerializer` hook
+receives the body and returns whatever should be sent, so the `File` travels through a value the
+generated type calls a string and is put into a `FormData` by the serializer.
+
+The alternative, generating `Blob` instead, needs a transform passed through the Node API of
+openapi-typescript rather than the CLI, which would replace a one line cast with a build step.
+
+### 36. jsoup `text()` destroys the structure the splitter cuts on
+
+`Document.text()` returns the whole page as one line. The paragraph splitter cuts on two consecutive
+newlines, so a page extracted that way has no boundary to cut on and is chopped at sentence level by
+the fallback splitter instead.
+
+Selecting the block elements that carry prose and joining them with a blank line preserves the
+structure. Two details matter: the noise elements have to be removed first, or navigation ends up as
+paragraphs, and a list item nested in another item is matched twice by the selector, which is why a
+paragraph identical to the one before it is dropped.

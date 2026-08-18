@@ -14,8 +14,8 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 
-State as of 2026-08-18: build green across ten modules, 28 tests. The scaffold is complete and two
-feature modules are implemented.
+State as of 2026-08-18: build green across ten modules, 38 tests, and the JavaDoc gate active
+everywhere. The scaffold is complete and three feature areas are implemented.
 
 Authentication: registration, login, token rotation, logout, the weekly cleanup of invalidated
 refresh tokens, the client cookie encryption parameters, and the login and registration views bound
@@ -23,5 +23,11 @@ to the generated OpenAPI client.
 
 Workspace: the notebook, source document and chat session tables with their CBOR payloads, notebook
 management over `/api/v1/notebooks` scoped to the account of the presented access token, and the
-dashboard that lists, creates, renames, pins and removes them. Sources and conversations exist as
-storage only; nothing writes them yet, and no route opens a single notebook.
+dashboard that lists, creates, renames, pins and removes them.
+
+Ingestion: uploads and web addresses added below `/api/v1/notebooks/{id}/sources`, stored and
+answered immediately, then parsed with Apache Tika or jsoup, cut into overlapping segments and
+embedded in process into a shared vector store where every segment carries its notebook and its
+source. The Sumbook view shows the sources with the stage each has reached, the conversation that
+will be held about them, and the studio that will be generated from them. Chat sessions still exist
+as storage only, and nothing answers a question yet.

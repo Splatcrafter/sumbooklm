@@ -7,18 +7,21 @@ sumbooklm-parent                 (pom, aggregator + dependency and plugin manage
 ├── sumbooklm-domain             no dependencies
 ├── sumbooklm-persistence        -> domain
 ├── sumbooklm-security           -> domain, persistence
-├── sumbooklm-workspace          -> domain, persistence
 ├── sumbooklm-ingestion          -> domain
 ├── sumbooklm-ai                 -> domain
+├── sumbooklm-workspace          -> domain, persistence, ingestion, ai
 ├── sumbooklm-api                -> domain, persistence, security, workspace, ingestion, ai
 ├── sumbooklm-frontend           no Java, produces static/ resources
 └── sumbooklm-app                -> api, frontend
 ```
 
 The graph is acyclic and one directional. `domain` is a leaf and must stay framework free.
-`persistence`, `ingestion` and `ai` are siblings and must not reference each other; anything that
-needs two of them belongs in `api` or above. `security` and `workspace` are the two siblings that are
-allowed to depend on `persistence`, because each owns tables of its own; see ADR-012 and ADR-024.
+`persistence`, `ingestion` and `ai` are capability modules that must not reference each other:
+`ingestion` knows how to read a source, `ai` knows how to embed one, and neither knows that notebooks
+exist. `security` and `workspace` are the two modules that combine capabilities and own tables; see
+ADR-012 and ADR-024. `workspace` is therefore the only module that depends on `ingestion` and `ai`,
+because the pipeline that runs one after the other is the lifecycle of a source and not a capability
+of its own.
 
 ## Module responsibilities
 
@@ -36,16 +39,19 @@ cleanup of invalidated tokens, the derivation of the client cookie encryption pa
 objects. Owns the `user_account` and `refresh_token` data through the persistence module.
 
 **`sumbooklm-workspace`** — The lifecycle of a notebook and of everything below it: creating,
-listing, renaming, pinning and removing, including the removal of the sources and chat sessions a
-notebook holds. Like `security` it takes commands and returns domain objects and knows nothing about
-HTTP. Every one of its methods carries the account it acts for; see ADR-025.
+listing, renaming, pinning and removing a notebook, adding, listing and removing its sources, and the
+pipeline that turns a stored source into segments. Like `security` it takes commands and returns
+domain objects and knows nothing about HTTP. Every one of its methods carries the account it acts
+for; see ADR-025. The pipeline runs after the storing transaction commits; see ADR-028.
 
 **`sumbooklm-ingestion`** — jsoup for fetching and cleaning web sources, the LangChain4j Apache Tika
-document parser for extracting text from PDF, Markdown, HTML and plain text uploads. Produces domain
-level results.
+document parser for extracting text from PDF, Markdown, HTML and plain text uploads, and the splitter
+that cuts the extracted text into segments. Produces text and segments, and knows nothing about where
+either came from or goes.
 
 **`sumbooklm-ai`** — Chat model access (OpenAI compatible endpoint or Ollama), in process embeddings
-via `all-MiniLM-L6-v2`, vector storage via `InMemoryEmbeddingStore`.
+via `all-MiniLM-L6-v2`, vector storage via `InMemoryEmbeddingStore`. `NotebookIndex` is the only way
+into the store and takes the notebook and the source as parameters; see ADR-030.
 
 **`sumbooklm-api`** — Controllers, transport models, `ApiPaths`, `OpenApiConfiguration`, the
 `SecurityFilterChain` and the exception handler that maps failures onto problem details. Owns the
@@ -70,10 +76,11 @@ de.pfoertner.assessment.sumbooklm
 ├── config
 │   ├── SinglePageApplicationConfiguration
 │   ├── TimeConfiguration                       the shared Clock, see ADR-024
+│   ├── AsyncConfiguration                      @EnableAsync and the ingestion pool, see ADR-028
 │   └── H2ConsoleSecurityConfiguration          (dev profile only)
 ├── domain
 │   ├── user                                    UserAccount, UserProfile, AccountActivity
-│   └── workspace                               Notebook, DocumentStatus
+│   └── workspace                               Notebook, SourceDocument, DocumentStatus, SourceKind
 ├── persistence
 │   ├── schema.PayloadSchemaVersion
 │   ├── payload                                 PayloadTypes, PayloadCodec, PayloadDataFixerBootstrap
@@ -89,9 +96,14 @@ de.pfoertner.assessment.sumbooklm
 │   ├── cookie                                  cookie key derivation and its parameters
 │   └── access                                  SensitiveOperation and its aspect
 ├── workspace
-│   └── notebook                                NotebookService, update command, failure
+│   ├── notebook                                NotebookService, update command, failure
+│   └── source                                  SourceDocumentService, the pipeline, its event,
+│                                                fingerprints and failures
 ├── ingestion
+│   ├── extraction                              file and web extractors, their result and failure
+│   └── chunking                                TextChunker
 ├── ai
+│   └── embedding                               model and store beans, NotebookIndex, metadata keys
 └── api
     ├── ApiPaths
     ├── config                                  OpenApiConfiguration, SecurityConfiguration
@@ -131,11 +143,18 @@ sumbooklm-frontend
     ├── components
     │   ├── background   wave shader, its renderer, the deciding component
     │   └── ui           shadcn: button, input, label, field, separator, card,
-    │                    dropdown-menu, dialog, alert-dialog
+    │                    dropdown-menu, dialog, alert-dialog, tabs, textarea
     ├── notebooks
     │   ├── notebook.ts       client side type and its narrowing
-    │   ├── notebooksApi.ts   the four calls of /api/v1/notebooks
-    │   └── useNotebooks.ts   the list and the actions that change it
+    │   ├── notebooksApi.ts   the five calls of /api/v1/notebooks
+    │   ├── notebookRoutes.ts the address one Sumbook lives under
+    │   ├── TopicIcon.tsx     the topic square and its fallback icon
+    │   ├── useNotebooks.ts   the list and the actions that change it
+    │   └── useNotebook.ts    one Sumbook, loaded by its identifier
+    ├── sources
+    │   ├── source.ts         client side type, its narrowing and the pending predicate
+    │   ├── sourcesApi.ts     the four calls below /api/v1/notebooks/{id}/sources
+    │   └── useSources.ts     the list, its actions, and the polling while indexing runs
     ├── auth
     │   ├── authContext.ts    context, failure type, status
     │   ├── AuthProvider.tsx  session restore, login, register, refresh, logout
@@ -149,8 +168,10 @@ sumbooklm-frontend
     └── routes            AppLayout (the signed-in shell), NotFoundPage
         ├── account       AccountLayout, AuthCard, BrandMark, authFormStyles,
         │                 LoginPage, RegisterPage
-        └── dashboard     DashboardPage, NotebookCard, NotebookCreateCard,
-                          NotebookTitleDialog, NotebookDeleteDialog, NotebookMeta
+        ├── dashboard     DashboardPage, NotebookCard, NotebookCreateCard,
+        │                 NotebookTitleDialog, NotebookDeleteDialog, NotebookMeta
+        └── sumbook       SumbookPage, SourcesPanel, SourceListItem, AddSourceDialog,
+                          ChatPanel, ChatComposer, StudioPanel, SumbookMeta
 ```
 
 The account routes are a second top level branch of the router rather than children of `AppLayout`.

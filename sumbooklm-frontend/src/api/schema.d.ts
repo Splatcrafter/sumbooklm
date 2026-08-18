@@ -68,6 +68,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notebooks/{notebookId}/sources/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a web page as a source
+         * @description Stores the address and starts retrieving and indexing it. The response describes the source as it is stored, which is before the page has been read.
+         */
+        post: operations["addWebPage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebookId}/sources/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add an uploaded file as a source
+         * @description Stores the file and starts indexing it. The response describes the source as it is stored, which is before indexing has finished.
+         */
+        post: operations["addFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/logout": {
         parameters: {
             query?: never;
@@ -115,7 +155,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Read a notebook
+         * @description Returns one notebook of the account. The view of a single notebook loads it through this endpoint rather than searching the collection, so that opening it directly by its address works.
+         */
+        get: operations["read"];
         put?: never;
         post?: never;
         /**
@@ -147,6 +191,46 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebookId}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the sources of a notebook
+         * @description Returns every source of the notebook, oldest first, each with the stage it has reached on its way into the retrieval index.
+         */
+        get: operations["list_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebookId}/sources/{sourceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a source
+         * @description Removes the source and its segments from the retrieval index. The session of the presented access token has to be open, which is verified against the database.
+         */
+        delete: operations["delete_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -282,6 +366,54 @@ export interface components {
              * @description Number of sources currently belonging to the notebook.
              */
             sourceCount?: number;
+        };
+        /** @description Address of a web page to add as a source. */
+        WebSourceRequest: {
+            /**
+             * @description Address of the page to add.
+             * @example https://example.org/article
+             */
+            url: string;
+        };
+        /** @description A source of one notebook of the authenticated account. */
+        SourceResponse: {
+            /**
+             * Format: uuid
+             * @description Stable identifier of the source.
+             */
+            id?: string;
+            /**
+             * Format: uuid
+             * @description Identifier of the notebook the source belongs to.
+             */
+            notebookId?: string;
+            /**
+             * @description Name the source is listed under.
+             * @example Thermodynamics.pdf
+             */
+            displayName?: string;
+            /**
+             * @description Way the source entered the notebook.
+             * @enum {string}
+             */
+            kind?: "FILE" | "WEB";
+            /** @description Name of the uploaded file or address of the page. */
+            origin?: string;
+            /**
+             * @description Stage the source has reached on its way into the retrieval index.
+             * @enum {string}
+             */
+            status?: "UPLOADED" | "INDEXING" | "READY" | "ERROR";
+            /**
+             * Format: int32
+             * @description Number of tokens the indexed text was counted as, zero while unknown.
+             */
+            tokenCount?: number;
+            /**
+             * Format: date-time
+             * @description Point in time the source was added to its notebook.
+             */
+            createdAt?: string;
         };
         /** @description Credentials of an existing account. */
         LoginRequest: {
@@ -481,6 +613,124 @@ export interface operations {
             };
         };
     };
+    addWebPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description The source was stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SourceResponse"];
+                };
+            };
+            /** @description The request body is not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The notebook already holds this address. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    addFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The source was stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SourceResponse"];
+                };
+            };
+            /** @description The upload carries no bytes. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The notebook already holds this content. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The upload is larger than the accepted size. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -544,6 +794,42 @@ export interface operations {
             };
             /** @description The credentials were rejected. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notebook was returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotebookResponse"];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -659,6 +945,84 @@ export interface operations {
             };
             /** @description The request carries no key handle. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sources were returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SourceResponse"][];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The source was removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The session of the access token is closed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The notebook holds no such source. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

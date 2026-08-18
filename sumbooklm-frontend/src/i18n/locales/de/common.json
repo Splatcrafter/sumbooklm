@@ -85,6 +85,76 @@
       "action": "Das hat nicht geklappt. Bitte versuche es erneut."
     }
   },
+  "sumbook": {
+    "loading": "Dein Sumbook wird geöffnet ...",
+    "header": {
+      "meta": "{{sources}} • {{date}}",
+      "sources_one": "{{count}} Quelle",
+      "sources_other": "{{count}} Quellen"
+    },
+    "sources": {
+      "heading": "Quellen",
+      "count_one": "{{count}} Quelle",
+      "count_other": "{{count}} Quellen",
+      "add": "Quelle hinzufügen",
+      "loading": "Quellen werden geladen ...",
+      "empty": "Noch keine Quellen. Füge ein Dokument oder eine Webseite hinzu, auf die sich dieses Sumbook stützt.",
+      "remove": "{{name}} entfernen",
+      "kind": {
+        "file": "Hochgeladene Datei",
+        "web": "Webseite"
+      },
+      "status": {
+        "uploaded": "Wartet auf die Indexierung",
+        "indexing": "Wird indexiert ...",
+        "ready_one": "Indexiert, {{count}} Token",
+        "ready_other": "Indexiert, {{count}} Token",
+        "error": "Konnte nicht gelesen werden"
+      }
+    },
+    "add": {
+      "heading": "Quelle hinzufügen",
+      "description": "Lade ein Dokument hoch oder nenne eine Webseite. Die Indexierung läuft im Hintergrund.",
+      "tabs": {
+        "file": "Datei hochladen",
+        "url": "Webseiten-URL"
+      },
+      "dropzone": "Datei auswählen oder hierher ziehen",
+      "dropzoneHint": "PDF, TXT und Markdown",
+      "fields": {
+        "url": "Adresse",
+        "urlPlaceholder": "https://example.org/artikel"
+      },
+      "confirm": "Quelle hinzufügen"
+    },
+    "summary": {
+      "pending": "Die Zusammenfassung dieser Quellen gibt es noch nicht. Sie erscheint hier, sobald ein Sumbook sich selbst zusammenfassen kann.",
+      "noSources": "Dieses Sumbook hat noch nichts zusammenzufassen. Füge eine Quelle hinzu, sie wird für dich indexiert.",
+      "copy": "Zusammenfassung kopieren"
+    },
+    "chat": {
+      "placeholder": "Frage etwas zu deinen Quellen",
+      "sources_one": "{{count}} Quelle",
+      "sources_other": "{{count}} Quellen",
+      "send": "Frage absenden",
+      "notAvailable": "Antworten gibt es noch nicht. Deine Frage wurde nirgendwohin gesendet."
+    },
+    "studio": {
+      "heading": "Studio",
+      "placeholder": "Wähle eine Quelle oder beginne ein Gespräch. Was aus diesem Sumbook entsteht, erscheint hier."
+    },
+    "actions": {
+      "backToOverview": "Alle Sumbooks",
+      "cancel": "Abbrechen",
+      "retry": "Erneut versuchen"
+    },
+    "errors": {
+      "load": "Dieses Sumbook konnte nicht geladen werden.",
+      "missing": "Dieses Sumbook existiert nicht.",
+      "add": "Die Quelle konnte nicht hinzugefügt werden. Bitte versuche es erneut.",
+      "duplicate": "Diese Quelle ist bereits Teil des Sumbooks."
+    }
+  },
   "errors": {
     "routeNotFound": "Diese Seite existiert nicht."
   }

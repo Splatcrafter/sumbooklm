@@ -270,3 +270,60 @@ date formatted for the locale (`Oct 24, 2026`, `24. Okt. 2026`, `2026年10月24�
 and zero forms of the source count, a shared minimum card height, and no character above `U+2000` in
 the markup other than the topic icon and the separator. The script lives outside the repository; see
 open question 17.
+
+## Verification of the ingestion pipeline and the Sumbook view on 2026-08-18
+
+Full `mvn clean install` on JDK 25 / Maven 3.9.15: all ten modules green, 38 tests, JavaDoc gate now
+active in `sumbooklm-ingestion` and `sumbooklm-ai` as well, since both carry types for the first time.
+
+`SourceApiIntegrationTest` drives the assembled application over HTTP on a random port, ten cases. Six
+of them describe rules that hold before anything is stored, and four describe what the background run
+does afterwards:
+
+| Case | Asserted |
+| --- | --- |
+| Uploading a text file | `201` with `UPLOADED`, the file name kept, `kind` `FILE`, the location header, and then `READY` with a token count above zero |
+| Uploading anything | the activity timestamp of the notebook is refreshed |
+| Uploading no bytes | `400`, and nothing stored |
+| Uploading the same text twice | `201`, then `409`, and `201` again in a second notebook |
+| Adding `https://Example.org/article` then `.../article#section` | `201`, then `409`; `file:///etc/passwd` is `400` |
+| Adding `http://127.0.0.1:9/secret` | `201`, then `ERROR`, because the guard refuses the address |
+| A notebook of another account | listing, adding and removing all answer `404` |
+| No access token | `401` |
+| Removing a source | `204`, gone from the list, the count back to zero, and `404` on a second attempt |
+| Removing the notebook | its sources go with it |
+
+The indexing assertions poll the source until it has left `UPLOADED` and `INDEXING` rather than
+pausing for a fixed time, so the suite neither guesses at machine speed nor sleeps longer than it has
+to; the ten cases run in about eleven seconds including one real embedding run.
+
+`npm run api:generate` against the packaged jar regenerated `src/api/schema.d.ts` with the four source
+paths, and `npm run typecheck` and `npm run build` are green against it, with only the pre-existing
+chunk size warning.
+
+The generated client itself was then driven against that same running jar from Node, loading the very
+modules the browser loads through Vite's SSR loader and prefixing the relative paths with the origin:
+a real `File` uploaded through `uploadSourceFile` was stored, reached `READY` with sixteen tokens, the
+same content was refused with `409`, `not-an-address` was refused with `400`, a link was accepted, the
+upload was removed and the notebook's source count followed. That covers the one part the Java test
+cannot reach, which is whether the multipart body the browser code builds is a request the server
+accepts.
+
+The Sumbook view was rendered through the SSR loader in all three languages: no unresolved translation
+key, all three panel headings, the topic icon rendered as the characters it is, the fallback icon
+where it is empty, one separator in the header, the activity date formatted for the locale, the source
+count in header and composer including its singular form, the globe icon on web sources and the file
+icon on uploads, a spinner on each of the two pending sources, a check on the indexed one and an alert
+on the failed one, the token count of an indexed source in singular and plural, a remove action per
+source, the send button disabled and grey while the field is empty, the summary placeholder, the copy
+button offered as disabled, and no character above `U+2000` other than the topic icon and the
+separator. The dashboard checks were re-run unchanged, plus one for the cards now announcing
+themselves as links.
+
+The composer needed a DOM rather than a string, so it was driven with `jsdom` installed outside the
+manifest and removed afterwards: an empty field and a field holding only spaces keep the button
+disabled, grey and showing the not-allowed cursor; text enables it and turns it blue with a white
+arrow; shift with enter neither sends nor clears; enter sends the trimmed question; the button sends
+as well. Those are the requirements that no amount of static markup can demonstrate.
+
+All harnesses live outside the repository; see open question 17.

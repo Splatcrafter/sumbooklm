@@ -26,6 +26,10 @@
   /* The one non-grey the website keeps for failures, --rs-color-danger. */
   --color-jb-danger: #f45c4a;
 
+  /* The blue of the same system, --rs-color-blue, used for the single action that sends. */
+  --color-jb-accent: #087cfa;
+  --color-jb-accent-bright: #2b90ff;
+
   /* The website rounds cards at 16px and larger blocks above that. */
   --radius-jb-card: 16px;
   --radius-jb-block: 24px;

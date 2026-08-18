@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>SumbookLM :: Workspace</name>
-    <description>Notebook, source document and chat session management on top of the persistence layer.</description>
+    <description>Notebook and source document management, including the pipeline that indexes a source.</description>
 
     <dependencies>
         <dependency>
@@ -24,6 +24,14 @@
         <dependency>
             <groupId>de.pfoertner.assessment.sumbooklm</groupId>
             <artifactId>sumbooklm-persistence</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>de.pfoertner.assessment.sumbooklm</groupId>
+            <artifactId>sumbooklm-ingestion</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>de.pfoertner.assessment.sumbooklm</groupId>
+            <artifactId>sumbooklm-ai</artifactId>
         </dependency>
 
         <dependency>

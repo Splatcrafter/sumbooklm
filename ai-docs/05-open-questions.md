@@ -55,13 +55,12 @@ Neither ESLint/Prettier on the frontend nor Checkstyle/Spotless on the backend i
 assessment the conventions in the brief are strict enough that automated enforcement is probably
 worth adding before the codebase grows.
 
-## 8. The JavaDoc gate is disabled in two modules
+## 8. Resolved: the JavaDoc gate is active everywhere
 
 `sumbooklm-ingestion` and `sumbooklm-ai` set `maven.javadoc.skip=true` because Javadoc cannot
-process a source set without a type (finding 12). The property has to be removed from each POM as
-soon as the module gains its first class, otherwise the module keeps building without documentation
-enforcement and nothing points that out. `sumbooklm-domain` was in the same state and is not any
-more: it gained the user account types with the authentication module, and its property is gone.
+process a source set without a type (finding 12). Both gained their first classes with the ingestion
+pipeline, and both properties are gone, as `sumbooklm-domain`'s was when it gained the user account
+types. No module skips the gate any more, which is what this question was waiting for.
 
 ## 9. Ending a session on every device
 
@@ -112,13 +111,13 @@ deliberate as long as the API is small, because it does not reveal which endpoin
 confusing once authenticated clients call unknown paths, which will read as an authorization problem
 in their logs rather than a routing mistake.
 
-## 15. A notebook card cannot be opened yet
+## 15. Resolved: a notebook card opens its Sumbook
 
-The overview renders the notebooks and their actions, but nothing happens when a card itself is
-clicked, because there is no route below `/` that shows one notebook. That is deliberate for this
-step: inventing a detail route would have meant inventing what a notebook view contains. It has to be
-answered before the dashboard is shown to anyone, since a grid of cards that do not open reads as
-broken rather than as unfinished.
+The card now navigates to `/dashboard/sumbook/{id}`, which shows the sources, the conversation and
+the studio. What remains open from the original question is smaller: the card is a `div` with
+`role="link"` rather than an anchor, so it cannot be opened in a new tab. Wrapping the card in an
+anchor would nest the menu button inside a link, which is invalid; the alternative is an invisible
+anchor covering the card with the menu raised above it.
 
 ## 16. The document hash cannot be queried
 
@@ -136,9 +135,66 @@ missing translation keys, wrong plural forms and structural regressions, but it 
 `npm run build` and nothing runs it in a pipeline. Adding Vitest plus Testing Library would turn those
 scripts into real tests; it also adds a toolchain the project does not otherwise have.
 
-## 18. `last_activity_at` is only written by the application
+## 18. Opening a Sumbook does not count as activity
 
-The timestamp the overview is ordered by is refreshed when a notebook is created and when it is
-renamed. Opening a notebook does not refresh it, because there is no endpoint that opens one yet, and
-adding a source does not either. Both have to write it once the corresponding endpoints exist, or the
-section titled "recently opened" will be ordered by something else than what it claims.
+The timestamp the overview is ordered by is refreshed when a notebook is created, renamed, and now
+when a source is added or removed. Opening one still does not refresh it, because the endpoint that
+reads a notebook is a `GET` and a `GET` that writes is a `GET` that cannot be cached, retried or
+prefetched. The section titled "recently opened" therefore orders by "recently changed".
+
+The fix is an explicit endpoint that records the visit, called by the detail view when it mounts.
+That is worth doing once there is something to open that is worth returning to; today the two orders
+differ only for a Sumbook that is read and never touched.
+
+## 19. The vector index does not survive a restart, and nothing rebuilds it
+
+`InMemoryEmbeddingStore` keeps its vectors in the heap. After a restart every source still reports
+`READY`, because that is stored in the database, while the segments behind it are gone. The same
+happens to a source whose run was interrupted, which stays in `INDEXING` for ever because nothing
+picks it up again.
+
+Both need the same thing: a way to index a source that already exists. That is one endpoint and one
+call at startup for everything not in `READY`, and it becomes unavoidable the moment the vector store
+is not in memory any more, since a real one would then hold data that the application has to be able
+to reconcile against.
+
+## 20. The guard against internal addresses is not airtight
+
+A submitted address is resolved and refused when it points into a private range, and the address the
+request finally landed on is checked again before the page is read. Two gaps remain. The name is
+resolved once for the check and again for the request, so a name that changes between the two is not
+covered. And a redirect into a private range is followed before it is judged, so the request is made
+even though its content is discarded.
+
+Closing both means resolving the name once and connecting to the resolved address, with redirects
+handled by the application rather than by the library. That is the right shape once sources may be
+added by somebody other than the person running the server.
+
+## 21. A failed source says that it failed, not why
+
+`DocumentStatus.ERROR` carries no reason. A user whose upload failed sees that it failed and can only
+guess whether the file was scanned, the format unsupported or the page unreachable, and the log is not
+theirs to read.
+
+Storing the reason in the payload is easy; deciding what may be shown is the actual question. The
+message of a text extraction failure names hosts and file names, and the message of an unexpected
+failure names internals, so it needs a small set of causes rather than a free text field.
+
+## 22. Duplicate detection decodes every payload of the notebook
+
+Adding a source reads every source of the notebook and decodes its payload to compare one hash. That
+is cheap for a notebook with a dozen sources and wrong for one with a thousand.
+
+It is the direct consequence of the hash living in the payload, which open question 16 already
+records. The change is the same one: promote `documentHash` to an indexed column and let the database
+answer the question.
+
+## 23. Removing a notebook takes its vectors out outside any transaction
+
+Deleting a notebook or a source removes the matching segments from the vector store inside the
+transaction that deletes the rows, but the store has no transaction of its own. A rollback after that
+point would leave rows whose vectors are gone.
+
+Nothing follows the removal, so the window is theoretical today. It stops being theoretical as soon as
+the store is a real database, at which point the removal belongs in an after-commit listener like the
+one indexing already uses.

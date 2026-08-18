@@ -84,6 +84,72 @@
       "action": "処理できませんでした。もう一度お試しください。"
     }
   },
+  "sumbook": {
+    "loading": "Sumbook を開いています ...",
+    "header": {
+      "meta": "{{sources}} • {{date}}",
+      "sources_other": "{{count}} 件の資料"
+    },
+    "sources": {
+      "heading": "資料",
+      "count_other": "{{count}} 件の資料",
+      "add": "資料を追加",
+      "loading": "資料を読み込んでいます ...",
+      "empty": "まだ資料がありません。この Sumbook の土台となる文書やウェブページを追加してください。",
+      "remove": "{{name}} を削除",
+      "kind": {
+        "file": "アップロードしたファイル",
+        "web": "ウェブページ"
+      },
+      "status": {
+        "uploaded": "インデックス作成を待機中",
+        "indexing": "インデックスを作成しています ...",
+        "ready_other": "インデックス済み、{{count}} トークン",
+        "error": "読み取れませんでした"
+      }
+    },
+    "add": {
+      "heading": "資料を追加",
+      "description": "文書をアップロードするか、ウェブページを指定してください。インデックス作成は背後で実行されます。",
+      "tabs": {
+        "file": "ファイルをアップロード",
+        "url": "ウェブサイトの URL"
+      },
+      "dropzone": "ファイルを選択するか、ここにドロップ",
+      "dropzoneHint": "PDF、TXT、Markdown",
+      "fields": {
+        "url": "アドレス",
+        "urlPlaceholder": "https://example.org/article"
+      },
+      "confirm": "資料を追加"
+    },
+    "summary": {
+      "pending": "これらの資料の要約はまだありません。Sumbook が自身を要約できるようになると、ここに表示されます。",
+      "noSources": "この Sumbook にはまだ要約するものがありません。資料を追加すると、インデックスが作成されます。",
+      "copy": "要約をコピー"
+    },
+    "chat": {
+      "placeholder": "資料について質問してください",
+      "sources_other": "{{count}} 件の資料",
+      "send": "質問を送信",
+      "notAvailable": "回答機能はまだ利用できません。質問はどこにも送信されていません。"
+    },
+    "studio": {
+      "heading": "スタジオ",
+      "placeholder": "資料を選ぶか、会話を始めてください。この Sumbook から生成されたものがここに表示されます。"
+    },
+    "actions": {
+      "backToOverview": "すべての Sumbook",
+      "cancel": "キャンセル",
+      "retry": "再試行"
+    },
+    "errors": {
+      "load": "この Sumbook を読み込めませんでした。",
+      "missing": "この Sumbook は存在しません。",
+      "add": "資料を追加できませんでした。もう一度お試しください。",
+      "duplicate": "この資料はすでに Sumbook に含まれています。"
+    }
+  },
   "errors": {
     "routeNotFound": "このページは存在しません。"
   }

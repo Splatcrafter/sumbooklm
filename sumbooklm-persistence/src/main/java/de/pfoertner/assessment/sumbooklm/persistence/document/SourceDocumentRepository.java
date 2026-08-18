@@ -1,6 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.persistence.document;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,6 +34,24 @@ public interface SourceDocumentRepository extends JpaRepository<SourceDocumentEn
             group by document.notebookId
             """)
     List<NotebookSourceCount> countPerNotebook(@Param("userId") UUID userId);
+
+    /**
+     * Finds the sources of one notebook, oldest first.
+     *
+     * @param notebookId identifier of the notebook the sources belong to
+     * @param userId     identifier of the owning account
+     * @return the sources of the notebook, in the order they were added
+     */
+    List<SourceDocumentEntity> findAllByNotebookIdAndUserIdOrderByCreatedAtAsc(UUID notebookId, UUID userId);
+
+    /**
+     * Finds one source of an account.
+     *
+     * @param id     identifier of the source
+     * @param userId identifier of the owning account
+     * @return the source, or an empty result if the account owns no source with that identifier
+     */
+    Optional<SourceDocumentEntity> findByIdAndUserId(UUID id, UUID userId);
 
     /**
      * Counts the sources of one notebook.

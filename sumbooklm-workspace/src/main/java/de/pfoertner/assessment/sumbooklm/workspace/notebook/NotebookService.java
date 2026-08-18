@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import de.pfoertner.assessment.sumbooklm.ai.embedding.NotebookIndex;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.Notebook;
 import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.document.NotebookSourceCount;
@@ -35,8 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>Removal</h2>
  * Deleting a notebook deletes the sources and the chat sessions that belong to it in the same
- * transaction. The rows below a notebook carry its identifier rather than a foreign key with a
- * cascade, so the cascade is performed here, where it is visible.
+ * transaction, and takes its segments out of the retrieval index. The rows below a notebook carry
+ * its identifier rather than a foreign key with a cascade, so the cascade is performed here, where
+ * it is visible.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -65,6 +67,11 @@ public class NotebookService {
     private final NotebookMapper notebookMapper;
 
     /**
+     * Retrieval index the segments of a removed notebook are taken out of.
+     */
+    private final NotebookIndex notebookIndex;
+
+    /**
      * Source of the current time, so that the recorded timestamps are deterministic in tests.
      */
     private final Clock clock;
@@ -76,17 +83,20 @@ public class NotebookService {
      * @param sourceDocumentRepository storage of the sources
      * @param chatSessionRepository    storage of the chat sessions
      * @param notebookMapper           translator between rows, payload and the domain model
+     * @param notebookIndex            retrieval index the segments of a notebook live in
      * @param clock                    source of the current time
      */
     public NotebookService(final NotebookRepository notebookRepository,
                            final SourceDocumentRepository sourceDocumentRepository,
                            final ChatSessionRepository chatSessionRepository,
                            final NotebookMapper notebookMapper,
+                           final NotebookIndex notebookIndex,
                            final Clock clock) {
         this.notebookRepository = notebookRepository;
         this.sourceDocumentRepository = sourceDocumentRepository;
         this.chatSessionRepository = chatSessionRepository;
         this.notebookMapper = notebookMapper;
+        this.notebookIndex = notebookIndex;
         this.clock = clock;
     }
 
@@ -105,6 +115,21 @@ public class NotebookService {
                 .map(entity -> this.notebookMapper.toDomain(
                         entity, sourceCounts.getOrDefault(entity.getId(), 0L)))
                 .toList();
+    }
+
+    /**
+     * Reads one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to read
+     * @return the notebook, with the number of sources it holds
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    @Transactional(readOnly = true)
+    public Notebook get(final UUID userId, final UUID notebookId) {
+        final NotebookEntity entity = require(userId, notebookId);
+        return this.notebookMapper.toDomain(entity,
+                this.sourceDocumentRepository.countByNotebookIdAndUserId(notebookId, userId));
     }
 
     /**
@@ -171,6 +196,7 @@ public class NotebookService {
         this.sourceDocumentRepository.deleteByNotebookIdAndUserId(notebookId, userId);
         this.chatSessionRepository.deleteByNotebookIdAndUserId(notebookId, userId);
         this.notebookRepository.delete(entity);
+        this.notebookIndex.removeNotebook(notebookId);
     }
 
     /**

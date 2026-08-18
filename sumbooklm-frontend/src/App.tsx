@@ -7,6 +7,7 @@ import { AccountLayout } from '@/routes/account/AccountLayout';
 import { LoginPage } from '@/routes/account/LoginPage';
 import { RegisterPage } from '@/routes/account/RegisterPage';
 import { DashboardPage } from '@/routes/dashboard/DashboardPage';
+import { SumbookPage } from '@/routes/sumbook/SumbookPage';
 
 const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'dashboard/sumbook/:notebookId', element: <SumbookPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

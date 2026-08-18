@@ -6,6 +6,7 @@ import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -18,6 +19,12 @@ import jakarta.persistence.Version;
  * both, and the point in time it was added. Its name, its processing state, its token count and its
  * content hash live in {@code payload} as CBOR bytes written at the schema version recorded in
  * {@code payload_version}.
+ *
+ * <h2>Stored Content</h2>
+ * {@code content} holds the bytes of an uploaded file, so that the source can be parsed again
+ * without asking the user to upload it a second time. A source that names a web page leaves the
+ * column empty: its content lives at its address, and a copy taken at upload time would silently
+ * become a different document than the one the address resolves to.
  *
  * <h2>Two Identifier Columns</h2>
  * The owner is carried next to the notebook instead of being reached through it. A source is always
@@ -61,6 +68,13 @@ public class SourceDocumentEntity {
     private Instant createdAt;
 
     /**
+     * Bytes of the uploaded file, or {@code null} for a source that names a web page.
+     */
+    @Lob
+    @Column(name = "content")
+    private byte[] content;
+
+    /**
      * CBOR encoded payload of the source.
      */
     @Column(name = "payload", nullable = false, length = 65_536)
@@ -92,6 +106,7 @@ public class SourceDocumentEntity {
      * @param userId         identifier of the account the source belongs to
      * @param notebookId     identifier of the notebook the source belongs to
      * @param createdAt      point in time the source was added
+     * @param content        bytes of the uploaded file, or {@code null} for a web page
      * @param payload        CBOR encoded payload of the source
      * @param payloadVersion payload schema version the payload was written with
      */
@@ -99,12 +114,14 @@ public class SourceDocumentEntity {
                                 final UUID userId,
                                 final UUID notebookId,
                                 final Instant createdAt,
+                                final byte[] content,
                                 final byte[] payload,
                                 final int payloadVersion) {
         this.id = id;
         this.userId = userId;
         this.notebookId = notebookId;
         this.createdAt = createdAt;
+        this.content = content;
         this.payload = payload;
         this.payloadVersion = payloadVersion;
     }
@@ -143,6 +160,15 @@ public class SourceDocumentEntity {
      */
     public Instant getCreatedAt() {
         return this.createdAt;
+    }
+
+    /**
+     * Returns the bytes of the uploaded file.
+     *
+     * @return the stored bytes, or {@code null} for a source that names a web page
+     */
+    public byte[] getContent() {
+        return this.content;
     }
 
     /**

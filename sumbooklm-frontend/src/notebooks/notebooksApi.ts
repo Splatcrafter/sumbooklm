@@ -35,6 +35,23 @@ export async function listNotebooks(accessToken: string): Promise<Notebook[]> {
 }
 
 /**
+ * Reads one notebook.
+ *
+ * The view of a single Sumbook loads it through this call rather than searching the collection, so
+ * that opening its address directly works even when the collection was never loaded.
+ */
+export async function getNotebook(accessToken: string, notebookId: string): Promise<Notebook> {
+  const { data, response } = await apiClient.GET('/api/v1/notebooks/{notebookId}', {
+    headers: authorization(accessToken),
+    params: { path: { notebookId } },
+  });
+  if (!response.ok || !data) {
+    throw new NotebookRequestError(response.status);
+  }
+  return toNotebook(data);
+}
+
+/**
  * Creates a notebook and returns it as the backend stored it.
  */
 export async function createNotebook(accessToken: string, title: string): Promise<Notebook> {

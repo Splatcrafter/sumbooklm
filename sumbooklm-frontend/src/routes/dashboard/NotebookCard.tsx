@@ -1,5 +1,6 @@
-import { MoreVertical, NotebookText, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import { MoreVertical, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,15 +11,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Notebook } from '@/notebooks/notebook';
+import { sumbookPath } from '@/notebooks/notebookRoutes';
+import { TopicIcon } from '@/notebooks/TopicIcon';
 import { useNotebookMeta } from '@/routes/dashboard/NotebookMeta';
 
 /**
  * One notebook of the overview.
  *
- * The topic icon is rendered as the characters the backend stored, which is the one place where a
- * symbol reaches the interface as data. It is empty until the backend has derived it, and the card
- * shows a neutral icon of its own in that case instead of a placeholder character, so an unlabelled
- * notebook does not look like a labelled one.
+ * The whole card opens the Sumbook, so the target is the size of the card rather than of its title.
+ * The menu inside it opens on its own and must not open the Sumbook as well, which is why it stops
+ * the click from travelling further up.
  */
 export function NotebookCard({
   notebook,
@@ -33,21 +35,24 @@ export function NotebookCard({
 }) {
   const { t } = useTranslation();
   const meta = useNotebookMeta();
+  const navigate = useNavigate();
 
   return (
-    <Card className="min-h-40 gap-3 rounded-jb-card bg-jb-grey-95/70 ring-jb-grey-70/25 transition-colors hover:bg-jb-grey-90/70 hover:ring-jb-grey-60/40">
+    <Card
+      role="link"
+      tabIndex={0}
+      onClick={() => void navigate(sumbookPath(notebook.id))}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          void navigate(sumbookPath(notebook.id));
+        }
+      }}
+      className="min-h-40 cursor-pointer gap-3 rounded-jb-card bg-jb-grey-95/70 ring-jb-grey-70/25 transition-colors outline-none hover:bg-jb-grey-90/70 hover:ring-jb-grey-60/40 focus-visible:ring-2 focus-visible:ring-jb-grey-30/40"
+    >
       <CardHeader>
-        <div
-          aria-hidden={notebook.topicIcon === ''}
-          className="flex size-10 items-center justify-center rounded-xl bg-jb-grey-90 text-xl leading-none ring-1 ring-jb-grey-70/40"
-        >
-          {notebook.topicIcon === '' ? (
-            <NotebookText className="size-5 text-jb-grey-40" />
-          ) : (
-            notebook.topicIcon
-          )}
-        </div>
-        <CardAction>
+        <TopicIcon topicIcon={notebook.topicIcon} />
+        <CardAction onClick={(event) => event.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={

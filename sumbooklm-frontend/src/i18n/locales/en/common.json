@@ -3,6 +3,39 @@
     "name": "SumbookLM",
     "tagline": "Turn your sources into grounded answers."
   },
+  "account": {
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Use your username and password to continue.",
+      "submit": "Sign in",
+      "noAccount": "No account yet?",
+      "toRegister": "Create one"
+    },
+    "register": {
+      "title": "Create account",
+      "subtitle": "A few details are enough to get started.",
+      "submit": "Create account",
+      "hasAccount": "Already have an account?",
+      "toLogin": "Sign in"
+    },
+    "fields": {
+      "username": "Username",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "password": "Password"
+    },
+    "hints": {
+      "password": "At least {{length}} characters."
+    },
+    "signedInAs": "Signed in as {{username}}",
+    "signOut": "Sign out",
+    "errors": {
+      "invalidCredentials": "Username or password is not correct.",
+      "usernameTaken": "This username is already taken.",
+      "invalidInput": "Please check the entered values.",
+      "unexpected": "Something went wrong. Please try again."
+    }
+  },
   "errors": {
     "routeNotFound": "This page does not exist."
   }

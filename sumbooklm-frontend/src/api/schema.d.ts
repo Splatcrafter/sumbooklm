@@ -3,10 +3,244 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+    "/api/v1/token/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a refresh token for a new token pair
+         * @description Consumes the presented refresh token and issues a new pair. Presenting a token that was already consumed revokes every session of the account.
+         */
+        post: operations["refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an account and authenticate it
+         * @description Creates the account, records registration metadata and returns a token pair as if the new account had logged in.
+         */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close the current session
+         * @description Revokes the refresh token of the session the presented access token belongs to.
+         */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authenticate with credentials
+         * @description Verifies the credentials, records the login and returns a token pair.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/cookie-iv/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the parameters of the client side token store
+         * @description Derives the key belonging to the key handle cookie of the caller and returns it together with a freshly generated initialization vector.
+         */
+        get: operations["parameters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /** @description Refresh token to exchange for a new token pair. */
+        RefreshRequest: {
+            /** @description Refresh token issued by a previous login, registration or refresh. */
+            refreshToken: string;
+        };
+        /** @description Pair of an access token and a refresh token. */
+        TokenPairResponse: {
+            /**
+             * @description Scheme the access token is presented with.
+             * @example Bearer
+             */
+            tokenType?: string;
+            /** @description Short lived token for subsequent requests. */
+            accessToken?: string;
+            /**
+             * Format: date-time
+             * @description Expiry of the access token.
+             */
+            accessTokenExpiresAt?: string;
+            /** @description Long lived token used to obtain a new pair. */
+            refreshToken?: string;
+            /**
+             * Format: date-time
+             * @description Expiry of the refresh token.
+             */
+            refreshTokenExpiresAt?: string;
+        };
+        /** @description Data required to create an account. */
+        RegistrationRequest: {
+            /**
+             * @description Login name, unique across all accounts.
+             * @example erik
+             */
+            username: string;
+            /**
+             * @description Given name of the user.
+             * @example Erik
+             */
+            firstName: string;
+            /**
+             * @description Family name of the user.
+             * @example Pfoertner
+             */
+            lastName: string;
+            /** @description Clear text password of the new account. */
+            password: string;
+        };
+        /** @description Account a token pair belongs to. */
+        AuthenticatedUser: {
+            /**
+             * Format: uuid
+             * @description Stable identifier of the account.
+             */
+            id?: string;
+            /**
+             * @description Login name of the account.
+             * @example erik
+             */
+            username?: string;
+            /**
+             * @description Given name of the user.
+             * @example Erik
+             */
+            firstName?: string;
+            /**
+             * @description Family name of the user.
+             * @example Pfoertner
+             */
+            lastName?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the account was created.
+             */
+            registeredAt?: string;
+            /**
+             * Format: date-time
+             * @description Point in time of the most recent successful login.
+             */
+            lastLoginAt?: string;
+        };
+        /** @description Issued token pair together with the account it belongs to. */
+        AuthenticationResponse: {
+            /** @description Issued token pair. */
+            tokens?: components["schemas"]["TokenPairResponse"];
+            /** @description Account the token pair belongs to. */
+            user?: components["schemas"]["AuthenticatedUser"];
+        };
+        /** @description Credentials of an existing account. */
+        LoginRequest: {
+            /**
+             * @description Login name of the account.
+             * @example erik
+             */
+            username: string;
+            /** @description Clear text password of the account. */
+            password: string;
+        };
+        /** @description Parameters for encrypting and decrypting the client side token store. */
+        CookieCryptographyResponse: {
+            /**
+             * @description Name of the cookie the client stores its token pair in.
+             * @example sumbooklm_auth
+             */
+            cookieName?: string;
+            /**
+             * @description Name of the cipher.
+             * @example AES-GCM
+             */
+            algorithm?: string;
+            /**
+             * Format: int32
+             * @description Length of the key in bits.
+             * @example 256
+             */
+            keyLength?: number;
+            /**
+             * Format: int32
+             * @description Expected length of an initialization vector in bytes.
+             * @example 12
+             */
+            initializationVectorLength?: number;
+            /**
+             * Format: int32
+             * @description Length of the authentication tag in bits.
+             * @example 128
+             */
+            authenticationTagLength?: number;
+            /** @description Base64 encoded key of the calling client. */
+            key?: string;
+            /** @description Base64 encoded vector to use for the next encryption. */
+            initializationVector?: string;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -14,4 +248,171 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description A new token pair was issued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TokenPairResponse"];
+                };
+            };
+            /** @description The refresh token was rejected. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationRequest"];
+            };
+        };
+        responses: {
+            /** @description The account was created and authenticated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthenticationResponse"];
+                };
+            };
+            /** @description The request body is not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The username is already taken. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session was closed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The session is already closed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description The credentials were accepted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthenticationResponse"];
+                };
+            };
+            /** @description The request body is not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The credentials were rejected. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    parameters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The parameters were derived. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CookieCryptographyResponse"];
+                };
+            };
+            /** @description The request carries no key handle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+}

@@ -3,6 +3,39 @@
     "name": "SumbookLM",
     "tagline": "資料を根拠のある回答に変えましょう。"
   },
+  "account": {
+    "login": {
+      "title": "ログイン",
+      "subtitle": "ユーザー名とパスワードを入力してください。",
+      "submit": "ログイン",
+      "noAccount": "アカウントをお持ちでないですか？",
+      "toRegister": "作成する"
+    },
+    "register": {
+      "title": "アカウント作成",
+      "subtitle": "いくつかの情報だけで始められます。",
+      "submit": "アカウントを作成",
+      "hasAccount": "すでにアカウントをお持ちですか？",
+      "toLogin": "ログイン"
+    },
+    "fields": {
+      "username": "ユーザー名",
+      "firstName": "名",
+      "lastName": "姓",
+      "password": "パスワード"
+    },
+    "hints": {
+      "password": "{{length}} 文字以上で入力してください。"
+    },
+    "signedInAs": "{{username}} としてログイン中",
+    "signOut": "ログアウト",
+    "errors": {
+      "invalidCredentials": "ユーザー名またはパスワードが正しくありません。",
+      "usernameTaken": "このユーザー名はすでに使用されています。",
+      "invalidInput": "入力内容を確認してください。",
+      "unexpected": "問題が発生しました。もう一度お試しください。"
+    }
+  },
   "errors": {
     "routeNotFound": "このページは存在しません。"
   }

@@ -3,6 +3,39 @@
     "name": "SumbookLM",
     "tagline": "Verwandle deine Quellen in belegte Antworten."
   },
+  "account": {
+    "login": {
+      "title": "Anmelden",
+      "subtitle": "Melde dich mit Benutzername und Passwort an.",
+      "submit": "Anmelden",
+      "noAccount": "Noch kein Konto?",
+      "toRegister": "Jetzt erstellen"
+    },
+    "register": {
+      "title": "Konto erstellen",
+      "subtitle": "Ein paar Angaben genügen für den Start.",
+      "submit": "Konto erstellen",
+      "hasAccount": "Schon registriert?",
+      "toLogin": "Anmelden"
+    },
+    "fields": {
+      "username": "Benutzername",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "password": "Passwort"
+    },
+    "hints": {
+      "password": "Mindestens {{length}} Zeichen."
+    },
+    "signedInAs": "Angemeldet als {{username}}",
+    "signOut": "Abmelden",
+    "errors": {
+      "invalidCredentials": "Benutzername oder Passwort ist nicht korrekt.",
+      "usernameTaken": "Dieser Benutzername ist bereits vergeben.",
+      "invalidInput": "Bitte überprüfe die eingegebenen Werte.",
+      "unexpected": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+    }
+  },
   "errors": {
     "routeNotFound": "Diese Seite existiert nicht."
   }

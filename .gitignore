@@ -52,10 +52,6 @@ node_modules/
 node_modules/**
 node_modules/*.*
 
-# Claude Code
-/.claude/
-/CLAUDE.md
-
 # GitHub
 current-ticket.md
 /data/

@@ -1,0 +1,36 @@
+Ziel dieses Projektes ist ein Klon des berühmten "NotebookLM" (bzw. wie es jetzt umbenannt wurde: "Gemini Notebook"). Das Ganze ist ein Assessment-Test, heißt es muss als MVP architektonisch wirklich sauber umgesetzt werden. Deine erste Aufgabe ist es, mir ausschließlich das Grundgerüst zu erstellen.
+
+Unter "Grundgerüst" ist strikt Folgendes zu verstehen: Lege die Multi-Module-Struktur an, binde alle genannten Dependencies ein und erstelle maximal die absolut nötigsten Basis-Klassen (wie z. B. die @SpringBootApplication-Main-Klasse). Schreibe in diesem Schritt noch keinerlei Fachlogik, Services oder Implementierungen!
+
+Das Frontend wird beim Build-Prozess in das Backend integriert und zusammen als ein einziges ausführbares Artefakt ausgeliefert. Konkret bedeutet das: Das Frontend soll über den Maven-Build-Lifecycle (z.B. via frontend-maven-plugin) gebaut und der Vite-Output in den static-Ordner von Spring Boot kopiert werden. Spring Boot soll dabei als Host für die Single Page Application (SPA) fungieren und ein Fallback-Routing implementieren, bei dem alle nicht erkannten Routen auf die index.html weitergeleitet werden, damit das React-Routing (React Router) fehlerfrei funktioniert.
+
+Für die AI-Integration bestehe ich in der Live-Production auf einem BYOK-Ansatz (Bring Your Own Key). Für lokales Deployment (im Developer-Modus, falls man sich auf einer leistungsstarken Dev-Maschine befindet) soll dies mit einer "Use Local LLM"-Option (wie Qwen, Ollama etc.) kombiniert und ergänzt werden, um zu entscheiden was man lieber will. Bedeutet beides wird angeboten im Developer Modus. Dafür halte ich langchain4j-open-ai für die beste Wahl, insbesondere den Spring Boot Starter.
+
+Für die Datenbankanbindung schlage ich PostgreSQL vor, bzw. für lokales Dev-Testing eine In-Memory-DB (H2) für schnelle Iterationen. Dafür wird auf Spring Data JPA gesetzt. Für die eigentliche Datenspeicherung wird ein JSON-CBOR-Blob verwendet, welcher mit Jackson (jackson-dataformat-cbor) encodiert und decodiert wird.
+Wieso? Ein CBOR-Blob enthält serialisierte Daten, die über Aether Datafixers wunderbar über verschiedene Versionen hinweg migriert werden können - ganz ohne den Kopfschmerz von Flyway-Migrationsskripten, die bei jeder Gelegenheit auseinanderfallen. Aether Datafixers ist ein hochperformantes Tool für serialisierte Daten: Es importiert Daten im Format N, baut diese in einem formatunabhängigen IR-Tree (Intermediate Representation) auf, bearbeitet sie und migriert sie am Ende in ein neues (oder dasselbe) Format X. Die entsprechenden Fixer werden dabei über die Version N hinweg in einer Pipeline angewendet.
+Das heißt für die Datenspeicherung: Verwende so gut es geht JPA in Kombination mit CBOR für die eigentlichen Fachdaten und binde Aether Datafixers für die Migration ein.
+Flyway Migrationen sollen wirklich nur der äußerste Notfall sein, wenn nicht sogar ganz vermieden werden, da Fachdaten ausschließlich im CBOR-Blob liegen.
+Die erste Version des Schemas wird 1.0.0 sein, in einem Integer-Wert 100 geschrieben.
+
+Für das Parsen von Dokumenten wie Markdown, PDF, anderen Textdokumenten, HTML oder Webseiten wird Apache Tika (langchain4j-document-parser-apache-tika) verwendet, welches die Daten für das LLM aufbereitet. Das vorherige HTML-Scraping von URLs wird via jsoup übernommen und der bereinigte Content dann an Tika übergeben.
+
+Für die Embeddings und Vektorisierung fordere ich die Nutzung von langchain4j-embeddings-all-minilm-l6-v2 (welches lokal und ohne API-Kosten läuft) sowie langchain4j-in-memory für den Vector Storage im Dev/Test-Modus.
+
+Um eine saubere Schnittstelle zwischen Backend und Frontend zu ziehen, wird auf eine OpenAPI-Integration (ehemals Swagger) via springdoc-openapi-starter-webmvc-ui gesetzt. Das Backend stellt hierbei den Single Point of Truth dar. Das bedeutet, dass die API-Spezifikation aus dem Backend generiert und über das TypeScript-Plugin (openapi-typescript) als typensicherer Client für den React-Teil im Frontend erzeugt werden soll.
+
+Kommen wir zum Frontend: Hier setzen wir auf Vite 8.2 als Buildsystem in Kombination mit React 19.2 und TypeScript.
+
+Für die Benutzeroberfläche wird auch direkt auf Lokalisierung geachtet; diese soll vorerst in Deutsch, Englisch und Japanisch verfügbar sein. Das Ganze wird via i18next, react-i18next und i18next-browser-languagedetector umgesetzt.
+
+Weitere Libraries für das Frontend sind lucide-react für die Icons, sowie react-markdown und remark-gfm für das Rendering der LLM-Ausgaben.
+
+Für das Routing wird auf die aktuellste Version von React Router (v8.x, ESM-only) gesetzt. Für die UI-Komponenten wird das aktuelle shadcn/ui (via shadcn@latest, mit Base UI als Standard-Core) in Kombination mit Tailwind CSS v4.3 (CSS-first Konfiguration) verwendet.
+
+Nutze WebSearch und WebFetch, um die aktuellsten Informationen und Versionen der benötigten Libraries zu recherchieren, und baue basierend darauf das Grundgerüst auf. Dokumentiere am Ende deine Erkenntnisse, architektonischen Entscheidungen und den Projektaufbau in mehreren Dateien im Verzeichnis /ai-docs.
+
+Für diese Dokumentation und den Code gelten folgende strikte Regeln:
+- Isolation der AI-Docs: Die Dateien in /ai-docs dienen ausschließlich als dein eigenes, internes Wissenswerkzeug. Der Quellcode darf unter keinen Umständen jemals auf dieses Verzeichnis oder die darin enthaltenen Erkenntnisse referenzieren.
+- Keine Meta-Erkenntnisse im Code: Es dürfen keine Learnings, Gedankenprozesse oder Projekt-Zusammenfassungen im Code landen.
+- Strenge JavaDocs: JavaDocs dürfen ausschließlich das rein fachliche und technische Verhalten des Codes beschreiben (Was tut die Methode/Klasse und welche Parameter gibt es?).
+- Strikte Sprach- und Zeichenregelung (Zero-Emoji-Policy): Die Nutzung von Emojis oder jeglichen "AI-typischen" Sonder- und Unicode-Zeichen ist in der Codebase ist strikt untersagt. Emojis und andere Dinge sind maximal im Frontend erlaubt. Die einzige zulässige Sprache für das gesamte Projekt (inklusive Klassen, Variablen, Commits, JavaDocs, Kommentare und Dateinamen) ist ausnahmslos Englisch. Die einzige Ausnahme für andere Sprachen bilden ausschließlich die dedizierten Lokalisierungsdateien (i18n).
+- Restriktive Inline-Kommentare: Inline-Kommentare (//) sind nur punktuell und sparsam erlaubt, wenn wirklich schwerwiegende Probleme oder komplexe Workarounds gelöst wurden. Sie dienen dann ausschließlich dazu, späteren Reviewern oder Entwicklern den nötigen Kontext zum Warum einer komplizierten Lösung zu geben. Verzichte komplett auf triviale Kommentare für offensichtlichen Code!

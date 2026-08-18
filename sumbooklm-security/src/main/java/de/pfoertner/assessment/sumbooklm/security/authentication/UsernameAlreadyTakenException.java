@@ -1,5 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.security.authentication;
 
+import java.io.Serial;
+
 /**
  * Signals that an account cannot be created because its username is already in use.
  *
@@ -9,9 +11,10 @@ package de.pfoertner.assessment.sumbooklm.security.authentication;
 public class UsernameAlreadyTakenException extends RuntimeException {
 
     /**
-     * Identifies the serialized form of this class across compilations.
+     * Serialization version for compatibility with older versions of the class.
      */
-    private static final long serialVersionUID = 1L;
+    @Serial
+    private static final long serialVersionUID = -7623915014633367502L;
 
     /**
      * Creates the exception.

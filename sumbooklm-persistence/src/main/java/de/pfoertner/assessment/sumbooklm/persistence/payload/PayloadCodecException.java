@@ -1,5 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.persistence.payload;
 
+import java.io.Serial;
+
 /**
  * Signals that a payload could not be encoded, migrated or decoded.
  *
@@ -14,9 +16,10 @@ package de.pfoertner.assessment.sumbooklm.persistence.payload;
 public class PayloadCodecException extends RuntimeException {
 
     /**
-     * Identifies the serialized form of this class across compilations.
+     * Serialization version of the exception.
      */
-    private static final long serialVersionUID = 1L;
+    @Serial
+    private static final long serialVersionUID = -6400888191033533811L;
 
     /**
      * Creates the exception.

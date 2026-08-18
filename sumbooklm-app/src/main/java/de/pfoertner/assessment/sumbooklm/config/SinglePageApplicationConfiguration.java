@@ -3,6 +3,7 @@ package de.pfoertner.assessment.sumbooklm.config;
 import java.io.IOException;
 
 import de.pfoertner.assessment.sumbooklm.api.ApiPaths;
+import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -108,7 +109,7 @@ public class SinglePageApplicationConfiguration implements WebMvcConfigurer {
          * @throws IOException if the underlying resource cannot be inspected
          */
         @Override
-        protected @Nullable Resource getResource(final String resourcePath, final Resource location) throws IOException {
+        protected @Nullable Resource getResource(@NonNull final String resourcePath, @NonNull final Resource location) throws IOException {
             final Resource requested = super.getResource(resourcePath, location);
             if (requested != null) {
                 return requested;

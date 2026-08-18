@@ -1,5 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.security.token;
 
+import java.io.Serial;
+
 /**
  * Signals that a presented refresh token is not accepted.
  *
@@ -14,9 +16,10 @@ package de.pfoertner.assessment.sumbooklm.security.token;
 public class InvalidRefreshTokenException extends RuntimeException {
 
     /**
-     * Identifies the serialized form of this class across compilations.
+     * Serialization version for compatibility with older versions of the class.
      */
-    private static final long serialVersionUID = 1L;
+    @Serial
+    private static final long serialVersionUID = 1888318528776015753L;
 
     /**
      * Creates the exception.

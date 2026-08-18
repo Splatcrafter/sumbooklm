@@ -1,5 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.security.authentication;
 
+import java.io.Serial;
+
 /**
  * Signals that a login was rejected.
  *
@@ -13,9 +15,10 @@ package de.pfoertner.assessment.sumbooklm.security.authentication;
 public class InvalidCredentialsException extends RuntimeException {
 
     /**
-     * Identifies the serialized form of this class across compilations.
+     * Serialization version for compatibility with older versions of the class.
      */
-    private static final long serialVersionUID = 1L;
+    @Serial
+    private static final long serialVersionUID = 8104319939084304950L;
 
     /**
      * Creates the exception.

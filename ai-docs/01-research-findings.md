@@ -140,3 +140,15 @@ inert for `tsc -b` because the root project compiles no files.
 
 Verified afterwards: `npx shadcn@latest add button` created `src/components/ui/button.tsx`. The
 component was removed again, because the scaffold carries no UI primitives yet.
+
+### 12. Javadoc fails on a source set that contains only a `package-info.java`
+
+`javadoc` exits with `error: No public or protected classes found to document.` when a module
+carries a package declaration but no type. `-private` does not change this, because the problem is
+the absence of types rather than their visibility.
+
+This hits `sumbooklm-domain`, `sumbooklm-ingestion` and `sumbooklm-ai`, which are placeholders at
+scaffold stage. They set `maven.javadoc.skip=true` in their own POM with a comment that ties the
+property to the first type added to the module. `sumbooklm-frontend` needs no such property: the
+plugin skips a module with no Java sources at all on its own, as does the packaging POM of the
+parent.

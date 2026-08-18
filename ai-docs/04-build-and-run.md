@@ -20,6 +20,21 @@ npx shadcn@latest add <component>          # adds a Base UI component into src/c
 
 `SUMBOOKLM_BACKEND_URL` overrides the dev proxy target.
 
+## JavaDoc gate
+
+`mvn verify` runs `maven-javadoc-plugin` with `show=private`, `doclint=all` and
+`failOnWarnings=true` over main and test sources, so an undocumented element fails the build. The
+gate runs in `sumbooklm-persistence`, `sumbooklm-api` and `sumbooklm-app`; the remaining modules are
+skipped for the reason given in finding 12.
+
+```bash
+mvn verify -Dfrontend.skip=true            # runs the gate without the Node toolchain
+mvn -Dmaven.javadoc.skip=true verify       # bypasses the gate
+```
+
+Confirmed on 2026-08-18 that the gate bites: deleting the comment on `ApiPaths.BASE` turned the
+build red with `ApiPaths.java:17: warning: no comment`, and restoring it turned the build green.
+
 ## How the frontend reaches the backend artifact
 
 1. `frontend-maven-plugin:install-node-and-npm` (generate-resources) downloads Node v24.19.0 and npm

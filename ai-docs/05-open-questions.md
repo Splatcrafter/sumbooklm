@@ -54,3 +54,10 @@ release of the starter.
 Neither ESLint/Prettier on the frontend nor Checkstyle/Spotless on the backend is configured. For an
 assessment the conventions in the brief are strict enough that automated enforcement is probably
 worth adding before the codebase grows.
+
+## 8. The JavaDoc gate is disabled in three modules
+
+`sumbooklm-domain`, `sumbooklm-ingestion` and `sumbooklm-ai` set `maven.javadoc.skip=true` because
+Javadoc cannot process a source set without a type (finding 12). The property has to be removed from
+each POM as soon as the module gains its first class, otherwise the module keeps building without
+documentation enforcement and nothing points that out.

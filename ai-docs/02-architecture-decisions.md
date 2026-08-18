@@ -140,3 +140,18 @@ compiler. `sumbooklm-domain` cannot accidentally import a JPA entity manager bec
 its classpath.
 
 **Cost.** More POM files, and a cross-cutting change touches several modules.
+
+## ADR-011: JavaDoc completeness is enforced by the build
+
+**Decision.** `maven-javadoc-plugin` 3.12.0 runs `javadoc-no-fork` and `test-javadoc-no-fork` in the
+`verify` phase with `show=private`, `doclint=all` and `failOnWarnings=true`. Missing or malformed
+documentation on any element, including private fields and constructors, fails the build.
+
+**Reason.** Documentation completeness was previously enforced by review only, and review missed
+several members: a public `addResourceHandlers` without any comment, every constant of the SPA
+configuration, and three implicit default constructors. A doclint run finds all of them in one pass
+and cannot be talked out of it.
+
+**Cost.** Implicit default constructors have to be written out explicitly, because an implicit one
+cannot carry a comment and doclint reports it as `use of default constructor, which does not provide
+a comment`. Modules that contain no type at all cannot run the gate at all; see finding 12.

@@ -7,6 +7,17 @@ spring:
     hibernate:
       ddl-auto: validate
 
+sumbooklm:
+  security:
+    jwt:
+      secret: ${SUMBOOKLM_JWT_SECRET}
+    cookie:
+      secret: ${SUMBOOKLM_COOKIE_SECRET}
+      secure: true
+
+server:
+  forward-headers-strategy: framework
+
 springdoc:
   swagger-ui:
     enabled: false

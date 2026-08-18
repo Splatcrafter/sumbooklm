@@ -38,6 +38,18 @@
 
         <dependency>
             <groupId>de.splatgames.aether.datafixers</groupId>
+            <artifactId>aether-datafixers-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>de.splatgames.aether.datafixers</groupId>
+            <artifactId>aether-datafixers-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>de.splatgames.aether.datafixers</groupId>
+            <artifactId>aether-datafixers-codec</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>de.splatgames.aether.datafixers</groupId>
             <artifactId>aether-datafixers-spring-boot-starter</artifactId>
         </dependency>
 

@@ -1,8 +1,10 @@
 package de.pfoertner.assessment.sumbooklm.api.config;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,6 +28,11 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfiguration {
 
     /**
+     * Name the bearer authentication scheme is published under and referenced by in operations.
+     */
+    private static final String BEARER_SCHEME_NAME = "bearerAuth";
+
+    /**
      * Version string reported in the {@code info.version} field of the specification.
      */
     private final String applicationVersion;
@@ -42,16 +49,23 @@ public class OpenApiConfiguration {
     }
 
     /**
-     * Builds the descriptive part of the OpenAPI specification.
+     * Builds the descriptive part of the OpenAPI specification and its authentication scheme.
      *
-     * @return an {@link OpenAPI} instance carrying title, version, description and license of the API
+     * @return an {@link OpenAPI} instance carrying title, version, description, license and the
+     *         bearer scheme protected operations refer to
      */
     @Bean
     public OpenAPI sumbookLmOpenApi() {
-        return new OpenAPI().info(new Info()
-                .title("SumbookLM API")
-                .version(this.applicationVersion)
-                .description("Endpoints for managing notebooks, ingesting sources and querying them with a language model.")
-                .license(new License().name("Proprietary")));
+        return new OpenAPI()
+                .info(new Info()
+                        .title("SumbookLM API")
+                        .version(this.applicationVersion)
+                        .description("Endpoints for managing notebooks, ingesting sources and querying them with a language model.")
+                        .license(new License().name("Proprietary")))
+                .components(new Components().addSecuritySchemes(BEARER_SCHEME_NAME, new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")
+                        .description("Access token issued by the login or registration endpoint.")));
     }
 }

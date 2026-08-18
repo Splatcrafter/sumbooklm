@@ -16,6 +16,13 @@ server:
   compression:
     enabled: true
 
+sumbooklm:
+  security:
+    jwt:
+      issuer: sumbooklm
+      access-token-validity: PT5M
+      refresh-token-validity: P90D
+
 springdoc:
   api-docs:
     path: /v3/api-docs

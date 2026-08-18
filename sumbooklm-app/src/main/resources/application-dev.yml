@@ -12,6 +12,14 @@ spring:
       enabled: true
       path: /h2-console
 
+sumbooklm:
+  security:
+    jwt:
+      secret: ${SUMBOOKLM_JWT_SECRET:development-only-jwt-signing-secret-0001}
+    cookie:
+      secret: ${SUMBOOKLM_COOKIE_SECRET:development-only-cookie-derivation-key-01}
+      secure: false
+
 logging:
   level:
     de.pfoertner.assessment.sumbooklm: DEBUG

@@ -15,6 +15,7 @@
     <modules>
         <module>sumbooklm-domain</module>
         <module>sumbooklm-persistence</module>
+        <module>sumbooklm-security</module>
         <module>sumbooklm-ingestion</module>
         <module>sumbooklm-ai</module>
         <module>sumbooklm-api</module>
@@ -89,6 +90,11 @@
             <dependency>
                 <groupId>${project.groupId}</groupId>
                 <artifactId>sumbooklm-persistence</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>sumbooklm-security</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

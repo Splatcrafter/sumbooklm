@@ -49,3 +49,4 @@ Setze folgende Anforderungen um:
     - Nutze ShadCN/ui und Tailwind v4.3 für das Styling. Die i18n-Regel für Texte gilt weiterhin.
 
 Es gelten weiterhin strikt die bekannten Projektregeln: Zero-Emoji-Policy im Quellcode/Variablen, ausschließlich englischer Code/Docs, keine Learnings oder Meta-Kommentare in der Codebase. Dokumentiere Architektur-Entscheidungen zu Chunk-Größen oder Async-Konfiguration in /ai-docs.
+Wie immer ist WebSearch und WebFetch erlaubt!

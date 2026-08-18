@@ -130,14 +130,6 @@ RUN curl -fsSL \
     chmod +x "$kotlin_lsp_sh" && \
     ln -s "$kotlin_lsp_sh" /usr/local/bin/kotlin-lsp
 
-# JetBrains Writerside builder (helpbuilderinspect). Pulled at image-build time
-# from the official image so the resulting container needs no Docker socket and
-# stays compatible with the hardened egress firewall configured at postCreate.
-COPY --from=jetbrains/writerside-builder:2026.04.8711 /opt/builder /opt/builder
-
-COPY writerside.sh /usr/local/bin/writerside
-RUN chmod +x /usr/local/bin/writerside
-
 # Bake user-scope Claude Code skills into the image. Drop new skills under
 # .devcontainer/claude/skills/ in the repo; post-create.sh syncs them into
 # ~/.claude/skills/ on every container start.

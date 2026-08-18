@@ -20,6 +20,26 @@ npx shadcn@latest add <component>          # adds a Base UI component into src/c
 
 `SUMBOOKLM_BACKEND_URL` overrides the dev proxy target.
 
+## Authentication endpoints
+
+| Method and path | Authentication | Purpose |
+| --- | --- | --- |
+| `POST /api/v1/register` | none | creates an account and returns a token pair for it |
+| `POST /api/v1/login` | none | verifies credentials and returns a token pair |
+| `POST /api/v1/token/refresh` | refresh token in the body | rotates the pair |
+| `POST /api/v1/logout` | access token as bearer | closes the session of that token |
+| `GET /api/v1/security/cookie-iv/` | key handle cookie | hands out the cookie encryption parameters |
+
+Everything else below `/api` requires a valid access token. Paths outside `/api` serve the single
+page application and stay open.
+
+```bash
+SUMBOOKLM_JWT_SECRET=... SUMBOOKLM_COOKIE_SECRET=... java -jar sumbooklm-app/target/sumbooklm.jar
+```
+
+The development profile carries defaults for both secrets so the application starts without any
+environment; the production profile does not, and a missing secret fails the startup.
+
 ## JavaDoc gate
 
 `mvn verify` runs `maven-javadoc-plugin` with `show=private`, `doclint=all` and
@@ -86,3 +106,51 @@ though no endpoints exist yet.
 * springdoc warns that `/v3/api-docs` and `/swagger-ui.html` are enabled by default. The `prod`
   profile disables the UI; the document itself stays enabled deliberately, because the frontend
   toolchain consumes it.
+
+## Verification of the authentication module on 2026-08-18
+
+Full `mvn clean install` on JDK 25 / Maven 3.9.15: all nine modules green, 19 tests, JavaDoc gate
+active in every module that has types.
+
+`AuthenticationFlowIntegrationTest` drives the assembled application over HTTP with `RestClient` on
+a random port, twelve cases: registration returning a pair and the handle cookie, duplicate username
+rejected as a conflict, a short password rejected before the service is reached, login returning the
+profile that went through the CBOR payload, wrong password and unknown username rejected
+identically, a protected endpoint rejected without a token, a refresh token rejected as a bearer
+credential, the cookie parameter endpoint refused without a handle, a stable key and a fresh vector
+per call, rotation consuming the presented token, reuse of a consumed token closing the whole
+session, and logout blocking the next sensitive operation with its still unexpired access token.
+
+`CookieCryptographyServiceTest` performs the encryption a browser would perform with the values the
+service hands out, so the parameters are exercised rather than compared against constants.
+`RefreshTokenCleanupJobTest` reads the cron expression out of the annotation and evaluates it, which
+puts the next two runs on 2026-08-23 and 2026-08-30, both Sundays at midnight.
+
+The client side of the cookie flow was then run against the packaged artifact with the same code the
+browser executes, on Node's Web Crypto implementation:
+
+| Step | Result |
+| --- | --- |
+| registration | `200`, cookie `Path=/ Max-Age=7776000 HttpOnly SameSite=Strict` |
+| parameters | `sumbooklm_auth`, `AES-GCM`, 256 bit key, 128 bit tag |
+| encrypted cookie | 1700 characters |
+| key across two calls | identical |
+| vector across two calls | different |
+| decrypt with the vector from the ciphertext | round trip succeeds |
+| parameters of a different handle | different key, decryption rejected |
+| request without a handle cookie | `401` |
+| refresh with the decrypted token | `200` |
+
+Routing of the packaged artifact, checked against the running jar:
+
+| Request | Status | Content type | Meaning |
+| --- | --- | --- | --- |
+| `GET /account/login` | 200 | `text/html` | the new routes are reachable as deep links |
+| `GET /account/register` | 200 | `text/html` | same |
+| `POST /api/v1/logout` without a token | 401 | | the filter chain protects the API prefix |
+| `POST /api/v1/register` with an invalid body | 400 | `application/problem+json` | RFC 9457 shape |
+| `GET /v3/api-docs` | 200 | `application/json` | contract regenerated for the frontend |
+
+Note the one behaviour that changed against the scaffold: an unknown path below `/api` now answers
+`401` instead of `404`, because authentication is required before routing happens. See open
+question 14.

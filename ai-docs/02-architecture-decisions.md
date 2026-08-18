@@ -155,3 +155,126 @@ and cannot be talked out of it.
 **Cost.** Implicit default constructors have to be written out explicitly, because an implicit one
 cannot carry a comment and doclint reports it as `use of default constructor, which does not provide
 a comment`. Modules that contain no type at all cannot run the gate at all; see finding 12.
+
+## ADR-012: Authentication lives in its own module
+
+**Decision.** A new module `sumbooklm-security` holds password hashing, the token lifecycle, the
+cookie key derivation and the marker for operations that verify their session. It depends on
+`domain` and `persistence`; `api` depends on it.
+
+**Alternative considered.** Putting the same classes into `sumbooklm-api` next to the controllers,
+which would have avoided a new module.
+
+**Reason.** The same argument as ADR-010: a module boundary is compiler enforced, a package
+convention is not. Keeping the services out of `api` also keeps them free of the servlet API, which
+is what makes them testable without a web environment and what forces the transport layer to decide
+explicitly which request facts, such as the caller address, reach the security layer.
+
+**Cost.** One more POM, and one deliberate exception: the `SecurityFilterChain` lives in `api`, not
+in `security`. It has to name concrete paths, and those are owned by `ApiPaths` in `api`. Which
+routes are public is an API statement anyway.
+
+## ADR-013: Both tokens are JWTs, verified by two different decoders
+
+**Decision.** Access and refresh token are both HS256 signed JWTs from the same key. They carry a
+`token_type` claim, and the application publishes two `JwtDecoder` beans that differ only in the
+value of that claim they accept. The primary one accepts access tokens and is what the resource
+server authenticates with; the second is used where a refresh token is exchanged.
+
+**Alternative considered.** An opaque, random refresh token. Since every use of a refresh token is
+checked against the database anyway, its signature carries no information the row does not already
+hold, and an opaque token cannot be replayed against a signature-only verifier by mistake.
+
+**Reason.** The brief asks for a JWT based approach with a strict separation of the two kinds. Two
+decoders make that separation structural instead of a check somebody has to remember to write: a
+refresh token presented as a bearer credential fails verification rather than being accepted as an
+access token. That case is covered by a test.
+
+**Cost.** Two decoder beans where the framework expects one, resolved by marking the access token
+decoder `@Primary`. A refresh token is also considerably larger than an opaque token would be,
+which matters because the client stores it in a cookie (see ADR-015).
+
+## ADR-014: Refresh tokens are stored as digests, rotated on use, and revoke their session on reuse
+
+**Decision.** `refresh_token` stores a SHA-256 digest of the issued token, never the token. Every
+successful exchange revokes the presented token and issues a new pair. Presenting a token that was
+already consumed revokes every token of the account.
+
+**Reason.** Storing a digest keeps a database dump from being a set of usable credentials. Rotation
+bounds the value of a stolen token to the time until the legitimate client refreshes next. Reuse of
+a consumed token can only mean that two parties hold it, and the server cannot tell which one is
+legitimate, so the safe answer is to end the session for both.
+
+**Cost.** A client that loses the response of a refresh has lost its session, because the token it
+still holds was already consumed on the server. That is the accepted trade-off of rotation. The
+revocation path also had to be marked `noRollbackFor`, because it reports its outcome with an
+unchecked exception, which would otherwise roll back the revocation it just performed.
+
+## ADR-015: The client encrypts its token pair with a key it never stores
+
+**Decision.** The server issues an opaque key handle in an `HttpOnly`, `SameSite=Strict` cookie. The
+client encrypts its token pair with AES-GCM and stores the ciphertext in a second, script readable
+cookie. `GET /api/v1/security/cookie-iv/` derives the key from the handle with HKDF over a server
+secret and returns it together with a freshly generated initialization vector.
+
+**Reason.** Anything a page can read, injected script can read. Moving the key out of script
+readable storage means the encrypted cookie alone is worthless: copying it out of a browser profile,
+a backup or a synchronised profile yields no tokens. Deriving instead of storing means no key
+material is persisted anywhere, and rotating the secret invalidates every stored client cookie at
+once.
+
+**Honest limit.** The scheme does not stop script that runs inside the origin: the browser attaches
+the handle cookie automatically, so injected code can simply repeat the request. It raises the cost
+of an offline copy, not of code execution. That is stated in the JavaDoc of the package rather than
+being left for a reviewer to discover.
+
+**Cost.** Restoring a session needs one request before anything can be decrypted, so the client has
+a third state next to authenticated and anonymous. The returned vector is for the next encryption
+only; decryption uses the vector the client stored in front of its ciphertext, because reusing a
+vector with the same key would break the authentication of the cipher.
+
+## ADR-016: A user account is split between columns and CBOR payload
+
+**Decision.** `user_account` carries identifier, username, password hash and the two timestamps as
+columns. First name, last name and the two recorded network addresses live in the CBOR payload with
+its schema version, encoded through an Aether Datafixers codec.
+
+**Reason.** This is ADR-002 applied to the first real aggregate. The promoted columns are exactly
+the ones something queries or compares: the username is looked up on every login, the hash is
+compared, and the timestamps are what a listing would sort by. The profile is read only after the
+row was already found, so keeping it in the payload costs nothing and makes adding a field a data
+fix rather than a migration.
+
+**Cost.** Reading an account decodes CBOR even when only the profile is needed, and a change to
+`UserAccountPayload` is only safe together with a schema version and a fix.
+
+## ADR-017: No `AuthenticationManager` and no `UserDetailsService`
+
+**Decision.** The login endpoint compares the presented password against the stored hash with the
+configured `PasswordEncoder` directly. Spring Security's `AuthenticationManager`,
+`DaoAuthenticationProvider` and `UserDetailsService` are not used.
+
+**Reason.** Those types exist to run an extensible chain of authentication mechanisms per request.
+In this application credentials are verified at exactly one endpoint, and every subsequent request
+is authenticated by the resource server from the access token. Wiring the chain would add three
+beans and a second database lookup per login without changing any outcome.
+
+**What is kept.** The parts that do carry weight: the delegating password encoder with its algorithm
+prefix, `upgradeEncoding` to re-hash on login when the encoding changed, and the constant work on
+the failing path so that a login does not reveal whether a username exists.
+
+**Cost.** Adding a second authentication mechanism later means introducing the manager at that
+point. Nothing in the current code prevents it.
+
+## ADR-018: The API is versioned in the path
+
+**Decision.** Endpoints live below `/api/v1`. `ApiPaths` declares the prefix and every endpoint
+constant, and controllers map against those constants.
+
+**Reason.** A breaking change can then be published next to the old contract instead of replacing
+it, which matters because the frontend generates its client from the specification and a silent
+change would surface as a type error at best. Declaring the paths as constants keeps the security
+filter chain and the controllers from drifting apart, since both read the same values.
+
+**Cost.** A version segment is a commitment: once `v2` exists, `v1` has to be maintained or
+deliberately retired.

@@ -14,5 +14,8 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 
-Scaffold state as of 2026-08-18: build green, application context starts, packaged artifact serves
-the SPA and the OpenAPI document. No business logic exists yet, by design.
+State as of 2026-08-18: build green across nine modules, 19 tests. The scaffold is complete and the
+authentication module is implemented: registration, login, token rotation, logout, the weekly
+cleanup of invalidated refresh tokens, the client cookie encryption parameters, and the login and
+registration views bound to the generated OpenAPI client. The notebook side of the application does
+not exist yet.

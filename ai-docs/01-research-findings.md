@@ -147,8 +147,106 @@ component was removed again, because the scaffold carries no UI primitives yet.
 carries a package declaration but no type. `-private` does not change this, because the problem is
 the absence of types rather than their visibility.
 
-This hits `sumbooklm-domain`, `sumbooklm-ingestion` and `sumbooklm-ai`, which are placeholders at
+This hit `sumbooklm-domain`, `sumbooklm-ingestion` and `sumbooklm-ai`, which were placeholders at
 scaffold stage. They set `maven.javadoc.skip=true` in their own POM with a comment that ties the
 property to the first type added to the module. `sumbooklm-frontend` needs no such property: the
 plugin skips a module with no Java sources at all on its own, as does the packaging POM of the
 parent.
+
+Update with the authentication module: `sumbooklm-domain` gained its first types and the property
+was removed from its POM, so the gate now runs there. `sumbooklm-ingestion` and `sumbooklm-ai` are
+still placeholders and still skip; see open question 8.
+
+### 13. Spring Boot 4 renamed the security starters
+
+Boot 4 groups starters by module, the same rename that turned `spring-boot-starter-web` into
+`spring-boot-starter-webmvc`. Both spellings are present in `spring-boot-dependencies` 4.1.0, but
+the new family is the one to use:
+
+| Boot 3 name | Boot 4 name |
+| --- | --- |
+| `spring-boot-starter-oauth2-resource-server` | `spring-boot-starter-security-oauth2-resource-server` |
+| `spring-boot-starter-aop` | `spring-boot-starter-aspectj` |
+
+`spring-boot-starter-security` kept its name. `spring-boot-starter-aop` does not exist in 4.1.0 at
+all, so the aspect that enforces the sensitive operation marker needs `-aspectj`.
+
+### 14. `TestRestTemplate` is gone in Spring Boot 4
+
+`spring-boot-test` 4.1.0 contains no `org.springframework.boot.test.web.client` package. The
+replacement in Framework 7 is `org.springframework.test.web.servlet.client.RestTestClient`, next to
+the existing `WebTestClient` and `MockMvcTester`.
+
+The integration test uses plain `RestClient` from `spring-web` instead, bound to the port from
+`@LocalServerPort`. It gives explicit control over headers and cookies, which the test needs in
+order to assert on `Set-Cookie` and to present a key handle by hand. Its default behaviour of
+throwing on a failing status is switched off with
+`defaultStatusHandler(status -> true, (request, response) -> { })`, because the failing statuses are
+what most of the test asserts on.
+
+### 15. The JDK 25 key derivation API is final, not preview
+
+JEP 510 finalised `javax.crypto.KDF` in JDK 25. Verified by running the derivation on
+Temurin 25.0.3 without `--enable-preview`:
+
+```java
+KDF.getInstance("HKDF-SHA256").deriveKey("AES", HKDFParameterSpec.ofExtract()
+        .addIKM(masterSecret).addSalt(handle).thenExpand(context, 32));
+```
+
+That removes the reason to pull in a third party library or to hand roll HKDF over `Mac` for the
+cookie key derivation of ADR-015.
+
+### 16. The Aether starter finds the current version by reflection
+
+`DataFixerAutoConfiguration` resolves the version a bootstrap writes in three steps: the property
+`aether.datafixers.domains.<domain>.current-version`, then a field literally named
+`CURRENT_VERSION` on the bootstrap class read via `Class#getField`, then
+`aether.datafixers.default-current-version`. If none of them yields a value, the context fails to
+start.
+
+Consequences for `PayloadDataFixerBootstrap`: the field has to stay `public static final` and of
+type `DataVersion`, and renaming it breaks the startup rather than the compilation. The starter also
+only builds a fixer at all when a `DataFixerBootstrap` bean exists
+(`@ConditionalOnBean(DataFixerBootstrap.class)`), and `MigrationService` only when a fixer exists.
+
+Two further details that shaped `PayloadCodec`:
+
+* `DataFixerImpl#update` returns the input unchanged when source and target version are equal, so a
+  payload at the current version costs a comparison and no tree walking.
+* `AetherDataFixer#encode` and `#decode` resolve the codec through the schema of a given version,
+  which is why the schema registration is what makes the round trip work, not the migration.
+
+### 17. Spring Security 7 removed the no-argument DSL methods
+
+`HttpSecurity` in 7.1.0 only exposes the `Customizer` overloads; `http.csrf().disable()` no longer
+compiles. Disabling now reads `csrf(csrf -> csrf.disable())`.
+
+Two more shapes that were verified against the 7.1.0 jars rather than assumed:
+
+* `NimbusJwtEncoder.withSecretKey(SecretKey)` and `NimbusJwtDecoder.withSecretKey(SecretKey)` both
+  return builders, so no `JWKSource` has to be assembled by hand for the HMAC case.
+* `DaoAuthenticationProvider` now takes its `UserDetailsService` through the constructor. Not used
+  here, see ADR-017.
+
+### 18. `openapi-typescript` marks every generated property optional
+
+springdoc emits no `required` array for records unless every component is annotated, so the
+generated `schema.d.ts` types every field as `string | undefined`. Rather than annotating every
+component of every response, the frontend narrows once, in `src/auth/session.ts`, and raises a
+`MalformedResponseError` when a field the client relies on is missing. The rest of the frontend then
+works with non-optional types.
+
+### 19. TypeScript 5.7 made `Uint8Array` generic over its buffer
+
+`new Uint8Array(length)` infers `Uint8Array<ArrayBufferLike>`, which no longer satisfies
+`BufferSource` in the Web Crypto signatures because `ArrayBufferLike` includes `SharedArrayBuffer`.
+Allocating explicitly as `new Uint8Array(new ArrayBuffer(length))` gives `Uint8Array<ArrayBuffer>`
+and compiles. This hits every byte array handed to `crypto.subtle`.
+
+### 20. shadcn CLI additions are self-contained
+
+`npx shadcn@4.18.0 add button input label field` wrote five files into `src/components/ui` and
+touched nothing else: no `package.json` change, no `index.css` change, no reformatting of
+`components.json`. The `field` component pulls in `separator` as a dependency, which is why five
+files appear for four requested components.

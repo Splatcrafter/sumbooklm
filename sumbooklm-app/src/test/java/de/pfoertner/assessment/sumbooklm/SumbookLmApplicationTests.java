@@ -20,6 +20,12 @@ import org.springframework.test.context.ActiveProfiles;
 class SumbookLmApplicationTests {
 
     /**
+     * Creates the test class. The instance is created by JUnit and holds no state.
+     */
+    SumbookLmApplicationTests() {
+    }
+
+    /**
      * Starts the application context and fails when any bean cannot be created.
      */
     @Test

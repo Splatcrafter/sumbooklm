@@ -19,6 +19,9 @@ public final class ApiPaths {
      */
     public static final String BASE = "/api";
 
+    /**
+     * Prevents instantiation of this constant holder.
+     */
     private ApiPaths() {
         throw new AssertionError("ApiPaths is a constant holder and must not be instantiated");
     }

@@ -41,12 +41,38 @@ import org.springframework.web.servlet.resource.PathResourceResolver;
 @Configuration
 public class SinglePageApplicationConfiguration implements WebMvcConfigurer {
 
+    /**
+     * Classpath location the frontend build copies its compiled assets into.
+     */
     private static final String STATIC_LOCATION = "classpath:/static/";
 
+    /**
+     * Classpath relative location of the application shell served for client side routes.
+     */
     private static final String ENTRY_DOCUMENT = "static/index.html";
 
+    /**
+     * API prefix in the form resource paths are resolved with, without a leading slash and with
+     * a trailing slash, so that it can be matched against the path passed to the resolver.
+     */
     private static final String API_RESOURCE_PREFIX = ApiPaths.BASE.substring(1) + "/";
 
+    /**
+     * Creates the configuration. The instance is created by the container and holds no state.
+     */
+    public SinglePageApplicationConfiguration() {
+    }
+
+    /**
+     * Registers the resource handler that serves the packaged frontend and its entry document.
+     *
+     * <p>The handler is bound to the {@code /**} pattern and resolves against
+     * {@value #STATIC_LOCATION}. Resolution runs through a resource chain whose last resolver
+     * falls back to the application shell, which is what makes client side routes reachable by
+     * direct request.
+     *
+     * @param registry registry the resource handler is contributed to
+     */
     @Override
     public void addResourceHandlers(final ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/**")
@@ -57,13 +83,20 @@ public class SinglePageApplicationConfiguration implements WebMvcConfigurer {
 
     /**
      * Resolves packaged assets and falls back to the application shell for client side routes.
-     *
-     * @author Erik Pförtner
-     * @since 0.1.0
      */
     private static final class SinglePageApplicationResourceResolver extends PathResourceResolver {
 
+        /**
+         * Application shell returned for every path that is neither a packaged asset nor an API
+         * path. The resource is resolved once and re-read on each request by the servlet layer.
+         */
         private final Resource entryDocument = new ClassPathResource(ENTRY_DOCUMENT);
+
+        /**
+         * Creates the resolver and looks up the application shell on the classpath.
+         */
+        private SinglePageApplicationResourceResolver() {
+        }
 
         /**
          * Resolves a request path against the packaged assets of the frontend.

@@ -34,6 +34,9 @@ public final class PayloadSchemaVersion {
      */
     public static final int CURRENT = V1_0_0;
 
+    /**
+     * Prevents instantiation of this constant holder.
+     */
     private PayloadSchemaVersion() {
         throw new AssertionError("PayloadSchemaVersion is a constant holder and must not be instantiated");
     }

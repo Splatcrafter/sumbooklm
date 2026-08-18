@@ -25,6 +25,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfiguration {
 
+    /**
+     * Version string reported in the {@code info.version} field of the specification.
+     */
     private final String applicationVersion;
 
     /**

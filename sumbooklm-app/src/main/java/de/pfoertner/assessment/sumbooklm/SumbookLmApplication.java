@@ -24,11 +24,18 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class SumbookLmApplication {
 
     /**
+     * Creates the configuration class that carries the application entry point. The instance is
+     * created by the container during component scanning and holds no state.
+     */
+    public SumbookLmApplication() {
+    }
+
+    /**
      * Starts the Spring application context and the embedded web server.
      *
      * @param args command line arguments forwarded to Spring Boot, never {@code null}
      */
-    public static void main(final String[] args) {
+    static void main(final String[] args) {
         SpringApplication.run(SumbookLmApplication.class, args);
     }
 }

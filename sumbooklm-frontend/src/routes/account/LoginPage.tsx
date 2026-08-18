@@ -61,7 +61,7 @@ export function LoginPage() {
         </>
       }
     >
-      <form className="flex flex-col gap-6" onSubmit={(event) => void submit(event)} noValidate>
+      <form className="flex flex-1 flex-col gap-6" onSubmit={(event) => void submit(event)} noValidate>
         <FieldGroup className="gap-4">
           <Field>
             <FieldLabel className={authLabelClasses} htmlFor="username">

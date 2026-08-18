@@ -389,3 +389,31 @@ rather than by reasoning about it.
 ramp, which widens the plateaus and steepens the crossings. At 0.45 the bands gain defined edges while
 the violet mid tones survive; pushing it further turns the image into a two colour poster and skips
 the middle of the ramp entirely.
+
+## ADR-023: The account cards reserve a height instead of fitting their content
+
+**Decision.** The primary card of the account screens reserves a fixed minimum height from the small
+breakpoint upwards, keeps its header at the top and pins its submit button to the bottom edge. All text
+on both screens lives on a card; the frame around them carries none.
+
+**Reason.** Sign-in and registration differ by one field row, so a card that fits its content changes
+size when a visitor moves between them, and because the panel is vertically centred, both edges move at
+once. Reserving the height of the longer form removes the movement, and pinning the button means the
+spare room appears as spacing above it rather than as a hole in the middle. The header never moves,
+which is the part a reader is looking at while the route changes.
+
+Text was moved off the background for the same class of reason: it was legible over the dark parts of
+the waves and poor over the bright ones, and which part it lands on depends on the viewport.
+
+**The trap in reserving a height.** The reserve has to exceed the content, not match it. A reserve one
+pixel below the taller form leaves that form deciding its own height, and the two differ by that pixel.
+Fractional line boxes make it worse, because a fractional content height rounds differently than the
+reserve; the subtitle originally used a line height of 1.625 on a 14 pixel font, which is 22.75 pixels.
+Every line box inside the card is now a whole number of pixels, and the reserve sits well above the
+computed content height.
+
+**Cost.** The reserve is a constant, and no CSS mechanism equalises the height of two independently
+routed screens without one. A translation that wraps a line where the current ones do not will exceed
+it, at which point that screen grows and the constant needs raising. The failure mode is deliberately
+a growing card rather than clipped content, which is why the property is a minimum height and not a
+fixed one.

@@ -12,8 +12,10 @@ export const authInputClasses =
 
 export const authLabelClasses = 'text-[0.8125rem] font-medium text-jb-grey-30';
 
+// The auto margin pins the button to the lower edge of the card, so the height the card reserves for
+// the longest form shows up as spacing above the button rather than as a gap in the middle.
 export const authSubmitClasses =
-  'h-10 w-full rounded-jb-card bg-jb-grey-5 font-medium text-jb-black hover:bg-white ' +
+  'mt-auto h-10 w-full rounded-jb-card bg-jb-grey-5 font-medium text-jb-black hover:bg-white ' +
   'focus-visible:ring-jb-grey-30/25 disabled:opacity-45';
 
 export const authErrorClasses =

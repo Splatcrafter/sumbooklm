@@ -5,7 +5,7 @@ import { Link, Navigate, useNavigate } from 'react-router';
 import { AuthFailure } from '@/auth/authContext';
 import { useAuth } from '@/auth/useAuth';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/routes/account/AuthCard';
 import {
@@ -69,7 +69,7 @@ export function RegisterPage() {
         </>
       }
     >
-      <form className="flex flex-col gap-6" onSubmit={(event) => void submit(event)} noValidate>
+      <form className="flex flex-1 flex-col gap-6" onSubmit={(event) => void submit(event)} noValidate>
         <FieldGroup className="gap-4">
           <Field>
             <FieldLabel className={authLabelClasses} htmlFor="username">
@@ -85,7 +85,7 @@ export function RegisterPage() {
               onChange={(event) => update('username', event.target.value)}
             />
           </Field>
-          <Field orientation="responsive">
+          <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel className={authLabelClasses} htmlFor="firstName">
                 {t('account.fields.firstName')}
@@ -114,11 +114,16 @@ export function RegisterPage() {
                 onChange={(event) => update('lastName', event.target.value)}
               />
             </Field>
-          </Field>
+          </div>
           <Field>
-            <FieldLabel className={authLabelClasses} htmlFor="password">
-              {t('account.fields.password')}
-            </FieldLabel>
+            <div className="flex items-baseline justify-between gap-3">
+              <FieldLabel className={authLabelClasses} htmlFor="password">
+                {t('account.fields.password')}
+              </FieldLabel>
+              <span className="text-xs text-jb-grey-60">
+                {t('account.hints.password', { length: MINIMUM_PASSWORD_LENGTH })}
+              </span>
+            </div>
             <Input
               id="password"
               name="password"
@@ -130,9 +135,6 @@ export function RegisterPage() {
               value={form.password}
               onChange={(event) => update('password', event.target.value)}
             />
-            <FieldDescription className="text-jb-grey-60">
-              {t('account.hints.password', { length: MINIMUM_PASSWORD_LENGTH })}
-            </FieldDescription>
           </Field>
           {failure ? (
             <p className={authErrorClasses} role="alert">

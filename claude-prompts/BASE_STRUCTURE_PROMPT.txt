@@ -1,0 +1,47 @@
+Nun, da das Login-System und die grundlegende Projektarchitektur stehen, implementieren wir den nächsten großen Schritt: Das Workspace- und Dokumenten-Management (im UI ab jetzt "Sumbooks" genannt).
+
+Zu erstellen im Backend ist nun die Logik für:
+
+1. JPA Wrapper Entitäten:
+  - Es werden Datenbankmodelle benötigt, die die einzelnen Notebooks (den Workspace), SourceDocuments (die hochgeladenen Quellen) und ChatSessions halten.
+
+  - Jede dieser Entitäten benötigt zwingend die relationale Spalte user_id.
+
+  - SourceDocument und ChatSession benötigen zusätzlich die notebook_id.
+
+  - Alle Entitäten benötigen das payload-Feld (Blob) für unsere CBOR-JSON-Daten, die wir über Aether Datafixers migrieren können.
+
+2. Java Records für die CBOR-Payload:
+  - Definiere saubere, versionierbare Java Records für die eigentlichen Fachdaten, die als Blob serialisiert (jackson-dataformat-cbor) im Payload-Feld landen.
+
+  - NotebookPayload: Benötigt Felder für title, pinned (boolean) und topicIcon (String für das spätere generierte Unicode-Zeichen).
+
+  - DocumentPayload: Nimm direkt Felder für die kommende RAG-Pipeline auf: status (Enum: "UPLOADED", "INDEXING", "READY", "ERROR"), tokenCount und documentHash (zur Vermeidung von Duplikaten).
+
+3. REST API (/api/v1/notebooks):
+  - Implementiere den NotebookController für grundlegende CRUD-Operationen (Auflisten, Erstellen, Aktualisieren [für Titel, Pin-Status], Löschen).
+
+  - Wichtig: Alle Datenbankabfragen müssen zwingend auf die user_id des aktuell via JWT authentifizierten Nutzers gefiltert werden.
+
+4. Frontend Dashboard (React & ShadCN):
+Das Frontend soll im Stil des Login-Systems gehalten sein: Modern, clean und stark an Googles NotebookLM orientiert. Setze dies unter Nutzung der generierten OpenAPI-Clients um.
+
+  - UI/UX Vorgaben für das Dashboard:
+
+    - Lokalisierung: Nutze i18n für alle Texte. Der Code selbst bleibt strikt englisch.
+
+    - Layout: Zeige die Sumbooks als Grid von ShadCN-Cards an.
+
+    - Kategorien: Es gibt zwei Sektionen: "Angepinnte Sumbooks" (Pinned Sumbooks) ganz oben (nur sichtbar, wenn gepinnte Sumbooks existieren) und darunter "Zuletzt geöffnete Sumbooks" (Recently opened Sumbooks).
+
+    - Die "Erstellen"-Card: Die allererste Card unter "Zuletzt geöffnete Sumbooks" muss IMMER die Aktion "Neues Sumbook erstellen" sein. Das Design dieser Card: Mittig platzierter Text mit einem darüber liegenden Plus-Icon in einem Kreis (Lucide-Icon). Klick öffnet den Erstellen-Dialog.
+
+    - Reguläre Sumbook-Card:
+
+      - Oben Links: Anzeige des topicIcon (als Unicode-Zeichen gerendert, welches später vom LLM errechnet wird).
+
+      - Oben Rechts: Ein 3-Punkte-Vertikal-Menü (nutze ShadCN DropdownMenu). Inhalt: "Titel bearbeiten" (Edit Title), "Sumbook anpinnen" / "lösen" (Pin/Unpin) und "Sumbook Löschen" (Delete). Ein Klick auf Löschen muss zwingend einen ShadCN AlertDialog zur Bestätigung öffnen.
+
+      - Body/Footer: Ein großer, klar lesbarer Titel. Darunter, in kleinerer, gedimmter Schrift (Muted Text), das Datum der letzten Aktivität, gefolgt von einem Punkt (•) als Separator und der Anzahl der Quellen (z.B. "Oct 24, 2026 • 3 Sources").
+
+Es gelten weiterhin die strikten Regeln: Zero-Emoji-Policy (im Code und in Variablen, ausgenommen das Laden des topicIcon Strings aus der DB in der UI), ausschließlich englischer Code und isolierte Dokumentation in /ai-docs.

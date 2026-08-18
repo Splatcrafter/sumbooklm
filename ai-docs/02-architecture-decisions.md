@@ -373,6 +373,8 @@ identically on both sides, so a divergence is visible by comparing two lists.
 
 **Why a colour ramp at all.** The cards use the JetBrains website grayscale, which was the request.
 The background was never part of that request, and forcing it into the same near-black greys is what
-made the screen look dead. It now runs a six stop ramp from near black through indigo and violet to a
-muted rose, which keeps the neutral grey cards reading as neutral while giving the screen tonal range.
-The palette is one array in each of the two implementations.
+made the screen look dead. It now runs a six stop ramp from near black through deep indigo and
+saturated violet into hot magenta and pink, at full saturation rather than muted. The neutral grey
+cards still read as neutral, because the horizontal sweep holds the left side at roughly a fifth of
+its brightness and the cards sit at 85 percent opacity over it. The palette is one array in each of
+the two implementations, and the constants are compared between them rather than trusted.

@@ -397,3 +397,17 @@ side by side. The named constants and the colour ramp were compared programmatic
 control flow was checked by hand. The one trap found that way was the fold matrix: `mat2` takes its
 arguments in column order, so writing the rotation as it reads on paper produces the mirror image of
 the intended one.
+
+### 27. PNG filtering matters more than resolution for this image
+
+The generated still background is almost entirely smooth gradients. Written with filter type 0, no
+filtering, it came to 428 kB at 800 by 450. Switching the encoder to Paeth filtering, where each byte
+is stored as its difference to a predicted neighbour, halved it to 218 kB with identical pixels. That
+is a larger saving than dropping the resolution would have given, and it costs no quality.
+
+Verified by decoding the result with an independent implementation of the Paeth reconstruction rather
+than by trusting the encoder: the file parses, reports 800 by 450 at eight bits with colour type 2,
+and reconstructs to plausible pixel values.
+
+The asset is only fetched by the devices that use it. The image element exists in the DOM solely when
+the capability check chose the still background, so a desktop that runs the shader never downloads it.

@@ -26,7 +26,7 @@ const SWEEP_FLOOR = 0.22;
 const SWEEP_CEILING = 1.08;
 
 /** Colour ramp of the background, sampled by the height of the field. */
-const PALETTE = ['#07060b', '#120f21', '#25193c', '#40274e', '#653d57', '#8e6068'];
+const PALETTE = ['#06030f', '#1a0a4a', '#4b12a8', '#a01ad8', '#f02fa0', '#ff9ad2'];
 
 const FOLD = [1.6, 1.2, -1.2, 1.6];
 const K1 = 0.366025404;
@@ -152,12 +152,36 @@ function chunk(type, data) {
   return Buffer.concat([length, body, checksum]);
 }
 
+/**
+ * Paeth predictor of the PNG specification: the neighbour closest to left plus above minus corner.
+ */
+function paeth(left, above, corner) {
+  const estimate = left + above - corner;
+  const dLeft = Math.abs(estimate - left);
+  const dAbove = Math.abs(estimate - above);
+  const dCorner = Math.abs(estimate - corner);
+  if (dLeft <= dAbove && dLeft <= dCorner) {
+    return left;
+  }
+  return dAbove <= dCorner ? above : corner;
+}
+
 function encodePng(width, height, pixels) {
   const stride = width * 3;
   const raw = Buffer.alloc((stride + 1) * height);
+  // Paeth filtering rather than no filtering. The image is almost entirely smooth gradients, where
+  // storing the difference to a predicted neighbour compresses several times better than storing
+  // the samples themselves.
   for (let y = 0; y < height; y++) {
-    raw[y * (stride + 1)] = 0;
-    pixels.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+    const rowStart = y * (stride + 1);
+    raw[rowStart] = 4;
+    for (let x = 0; x < stride; x++) {
+      const current = pixels[y * stride + x];
+      const left = x >= 3 ? pixels[y * stride + x - 3] : 0;
+      const above = y > 0 ? pixels[(y - 1) * stride + x] : 0;
+      const corner = x >= 3 && y > 0 ? pixels[(y - 1) * stride + x - 3] : 0;
+      raw[rowStart + 1 + x] = (current - paeth(left, above, corner)) & 0xff;
+    }
   }
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);

@@ -188,8 +188,9 @@ The login and registration screens sit at `/account/login` and `/account/registe
 router branch, not children of the application layout. They are always dark, they use the JetBrains
 website grayscale from finding 22 through the `jb-*` Tailwind namespace defined in `src/index.css`,
 and they place two stacked cards on the left over a generated background. The background is not part
-of that grayscale: it runs a six stop ramp from near black through indigo and violet, because forcing
-it into the same near-black greys left the screen without tonal range (ADR-022).
+of that grayscale: it runs a saturated six stop ramp from near black through indigo and violet into
+hot magenta, because forcing it into the same near-black greys left the screen without tonal range
+(ADR-022).
 
 The background has two forms and picks between them at runtime:
 

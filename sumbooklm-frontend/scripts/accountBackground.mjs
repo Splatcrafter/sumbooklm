@@ -22,8 +22,10 @@ const WARP_AMOUNT = 3.6;
 const DRIFT_WEIGHT = 0.26;
 const WAVE_WEIGHT = 0.4;
 const CREST_LIGHT = 0.05;
-const SWEEP_FLOOR = 0.22;
-const SWEEP_CEILING = 1.08;
+
+// Pulls the sine towards its extremes, which widens the plateaus and steepens the crossings between
+// them. One is the plain sine; below one the bands gain defined edges.
+const SHARPNESS = 0.45;
 
 /** Colour ramp of the background, sampled by the height of the field. */
 const PALETTE = ['#06030f', '#1a0a4a', '#4b12a8', '#a01ad8', '#f02fa0', '#ff9ad2'];
@@ -96,7 +98,8 @@ function waveField(px, py, time) {
   const drift = fbm(px * 0.55, py * 0.55);
   const bend = fbm(px * 0.55 + 3.7, py * 0.55 + 8.1);
   const phase = py * BANDS + bend * WARP_AMOUNT + px * 0.55 + time * 0.05;
-  const wave = Math.sin(Math.PI * phase);
+  const raw = Math.sin(Math.PI * phase);
+  const wave = Math.sign(raw) * Math.abs(raw) ** SHARPNESS;
   return { height: 0.5 + WAVE_WEIGHT * wave + DRIFT_WEIGHT * drift, crest: wave };
 }
 
@@ -121,10 +124,9 @@ function shade(u, v, aspect) {
   const highlight = [1, 0.9, 0.84];
   const colour = sampleRamp(field.height).map((channel, i) => channel + crest * CREST_LIGHT * highlight[i]);
 
-  const sweep = SWEEP_FLOOR + (SWEEP_CEILING - SWEEP_FLOOR) * smoothstep(-0.05, 0.92, u);
   const distance = Math.hypot((u - 0.5) * aspect, v - 0.5);
-  const vignette = 0.66 + 0.34 * (1 - smoothstep(0.42, 1.18, distance));
-  return colour.map((channel) => channel * sweep * vignette);
+  const vignette = 0.82 + 0.18 * (1 - smoothstep(0.42, 1.18, distance));
+  return colour.map((channel) => channel * vignette);
 }
 
 const CRC_TABLE = (() => {

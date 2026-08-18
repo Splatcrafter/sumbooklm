@@ -17,8 +17,9 @@ void main(void) {
  *
  * A stack of sine bands is bent by low frequency fractal noise, which produces flowing waves. The
  * order matters: warping bands gives waves, whereas warping the noise itself gives crumpled marble.
- * The height of the field samples a six stop colour ramp, wave crests catch a warm light, and a
- * horizontal sweep keeps the left side dark where the form sits.
+ * The height of the field samples a six stop colour ramp and wave crests catch a warm light. The
+ * brightness is even across the width: the form stays readable through the opacity of its card
+ * rather than by darkening the side it sits on.
  *
  * The octave count is a uniform rather than a constant, because the renderer lowers it when the
  * measured frame time says the device cannot keep up.
@@ -44,8 +45,10 @@ const float WARP_AMOUNT = 3.6;
 const float DRIFT_WEIGHT = 0.26;
 const float WAVE_WEIGHT = 0.4;
 const float CREST_LIGHT = 0.05;
-const float SWEEP_FLOOR = 0.22;
-const float SWEEP_CEILING = 1.08;
+
+// Pulls the sine towards its extremes, which widens the plateaus and steepens the crossings between
+// them. One is the plain sine; below one the bands gain defined edges.
+const float SHARPNESS = 0.45;
 
 // Rotation combined with a scale of two, applied between octaves so the sum does not line up on the
 // axes. Written in column order, so this is the matrix whose first row is (1.6, 1.2).
@@ -114,7 +117,8 @@ Wave waveField(vec2 p, float time) {
     float drift = fbm(p * 0.55);
     float bend = fbm(p * 0.55 + vec2(3.7, 8.1));
     float phase = p.y * BANDS + bend * WARP_AMOUNT + p.x * 0.55 + time * 0.05;
-    float wave = sin(PI * phase);
+    float raw = sin(PI * phase);
+    float wave = sign(raw) * pow(abs(raw), SHARPNESS);
 
     Wave result;
     result.height = 0.5 + WAVE_WEIGHT * wave + DRIFT_WEIGHT * drift;
@@ -142,10 +146,8 @@ void main(void) {
     vec3 colour = sampleRamp(field.height);
     colour += smoothstep(0.7, 1.0, field.crest) * CREST_LIGHT * vec3(1.0, 0.9, 0.84);
 
-    colour *= SWEEP_FLOOR + (SWEEP_CEILING - SWEEP_FLOOR) * smoothstep(-0.05, 0.92, uv.x);
-
     float distance = length(vec2((uv.x - 0.5) * aspect, uv.y - 0.5));
-    colour *= 0.66 + 0.34 * (1.0 - smoothstep(0.42, 1.18, distance));
+    colour *= 0.82 + 0.18 * (1.0 - smoothstep(0.42, 1.18, distance));
 
     // Eight bits per channel over a ramp this shallow bands visibly; one step of noise removes it.
     colour += dither(gl_FragCoord.xy) / 255.0;

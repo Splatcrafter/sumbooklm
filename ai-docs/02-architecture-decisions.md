@@ -374,7 +374,18 @@ identically on both sides, so a divergence is visible by comparing two lists.
 **Why a colour ramp at all.** The cards use the JetBrains website grayscale, which was the request.
 The background was never part of that request, and forcing it into the same near-black greys is what
 made the screen look dead. It now runs a six stop ramp from near black through deep indigo and
-saturated violet into hot magenta and pink, at full saturation rather than muted. The neutral grey
-cards still read as neutral, because the horizontal sweep holds the left side at roughly a fifth of
-its brightness and the cards sit at 85 percent opacity over it. The palette is one array in each of
-the two implementations, and the constants are compared between them rather than trusted.
+saturated violet into hot magenta and pink, at full saturation rather than muted. The palette is one
+array in each of the two implementations, and the constants are compared between them rather than
+trusted.
+
+**Even lighting, and what carries readability instead.** An earlier version darkened the left half
+with a horizontal sweep so the form had a quiet bed. That was removed: the darkened edge read as a
+band rather than as lighting. Readability now rests on the cards themselves, which sit at 85 percent
+opacity, and on a shadow behind the identity above them, which is the only text on the screen not
+backed by a card. This was checked by rendering the field with a rectangle drawn where the card sits
+rather than by reasoning about it.
+
+**Sharpness.** The sine is pulled towards its extremes by an exponent below one before it samples the
+ramp, which widens the plateaus and steepens the crossings. At 0.45 the bands gain defined edges while
+the violet mid tones survive; pushing it further turns the image into a two colour poster and skips
+the middle of the ramp entirely.

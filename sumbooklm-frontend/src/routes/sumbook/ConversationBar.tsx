@@ -44,21 +44,18 @@ export function ConversationBar({
     conversation.title === '' ? t('sumbook.chat.untitled') : conversation.title;
 
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-jb-grey-80/50 pb-2">
-      <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-jb-grey-30">
+    <div className="flex shrink-0 items-center gap-1">
+      <span className="hidden max-w-40 truncate text-[0.8125rem] text-nb-muted sm:inline">
         {current ? name(current) : t('sumbook.chat.untitled')}
       </span>
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={t('sumbook.chat.conversations')}
-          className="flex size-8 shrink-0 items-center justify-center rounded-jb-card text-jb-grey-50 transition-colors outline-none hover:bg-jb-grey-80/60 hover:text-jb-grey-10 focus-visible:ring-2 focus-visible:ring-jb-grey-30/40"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-nb-muted transition-colors outline-none hover:bg-nb-hover hover:text-nb-text focus-visible:ring-2 focus-visible:ring-nb-accent"
         >
           <MessagesSquare className="size-4" aria-hidden />
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-64 bg-jb-grey-90 text-jb-grey-10 ring-jb-grey-70/40"
-        >
+        <DropdownMenuContent align="end" className="w-64 rounded-nb-tile bg-nb-raised text-nb-text">
           {conversations.map((conversation) => (
             <DropdownMenuItem key={conversation.id} onClick={() => onSelect(conversation.id)}>
               <Check

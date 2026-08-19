@@ -3,12 +3,14 @@ import { NotebookText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * The square that stands for the subject of a Sumbook.
+ * The symbol standing for the subject of a Sumbook.
  *
- * The icon is rendered as the characters the backend stored, which is the one place where a symbol
- * reaches the interface as data. It is empty until the backend has derived it, and a neutral icon is
- * shown in that case rather than a placeholder character, so an unlabelled Sumbook does not look
- * like a labelled one.
+ * It is rendered as the characters the backend stored, which is the one place where a symbol reaches
+ * the interface as data. It stands on its own without a plate behind it, at a size where an emoji
+ * reads as an illustration rather than as a glyph in a line of text.
+ *
+ * Until the backend has derived one, a neutral outline icon is shown instead of a placeholder
+ * character, so an unlabelled Sumbook does not look like a labelled one.
  */
 export function TopicIcon({
   topicIcon,
@@ -20,18 +22,15 @@ export function TopicIcon({
   iconClassName?: string;
 }) {
   return (
-    <div
-      aria-hidden={topicIcon === ''}
-      className={cn(
-        'flex size-10 items-center justify-center rounded-xl bg-jb-grey-90 text-xl leading-none ring-1 ring-jb-grey-70/40',
-        className,
-      )}
+    <span
+      aria-hidden
+      className={cn('flex items-center justify-center text-4xl leading-none select-none', className)}
     >
       {topicIcon === '' ? (
-        <NotebookText className={cn('size-5 text-jb-grey-40', iconClassName)} />
+        <NotebookText className={cn('size-8 text-nb-muted', iconClassName)} />
       ) : (
         topicIcon
       )}
-    </div>
+    </span>
   );
 }

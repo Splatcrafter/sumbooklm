@@ -39,18 +39,18 @@ export function AuthCard({
 
   return (
     <div className="flex flex-col gap-3">
-      <section className="flex flex-col rounded-jb-block border border-jb-black/80 bg-jb-black/85 p-7 shadow-[0_28px_70px_-20px_rgb(0_0_0/0.85)] ring-1 ring-jb-grey-70/20 ring-inset backdrop-blur-2xl sm:min-h-[32rem]">
+      <section className="flex flex-col rounded-3xl border border-nb-line/70 bg-nb-surface/90 p-7 shadow-[0_28px_70px_-20px_rgb(0_0_0/0.85)] backdrop-blur-2xl sm:min-h-[32rem]">
         <div className="mb-6 flex items-center gap-3">
           <BrandMark />
-          <span className="text-sm font-semibold tracking-tight text-jb-grey-5">{t('app.name')}</span>
+          <span className="text-base font-medium text-nb-text">{t('app.name')}</span>
         </div>
         <header className="flex flex-col gap-1.5">
-          <h1 className="text-xl font-semibold tracking-tight text-jb-grey-5">{title}</h1>
-          <p className="text-sm leading-6 text-jb-grey-50">{subtitle}</p>
+          <h1 className="text-2xl leading-8 font-medium text-nb-text">{title}</h1>
+          <p className="text-sm leading-6 text-nb-muted">{subtitle}</p>
         </header>
         <div className="mt-6 flex flex-1 flex-col">{children}</div>
       </section>
-      <aside className="rounded-jb-card border border-jb-black/80 bg-jb-black/70 px-5 py-3.5 text-sm text-jb-grey-50 shadow-[0_16px_40px_-24px_rgb(0_0_0/0.8)] ring-1 ring-jb-grey-70/15 ring-inset backdrop-blur-xl">
+      <aside className="rounded-3xl border border-nb-line/70 bg-nb-surface/80 px-5 py-3.5 text-sm text-nb-muted shadow-[0_16px_40px_-24px_rgb(0_0_0/0.8)] backdrop-blur-xl">
         {footer}
       </aside>
     </div>

@@ -120,7 +120,7 @@ export function RegisterPage() {
               <FieldLabel className={authLabelClasses} htmlFor="password">
                 {t('account.fields.password')}
               </FieldLabel>
-              <span className="text-xs text-jb-grey-60">
+              <span className="text-xs text-nb-faint">
                 {t('account.hints.password', { length: MINIMUM_PASSWORD_LENGTH })}
               </span>
             </div>

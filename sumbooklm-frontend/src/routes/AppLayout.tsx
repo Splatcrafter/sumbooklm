@@ -14,8 +14,7 @@ import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
  *
  * The shell carries the dark surface of the account screens without their moving background: those
  * screens are a destination a visitor looks at, while this one is a place they work in, and a
- * backdrop that keeps changing behind a grid of cards competes with the cards. What connects the two
- * is the palette and the single accent glow at the top edge.
+ * backdrop that keeps changing behind the material competes with it.
  *
  * Restoring a stored session takes a request, so the shell waits for that to finish before it
  * decides between the application and the sign-in screen. Rendering the application first and
@@ -33,7 +32,7 @@ export function AppLayout() {
 
   if (status === 'restoring') {
     return (
-      <div className="dark flex min-h-svh items-center justify-center bg-jb-black text-sm text-jb-grey-50">
+      <div className="dark flex min-h-svh items-center justify-center bg-nb-ground text-sm text-nb-muted">
         {t('app.restoring')}
       </div>
     );
@@ -44,26 +43,22 @@ export function AppLayout() {
   }
 
   return (
-    <div className="dark relative isolate flex min-h-svh flex-col bg-jb-black text-jb-grey-10">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(60rem_28rem_at_18%_-6rem,rgb(75_18_168/0.5),transparent_70%)]"
-      />
-      <header className="sticky top-0 z-10 border-b border-jb-grey-90 bg-jb-black/85 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4 sm:px-8 lg:px-10">
+    <div className="dark flex h-svh flex-col overflow-hidden bg-nb-ground text-nb-text">
+      <header className="shrink-0">
+        <div className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-5">
           <Link to="/" className="flex items-center gap-3">
             <BrandMark />
-            <span className="text-sm font-semibold tracking-tight text-jb-grey-5">{t('app.name')}</span>
+            <span className="text-base font-medium text-nb-text">{t('app.name')}</span>
           </Link>
           {user ? (
             <div className="flex items-center gap-3">
-              <span className="hidden text-sm text-jb-grey-50 sm:inline">
+              <span className="hidden text-[0.8125rem] text-nb-muted sm:inline">
                 {t('account.signedInAs', { username: user.username })}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-90 hover:text-jb-grey-5"
+                className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
                 onClick={() => setSettingsOpen(true)}
               >
                 <Cpu aria-hidden />
@@ -74,7 +69,7 @@ export function AppLayout() {
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-90 hover:text-jb-grey-5"
+                className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
                 onClick={() => void logout()}
               >
                 {t('account.signOut')}
@@ -83,7 +78,7 @@ export function AppLayout() {
           ) : null}
         </div>
       </header>
-      <main className="flex flex-1 flex-col">
+      <main className="flex min-h-0 flex-1 flex-col">
         <Outlet />
       </main>
       <ModelSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />

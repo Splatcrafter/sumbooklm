@@ -95,18 +95,18 @@ export function AddSourceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-jb-card bg-jb-grey-95 text-jb-grey-10 ring-jb-grey-70/40 sm:max-w-md">
+      <DialogContent className="rounded-3xl border border-nb-line bg-nb-surface text-nb-text ring-0 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-jb-grey-5">{t('sumbook.add.heading')}</DialogTitle>
-          <DialogDescription className="text-jb-grey-50">{t('sumbook.add.description')}</DialogDescription>
+          <DialogTitle className="text-nb-text">{t('sumbook.add.heading')}</DialogTitle>
+          <DialogDescription className="text-nb-muted">{t('sumbook.add.description')}</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)} noValidate>
           <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
-            <TabsList className="w-full bg-jb-black/40">
-              <TabsTrigger value="file" className="data-active:bg-jb-grey-80 data-active:text-jb-grey-5">
+            <TabsList className="w-full bg-nb-ground/40">
+              <TabsTrigger value="file" className="data-active:bg-nb-hover data-active:text-nb-text">
                 {t('sumbook.add.tabs.file')}
               </TabsTrigger>
-              <TabsTrigger value="url" className="data-active:bg-jb-grey-80 data-active:text-jb-grey-5">
+              <TabsTrigger value="url" className="data-active:bg-nb-hover data-active:text-nb-text">
                 {t('sumbook.add.tabs.url')}
               </TabsTrigger>
             </TabsList>
@@ -127,24 +127,24 @@ export function AddSourceDialog({
                 }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={drop}
-                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-jb-card border border-dashed px-4 py-8 text-center transition-colors ${
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-nb-tile border border-dashed px-4 py-8 text-center transition-colors ${
                   dragging
-                    ? 'border-jb-grey-40 bg-jb-grey-90/60'
-                    : 'border-jb-grey-70/70 bg-jb-black/25 hover:border-jb-grey-50'
+                    ? 'border-nb-muted bg-nb-surface/60'
+                    : 'border-nb-line/70 bg-nb-ground/25 hover:border-nb-muted'
                 }`}
               >
-                <span className="flex size-10 items-center justify-center rounded-full bg-jb-grey-90 ring-1 ring-jb-grey-70/50">
-                  <Upload className="size-4 text-jb-grey-20" aria-hidden />
+                <span className="flex size-10 items-center justify-center rounded-full bg-nb-surface ring-1 ring-nb-line/50">
+                  <Upload className="size-4 text-nb-body" aria-hidden />
                 </span>
-                <span className="text-sm font-medium text-jb-grey-20">
+                <span className="text-sm font-medium text-nb-body">
                   {file ? file.name : t('sumbook.add.dropzone')}
                 </span>
-                <span className="text-xs text-jb-grey-50">{t('sumbook.add.dropzoneHint')}</span>
+                <span className="text-xs text-nb-muted">{t('sumbook.add.dropzoneHint')}</span>
               </Label>
             </TabsContent>
 
             <TabsContent value="url" className="flex flex-col gap-2 pt-2">
-              <Label htmlFor={urlInputId} className="text-[0.8125rem] font-medium text-jb-grey-30">
+              <Label htmlFor={urlInputId} className="text-[0.8125rem] font-medium text-nb-body">
                 {t('sumbook.add.fields.url')}
               </Label>
               <Input
@@ -155,22 +155,22 @@ export function AddSourceDialog({
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
                 placeholder={t('sumbook.add.fields.urlPlaceholder')}
-                className="h-10 rounded-jb-card border-jb-grey-80 bg-jb-black/40 px-3 text-jb-grey-5 placeholder:text-jb-grey-60 focus-visible:border-jb-grey-50 focus-visible:ring-2 focus-visible:ring-jb-grey-30/15 dark:bg-jb-black/40"
+                className="h-11 rounded-nb-tile border-nb-line bg-nb-inset px-3.5 text-nb-text placeholder:text-nb-muted focus-visible:border-nb-accent focus-visible:ring-0 dark:bg-nb-inset"
               />
             </TabsContent>
           </Tabs>
 
           {error !== 'none' ? (
-            <p className="text-[0.8125rem] text-jb-danger" role="alert">
+            <p className="text-[0.8125rem] text-nb-danger" role="alert">
               {t(error === 'duplicate' ? 'sumbook.errors.duplicate' : 'sumbook.errors.add')}
             </p>
           ) : null}
 
-          <DialogFooter className="border-jb-grey-80/60 bg-jb-black/30">
+          <DialogFooter className="border-nb-hover/60 bg-nb-ground/30">
             <Button
               type="button"
               variant="outline"
-              className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5"
+              className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
               onClick={() => onOpenChange(false)}
             >
               {t('sumbook.actions.cancel')}
@@ -178,7 +178,7 @@ export function AddSourceDialog({
             <Button
               type="submit"
               disabled={submitting || !ready}
-              className="rounded-jb-card bg-jb-grey-5 font-medium text-jb-black hover:bg-white disabled:opacity-45"
+              className="rounded-full bg-nb-primary font-medium text-nb-on-primary hover:brightness-90 disabled:opacity-45"
             >
               {t('sumbook.add.confirm')}
             </Button>

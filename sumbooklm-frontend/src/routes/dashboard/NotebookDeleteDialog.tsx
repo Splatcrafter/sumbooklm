@@ -49,26 +49,26 @@ export function NotebookDeleteDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="rounded-jb-card bg-jb-grey-95 text-jb-grey-10 ring-jb-grey-70/40">
+      <AlertDialogContent className="rounded-3xl border border-nb-line bg-nb-surface text-nb-text ring-0">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-jb-grey-5">{t('dashboard.delete.heading')}</AlertDialogTitle>
-          <AlertDialogDescription className="text-jb-grey-50">
+          <AlertDialogTitle className="text-nb-text">{t('dashboard.delete.heading')}</AlertDialogTitle>
+          <AlertDialogDescription className="text-nb-muted">
             {t('dashboard.delete.description', { title })}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {failed ? (
-          <p className="text-[0.8125rem] text-jb-danger" role="alert">
+          <p className="text-[0.8125rem] text-nb-danger" role="alert">
             {t('dashboard.errors.action')}
           </p>
         ) : null}
         <AlertDialogFooter>
-          <AlertDialogCancel className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5">
+          <AlertDialogCancel className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text">
             {t('dashboard.actions.cancel')}
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={submitting}
-            className="rounded-jb-card"
+            className="rounded-nb-card"
             onClick={() => void confirm()}
           >
             {t('dashboard.delete.confirm')}

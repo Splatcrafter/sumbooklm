@@ -72,14 +72,14 @@ export function NotebookTitleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-jb-card bg-jb-grey-95 text-jb-grey-10 ring-jb-grey-70/40">
+      <DialogContent className="rounded-3xl border border-nb-line bg-nb-surface text-nb-text ring-0">
         <DialogHeader>
-          <DialogTitle className="text-jb-grey-5">{heading}</DialogTitle>
-          <DialogDescription className="text-jb-grey-50">{description}</DialogDescription>
+          <DialogTitle className="text-nb-text">{heading}</DialogTitle>
+          <DialogDescription className="text-nb-muted">{description}</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)} noValidate>
           <div className="flex flex-col gap-2">
-            <Label htmlFor={inputId} className="text-[0.8125rem] font-medium text-jb-grey-30">
+            <Label htmlFor={inputId} className="text-[0.8125rem] font-medium text-nb-body">
               {t('dashboard.fields.title')}
             </Label>
             <Input
@@ -88,20 +88,20 @@ export function NotebookTitleDialog({
               maxLength={200}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="h-10 rounded-jb-card border-jb-grey-80 bg-jb-black/40 px-3 text-jb-grey-5 placeholder:text-jb-grey-60 focus-visible:border-jb-grey-50 focus-visible:ring-2 focus-visible:ring-jb-grey-30/15 dark:bg-jb-black/40"
+              className="h-11 rounded-nb-tile border-nb-line bg-nb-inset px-3.5 text-nb-text placeholder:text-nb-muted focus-visible:border-nb-accent focus-visible:ring-0 dark:bg-nb-inset"
               placeholder={t('dashboard.fields.titlePlaceholder')}
             />
             {failed ? (
-              <p className="text-[0.8125rem] text-jb-danger" role="alert">
+              <p className="text-[0.8125rem] text-nb-danger" role="alert">
                 {t('dashboard.errors.action')}
               </p>
             ) : null}
           </div>
-          <DialogFooter className="border-jb-grey-80/60 bg-jb-black/30">
+          <DialogFooter className="border-nb-hover/60 bg-nb-ground/30">
             <Button
               type="button"
               variant="outline"
-              className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5"
+              className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
               onClick={() => onOpenChange(false)}
             >
               {t('dashboard.actions.cancel')}
@@ -109,7 +109,7 @@ export function NotebookTitleDialog({
             <Button
               type="submit"
               disabled={submitting || title.trim() === ''}
-              className="rounded-jb-card bg-jb-grey-5 font-medium text-jb-black hover:bg-white disabled:opacity-45"
+              className="rounded-full bg-nb-primary font-medium text-nb-on-primary hover:brightness-90 disabled:opacity-45"
             >
               {submitLabel}
             </Button>

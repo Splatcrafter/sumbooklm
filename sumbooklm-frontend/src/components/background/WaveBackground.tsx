@@ -58,7 +58,7 @@ export function WaveBackground() {
     <div
       aria-hidden
       data-background={showStillImage ? 'still' : 'shader'}
-      className="pointer-events-none absolute inset-0 overflow-hidden bg-jb-black"
+      className="pointer-events-none absolute inset-0 overflow-hidden bg-nb-ground"
     >
       {showStillImage ? (
         <img src={stillBackground} alt="" className="absolute inset-0 size-full object-cover" />

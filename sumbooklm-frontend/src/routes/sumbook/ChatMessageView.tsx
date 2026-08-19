@@ -41,7 +41,7 @@ function markdownComponents(sources: ChatSource[] | undefined): Components {
             href={href}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-jb-accent-bright underline underline-offset-2"
+            className="text-nb-accent underline underline-offset-2"
           >
             {children}
           </a>
@@ -51,7 +51,7 @@ function markdownComponents(sources: ChatSource[] | undefined): Components {
       return (
         <sup
           title={source?.displayName}
-          className="mx-0.5 rounded-full bg-jb-grey-80/80 px-1.5 py-0.5 text-[0.625rem] font-medium text-jb-grey-20"
+          className="mx-0.5 rounded-full bg-nb-raised px-1.5 py-0.5 text-[0.625rem] font-medium text-nb-body"
         >
           {number}
         </sup>
@@ -67,20 +67,20 @@ function markdownComponents(sources: ChatSource[] | undefined): Components {
       return <ol className="mb-2 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>;
     },
     h1({ children }) {
-      return <h3 className="mb-2 text-base font-semibold text-jb-grey-5">{children}</h3>;
+      return <h3 className="mt-3 mb-1.5 text-[0.9375rem] font-semibold text-nb-text first:mt-0">{children}</h3>;
     },
     h2({ children }) {
-      return <h3 className="mb-2 text-sm font-semibold text-jb-grey-5">{children}</h3>;
+      return <h3 className="mt-3 mb-1.5 text-sm font-semibold text-nb-text first:mt-0">{children}</h3>;
     },
     h3({ children }) {
-      return <h4 className="mb-1 text-sm font-semibold text-jb-grey-10">{children}</h4>;
+      return <h4 className="mt-2 mb-1 text-sm font-semibold text-nb-body">{children}</h4>;
     },
     strong({ children }) {
-      return <strong className="font-semibold text-jb-grey-5">{children}</strong>;
+      return <strong className="font-semibold text-nb-text">{children}</strong>;
     },
     blockquote({ children }) {
       return (
-        <blockquote className="mb-2 border-l-2 border-jb-grey-70 pl-3 text-jb-grey-40 last:mb-0">
+        <blockquote className="mb-2 border-l-2 border-nb-line pl-3 text-nb-muted last:mb-0">
           {children}
         </blockquote>
       );
@@ -88,14 +88,14 @@ function markdownComponents(sources: ChatSource[] | undefined): Components {
     code({ children, className }) {
       const inline = !className;
       return inline ? (
-        <code className="rounded bg-jb-black/60 px-1 py-0.5 font-mono text-[0.8125rem]">{children}</code>
+        <code className="rounded bg-nb-inset px-1.5 py-0.5 font-mono text-[0.8125rem]">{children}</code>
       ) : (
         <code className="font-mono text-[0.8125rem]">{children}</code>
       );
     },
     pre({ children }) {
       return (
-        <pre className="mb-2 overflow-x-auto rounded-jb-card bg-jb-black/60 p-3 last:mb-0">{children}</pre>
+        <pre className="mb-2 overflow-x-auto rounded-nb-tile bg-nb-inset p-3 last:mb-0">{children}</pre>
       );
     },
     table({ children }) {
@@ -106,10 +106,10 @@ function markdownComponents(sources: ChatSource[] | undefined): Components {
       );
     },
     th({ children }) {
-      return <th className="border-b border-jb-grey-70 px-2 py-1 font-semibold">{children}</th>;
+      return <th className="border-b border-nb-line px-2 py-1 font-semibold">{children}</th>;
     },
     td({ children }) {
-      return <td className="border-b border-jb-grey-80/60 px-2 py-1">{children}</td>;
+      return <td className="border-b border-nb-hover/60 px-2 py-1">{children}</td>;
     },
   };
 }
@@ -128,18 +128,18 @@ export function ChatMessageView({ message }: { message: ChatMessage }) {
   if (message.role === 'USER') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-jb-card bg-jb-accent px-3 py-2 text-sm leading-6 whitespace-pre-wrap text-white">
+        <p className="max-w-[85%] rounded-[1.25rem] bg-nb-raised px-4 py-2.5 text-[0.9375rem] leading-6 whitespace-pre-wrap text-nb-text">
           {message.text}
-        </div>
+        </p>
       </div>
     );
   }
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[92%] rounded-jb-card bg-jb-grey-90/60 px-3 py-2 text-sm leading-6 text-jb-grey-20 ring-1 ring-jb-grey-80/60">
+      <div className="w-full text-[0.9375rem] leading-7 text-nb-body">
         {message.text === '' && message.streaming ? (
-          <span className="text-jb-grey-50" role="status">
+          <span className="text-nb-muted" role="status">
             {t('sumbook.chat.thinking')}
           </span>
         ) : (
@@ -149,26 +149,24 @@ export function ChatMessageView({ message }: { message: ChatMessage }) {
         )}
 
         {message.sources && message.sources.length > 0 ? (
-          <ul className="mt-2 flex flex-wrap gap-1.5 border-t border-jb-grey-80/60 pt-2">
+          <ul className="nb-muted-hand mt-3 flex flex-col gap-0.5 border-t border-nb-line/70 pt-2">
             {message.sources.map((source) => (
-              <li
-                key={source.sourceDocumentId}
-                className="max-w-56 truncate rounded-full bg-jb-black/40 px-2 py-0.5 text-[0.6875rem] text-jb-grey-40"
-              >
-                {source.number}. {source.displayName}
+              <li key={source.sourceDocumentId} className="flex min-w-0 gap-1.5 text-[0.6875rem] leading-4">
+                <span className="shrink-0 text-nb-accent/70">{source.number}</span>
+                <span className="truncate text-nb-muted">{source.displayName}</span>
               </li>
             ))}
           </ul>
         ) : null}
 
         {message.unanswered ? (
-          <p className="mt-2 text-xs text-jb-grey-40" role="status">
+          <p className="mt-2 text-xs text-nb-muted" role="status">
             {t('sumbook.chat.noSources')}
           </p>
         ) : null}
 
         {message.limited ? (
-          <p className="mt-2 text-xs text-jb-grey-40" role="status">
+          <p className="mt-2 text-xs text-nb-muted" role="status">
             {message.limitedForMinutes === undefined
               ? t('sumbook.chat.tooMany')
               : t('sumbook.chat.tooOften', { count: message.limitedForMinutes })}
@@ -176,7 +174,7 @@ export function ChatMessageView({ message }: { message: ChatMessage }) {
         ) : null}
 
         {message.failure !== undefined ? (
-          <p className="mt-2 text-xs text-jb-danger" role="alert">
+          <p className="mt-2 text-xs text-nb-danger" role="alert">
             {t('sumbook.chat.failed')}
             {message.failure !== '' ? ` ${message.failure}` : ''}
           </p>

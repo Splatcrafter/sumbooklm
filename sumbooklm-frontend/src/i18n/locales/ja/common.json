@@ -134,11 +134,13 @@
       "confirm": "資料を追加"
     },
     "summary": {
+      "heading": "要約",
       "pending": "これらの資料の要約はまだありません。Sumbook が自身を要約できるようになると、ここに表示されます。",
       "noSources": "この Sumbook にはまだ要約するものがありません。資料を追加すると、インデックスが作成されます。",
       "copy": "要約をコピー"
     },
     "chat": {
+      "heading": "チャット",
       "placeholder": "資料について質問してください",
       "sources_other": "{{count}} 件の資料",
       "send": "質問を送信",
@@ -154,7 +156,9 @@
       "newConversation": "新しい会話",
       "deleteConversation": "会話を削除",
       "untitled": "新しい会話",
-      "stop": "回答を停止"
+      "stop": "回答を停止",
+      "empty": "質問すると、その回答と出典となった資料がここに表示されます。",
+      "asked": "質問"
     },
     "studio": {
       "heading": "スタジオ",

@@ -16,16 +16,16 @@ import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
 /**
  * The middle panel, where the Sumbook is asked about its sources.
  *
- * An empty conversation shows what the Sumbook is instead of an empty box, and the summary that will
- * stand there is announced rather than left out. As soon as something has been asked, that space
- * belongs to the conversation: it is what the reader came back for, and it is the part that grows.
+ * An empty conversation shows what the Sumbook is instead of an empty box: its symbol, its name, how
+ * much it is grounded in, and the summary that will stand there once a Sumbook can write one. As soon
+ * as something has been asked, that space belongs to the conversation.
+ *
+ * The content is held to a reading measure and centred in whatever width the panel has, because a
+ * line of text stretched across a desk monitor is hard to read at any size.
  *
  * Asking needs a model, and this browser is the only place one is configured. A Sumbook that has none
  * therefore says so where the question would be typed, with the way to fix it right there, rather
  * than letting the question be sent and rejected.
- *
- * A Sumbook can hold several conversations. Which one is open is shown above the transcript rather
- * than beside it, because the panel that needs the width is this one.
  */
 export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourceCount: number }) {
   const { t } = useTranslation();
@@ -45,64 +45,66 @@ export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourc
 
   return (
     <section
-      aria-labelledby="sumbook-title"
-      className="flex min-h-0 flex-col gap-4 rounded-jb-block bg-jb-grey-95/60 p-5 ring-1 ring-jb-grey-70/25"
+      aria-labelledby="sumbook-chat"
+      className="flex min-h-0 flex-1 flex-col gap-3 rounded-nb-panel bg-nb-surface p-4"
     >
-      <header className="flex flex-col items-start gap-3">
-        <TopicIcon topicIcon={notebook.topicIcon} className="size-12 text-2xl" iconClassName="size-6" />
-        <div className="flex flex-col gap-1">
-          <h1 id="sumbook-title" className="text-2xl font-semibold tracking-tight text-jb-grey-5">
-            {notebook.title}
-          </h1>
-          <p className="text-[0.8125rem] leading-5 text-jb-grey-50">
-            {meta(sourceCount, notebook.lastActivityAt)}
-          </p>
-        </div>
-      </header>
-
-      <ConversationBar
-        conversations={conversations}
-        currentId={currentId}
-        onSelect={(sessionId) => void select(sessionId)}
-        onStart={() => void start()}
-        onRemove={(sessionId) => void remove(sessionId)}
-      />
-
-      <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-        {messages.length === 0 ? (
-          <div className="flex flex-1 flex-col justify-center gap-4">
-            <p className="max-w-2xl text-sm leading-6 text-jb-grey-40">
-              {status === 'failed'
-                ? t('sumbook.chat.historyFailed')
-                : sourceCount === 0
-                  ? t('sumbook.summary.noSources')
-                  : t('sumbook.summary.pending')}
-            </p>
-            <div className="flex">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-30 disabled:opacity-45"
-              >
-                <Copy />
-                {t('sumbook.summary.copy')}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          messages.map((message) => <ChatMessageView key={message.key} message={message} />)
-        )}
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="sumbook-chat" className="text-base leading-6 font-medium text-nb-text">
+          {t('sumbook.chat.heading')}
+        </h2>
+        <ConversationBar
+          conversations={conversations}
+          currentId={currentId}
+          onSelect={(sessionId) => void select(sessionId)}
+          onStart={() => void start()}
+          onRemove={(sessionId) => void remove(sessionId)}
+        />
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div ref={transcript} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-1 py-2">
+          {messages.length === 0 ? (
+            <div className="flex flex-1 flex-col justify-center gap-5">
+              <TopicIcon topicIcon={notebook.topicIcon} className="text-5xl" iconClassName="size-10" />
+              <div className="flex flex-col gap-1.5">
+                <h3 className="text-[1.75rem] leading-9 font-medium text-nb-text">{notebook.title}</h3>
+                <p className="text-[0.8125rem] leading-5 text-nb-muted">
+                  {meta(sourceCount, notebook.lastActivityAt)}
+                </p>
+              </div>
+              <p className="text-[0.9375rem] leading-7 text-nb-body">
+                {status === 'failed'
+                  ? t('sumbook.chat.historyFailed')
+                  : sourceCount === 0
+                    ? t('sumbook.summary.noSources')
+                    : t('sumbook.summary.pending')}
+              </p>
+              <div className="flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="rounded-full border-nb-line bg-transparent text-nb-body disabled:opacity-45"
+                >
+                  <Copy />
+                  {t('sumbook.summary.copy')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            messages.map((message) => <ChatMessageView key={message.key} message={message} />)
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
         {configured ? null : (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-jb-card bg-jb-grey-90/50 px-3 py-2 ring-1 ring-jb-grey-70/30">
-            <p className="text-xs text-jb-grey-40">{t('sumbook.chat.noModel')}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-nb-tile bg-nb-inset px-3 py-2">
+            <p className="text-xs text-nb-muted">{t('sumbook.chat.noModel')}</p>
             <Button
               variant="outline"
               size="sm"
-              className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5"
+              className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
               onClick={() => setSettingsOpen(true)}
             >
               {t('sumbook.chat.chooseModel')}

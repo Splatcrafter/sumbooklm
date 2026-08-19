@@ -92,17 +92,17 @@ export function ModelSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-jb-card bg-jb-grey-95 text-jb-grey-10 ring-jb-grey-70/40 sm:max-w-md">
+      <DialogContent className="rounded-3xl border border-nb-line bg-nb-surface text-nb-text ring-0 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-jb-grey-5">{t('settings.model.heading')}</DialogTitle>
-          <DialogDescription className="text-jb-grey-50">
+          <DialogTitle className="text-nb-text">{t('settings.model.heading')}</DialogTitle>
+          <DialogDescription className="text-nb-muted">
             {t('settings.model.description')}
           </DialogDescription>
         </DialogHeader>
 
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)} noValidate>
           <fieldset className="flex flex-col gap-2">
-            <legend className="pb-2 text-[0.8125rem] font-medium text-jb-grey-30">
+            <legend className="pb-2 text-[0.8125rem] font-medium text-nb-body">
               {t('settings.model.fields.provider')}
             </legend>
             <div className="grid grid-cols-3 gap-2">
@@ -112,10 +112,10 @@ export function ModelSettingsDialog({
                   type="button"
                   aria-pressed={draft.provider === provider}
                   onClick={() => change({ provider })}
-                  className={`rounded-jb-card px-3 py-2 text-[0.8125rem] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-jb-grey-30/40 ${
+                  className={`rounded-full px-3 py-2 text-[0.8125rem] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-nb-body/40 ${
                     draft.provider === provider
-                      ? 'bg-jb-accent text-white'
-                      : 'bg-jb-black/40 text-jb-grey-30 ring-1 ring-jb-grey-80 hover:bg-jb-grey-90'
+                      ? 'bg-nb-accent-container text-nb-accent'
+                      : 'bg-nb-ground/40 text-nb-body ring-1 ring-nb-hover hover:bg-nb-surface'
                   }`}
                 >
                   {t(`settings.model.providers.${provider}`)}
@@ -125,7 +125,7 @@ export function ModelSettingsDialog({
           </fieldset>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor={modelId} className="text-[0.8125rem] font-medium text-jb-grey-30">
+            <Label htmlFor={modelId} className="text-[0.8125rem] font-medium text-nb-body">
               {t('settings.model.fields.model')}
             </Label>
             <Input
@@ -134,13 +134,13 @@ export function ModelSettingsDialog({
               onChange={(event) => change({ model: event.target.value })}
               placeholder={hints.model}
               autoComplete="off"
-              className="h-10 rounded-jb-card border-jb-grey-80 bg-jb-black/40 px-3 text-jb-grey-5 placeholder:text-jb-grey-60 focus-visible:border-jb-grey-50 focus-visible:ring-2 focus-visible:ring-jb-grey-30/15 dark:bg-jb-black/40"
+              className="h-11 rounded-nb-tile border-nb-line bg-nb-inset px-3.5 text-nb-text placeholder:text-nb-muted focus-visible:border-nb-accent focus-visible:ring-0 dark:bg-nb-inset"
             />
           </div>
 
           {requiresApiKey(draft.provider) ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor={apiKeyId} className="text-[0.8125rem] font-medium text-jb-grey-30">
+              <Label htmlFor={apiKeyId} className="text-[0.8125rem] font-medium text-nb-body">
                 {t('settings.model.fields.apiKey')}
               </Label>
               <Input
@@ -149,14 +149,14 @@ export function ModelSettingsDialog({
                 value={draft.apiKey}
                 onChange={(event) => change({ apiKey: event.target.value })}
                 autoComplete="off"
-                className="h-10 rounded-jb-card border-jb-grey-80 bg-jb-black/40 px-3 text-jb-grey-5 placeholder:text-jb-grey-60 focus-visible:border-jb-grey-50 focus-visible:ring-2 focus-visible:ring-jb-grey-30/15 dark:bg-jb-black/40"
+                className="h-11 rounded-nb-tile border-nb-line bg-nb-inset px-3.5 text-nb-text placeholder:text-nb-muted focus-visible:border-nb-accent focus-visible:ring-0 dark:bg-nb-inset"
               />
-              <p className="text-xs leading-5 text-jb-grey-50">{t('settings.model.hints.apiKey')}</p>
+              <p className="text-xs leading-5 text-nb-muted">{t('settings.model.hints.apiKey')}</p>
             </div>
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor={baseUrlId} className="text-[0.8125rem] font-medium text-jb-grey-30">
+            <Label htmlFor={baseUrlId} className="text-[0.8125rem] font-medium text-nb-body">
               {t('settings.model.fields.baseUrl')}
             </Label>
             <Input
@@ -167,15 +167,15 @@ export function ModelSettingsDialog({
               onChange={(event) => change({ baseUrl: event.target.value })}
               placeholder={hints.baseUrl}
               autoComplete="off"
-              className="h-10 rounded-jb-card border-jb-grey-80 bg-jb-black/40 px-3 text-jb-grey-5 placeholder:text-jb-grey-60 focus-visible:border-jb-grey-50 focus-visible:ring-2 focus-visible:ring-jb-grey-30/15 dark:bg-jb-black/40"
+              className="h-11 rounded-nb-tile border-nb-line bg-nb-inset px-3.5 text-nb-text placeholder:text-nb-muted focus-visible:border-nb-accent focus-visible:ring-0 dark:bg-nb-inset"
             />
           </div>
 
-          <DialogFooter className="border-jb-grey-80/60 bg-jb-black/30">
+          <DialogFooter className="border-nb-hover/60 bg-nb-ground/30">
             <Button
               type="button"
               variant="outline"
-              className="mr-auto rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5"
+              className="mr-auto rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
               onClick={() => void reset()}
             >
               {t('settings.model.forget')}
@@ -183,7 +183,7 @@ export function ModelSettingsDialog({
             <Button
               type="button"
               variant="outline"
-              className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5"
+              className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
               onClick={() => onOpenChange(false)}
             >
               {t('settings.model.cancel')}
@@ -191,7 +191,7 @@ export function ModelSettingsDialog({
             <Button
               type="submit"
               disabled={saving || !isConfigured(draft)}
-              className="rounded-jb-card bg-jb-grey-5 font-medium text-jb-black hover:bg-white disabled:opacity-45"
+              className="rounded-full bg-nb-primary font-medium text-nb-on-primary hover:brightness-90 disabled:opacity-45"
             >
               {t('settings.model.confirm')}
             </Button>

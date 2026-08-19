@@ -137,11 +137,13 @@
       "confirm": "Quelle hinzufügen"
     },
     "summary": {
+      "heading": "Zusammenfassung",
       "pending": "Die Zusammenfassung dieser Quellen gibt es noch nicht. Sie erscheint hier, sobald ein Sumbook sich selbst zusammenfassen kann.",
       "noSources": "Dieses Sumbook hat noch nichts zusammenzufassen. Füge eine Quelle hinzu, sie wird für dich indexiert.",
       "copy": "Zusammenfassung kopieren"
     },
     "chat": {
+      "heading": "Chat",
       "placeholder": "Frage etwas zu deinen Quellen",
       "sources_one": "{{count}} Quelle",
       "sources_other": "{{count}} Quellen",
@@ -159,7 +161,9 @@
       "newConversation": "Neues Gespräch",
       "deleteConversation": "Gespräch löschen",
       "untitled": "Neues Gespräch",
-      "stop": "Antwort stoppen"
+      "stop": "Antwort stoppen",
+      "empty": "Stelle eine Frage, und die Antwort erscheint hier, zusammen mit den Quellen, aus denen sie stammt.",
+      "asked": "Gefragt"
     },
     "studio": {
       "heading": "Studio",

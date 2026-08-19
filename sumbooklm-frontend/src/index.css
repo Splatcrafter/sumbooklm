@@ -1,60 +1,135 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/dm-sans";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Grayscale of the JetBrains website design system, read from its own stylesheet, where the ramp
-   is defined as --rs-color-black, --rs-color-grey-* and --rs-color-white. The steps are linear:
-   every grey is 23 higher per channel than the previous one. Only the black carries a slight blue
-   cast, the greys are neutral. */
+/* The interface follows the conventions of the product it is a clone of, executed straight.
+ *
+ * Every value below was measured from the reference rather than estimated: the page ground behind
+ * the panels, the panel surface, the inset a field or chip takes inside a panel, the raised tile,
+ * and the text scale. Panels float on the ground with a gap between them, and a container nested
+ * inside a panel goes darker rather than lighter. */
 @theme {
-  --color-jb-black: #19191c;
-  --color-jb-grey-95: #252528;
-  --color-jb-grey-90: #303033;
-  --color-jb-grey-80: #474749;
-  --color-jb-grey-70: #5e5e60;
-  --color-jb-grey-60: #757577;
-  --color-jb-grey-50: #8c8c8e;
-  --color-jb-grey-40: #a3a3a4;
-  --color-jb-grey-30: #bababb;
-  --color-jb-grey-20: #d1d1d2;
-  --color-jb-grey-10: #e8e8e8;
-  --color-jb-grey-5: #f4f4f4;
+  /* Surfaces, from the ground a panel floats on to the tile that sits highest. */
+  --color-nb-ground: #1a1d22;
+  --color-nb-surface: #22262b;
+  --color-nb-inset: #1a1d22;
+  --color-nb-raised: #32343e;
+  --color-nb-line: #333940;
+  /* The outline a container takes when its fill is the same as the surface behind it, measured from
+     the reference. It is the only case in which a card carries an edge. */
+  --color-nb-outline: #37383b;
+  --color-nb-hover: #2b3037;
 
-  /* The one non-grey the website keeps for failures, --rs-color-danger. */
-  --color-jb-danger: #f45c4a;
+  /* Text, brightest to faintest. */
+  --color-nb-text: #f2f2f2;
+  --color-nb-body: #c7c7c7;
+  --color-nb-muted: #9aa0a6;
+  --color-nb-faint: #868c93;
 
-  /* The blue of the same system, --rs-color-blue, used for the single action that sends. */
-  --color-jb-accent: #087cfa;
-  --color-jb-accent-bright: #2b90ff;
+  /* The committing action is a light pill with dark text. */
+  --color-nb-primary: #ffffff;
+  --color-nb-on-primary: #1a1d22;
 
-  /* The website rounds cards at 16px and larger blocks above that. */
-  --radius-jb-card: 16px;
-  --radius-jb-block: 24px;
+  /* Selection and links carry the blue of the reference; the container is its tinted surface. */
+  --color-nb-accent: #a8c7fa;
+  --color-nb-accent-container: #2f334b;
+  --color-nb-danger: #f2b8b5;
+
+  /* Notebook cards are tinted per notebook, in one family of desaturated tones at a single
+     lightness, so a shelf of them reads as varied without any of them shouting. */
+  --color-nb-tint-olive: #3a3a2f;
+  --color-nb-tint-clay: #3a3230;
+  --color-nb-tint-moss: #303632;
+  --color-nb-tint-steel: #32383e;
+  --color-nb-tint-iris: #363040;
+  --color-nb-tint-rose: #3d3036;
+
+  /* The six stops the account background samples by wave height. They stay on the account screens. */
+  --color-aurora-void: #06030f;
+  --color-aurora-deep: #1a0a4a;
+  --color-aurora-violet: #4b12a8;
+  --color-aurora-magenta: #a01ad8;
+  --color-aurora-rose: #f02fa0;
+  --color-aurora-crest: #ff9ad2;
+
+  --radius-nb-tile: 12px;
+  --radius-nb-card: 16px;
+  --radius-nb-panel: 16px;
 }
 
-@layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
-  }
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
+/* The semantic variables the vendored primitives read, mapped onto the palette once. */
+:root {
+  --background: #1a1d22;
+  --foreground: #f2f2f2;
+  --card: #22262b;
+  --card-foreground: #f2f2f2;
+  --popover: #22262b;
+  --popover-foreground: #f2f2f2;
+  --primary: #ffffff;
+  --primary-foreground: #1a1d22;
+  --secondary: #2b3037;
+  --secondary-foreground: #f2f2f2;
+  --muted: #22262b;
+  --muted-foreground: #9aa0a6;
+  --accent: #2b3037;
+  --accent-foreground: #f2f2f2;
+  --destructive: #f2b8b5;
+  --border: #333940;
+  --input: #333940;
+  --ring: #a8c7fa;
+  --chart-1: #a8c7fa;
+  --chart-2: #9aa0a6;
+  --chart-3: #3a3a2f;
+  --chart-4: #32383e;
+  --chart-5: #3a3230;
+  --radius: 0.75rem;
+  --sidebar: #22262b;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #1a1d22;
+  --sidebar-accent: #2b3037;
+  --sidebar-accent-foreground: #f2f2f2;
+  --sidebar-border: #333940;
+  --sidebar-ring: #a8c7fa;
+}
+
+.dark {
+  --background: #1a1d22;
+  --foreground: #f2f2f2;
+  --card: #22262b;
+  --card-foreground: #f2f2f2;
+  --popover: #22262b;
+  --popover-foreground: #f2f2f2;
+  --primary: #ffffff;
+  --primary-foreground: #1a1d22;
+  --secondary: #2b3037;
+  --secondary-foreground: #f2f2f2;
+  --muted: #22262b;
+  --muted-foreground: #9aa0a6;
+  --accent: #2b3037;
+  --accent-foreground: #f2f2f2;
+  --destructive: #f2b8b5;
+  --border: #333940;
+  --input: #333940;
+  --ring: #a8c7fa;
+  --sidebar: #22262b;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #1a1d22;
+  --sidebar-accent: #2b3037;
+  --sidebar-accent-foreground: #f2f2f2;
+  --sidebar-border: #333940;
+  --sidebar-ring: #a8c7fa;
 }
 
 @theme inline {
+  /* Google Sans where the visitor's system has it, and a self-hosted geometric sans of the same
+     character everywhere else. */
+  --font-sans: 'Google Sans', 'Google Sans Text', 'DM Sans Variable', Roboto, system-ui, sans-serif;
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -86,80 +161,66 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 28px;
 }
 
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Surfaces the browser draws still belong to the palette. */
+  ::selection {
+    background-color: #a8c7fa4d;
+    color: #f2f2f2;
+  }
+  :root {
+    scrollbar-color: #333940 transparent;
+    scrollbar-width: thin;
+    caret-color: #a8c7fa;
+  }
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@layer components {
+  /* The aurora of the account screens, kept for the surface it was authored for. */
+  .aurora-wash {
+    background-image:
+      radial-gradient(28rem 12rem at 6% 130%, rgb(75 18 168 / 0.3), transparent 70%),
+      radial-gradient(22rem 10rem at 94% -40%, rgb(160 26 216 / 0.16), transparent 72%);
+  }
+
+  /* Sources appear in the panel with a delay set per entry by the view. */
+  .sheet-deal {
+    animation: sheet-deal 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  @keyframes sheet-deal {
+    from {
+      opacity: 0;
+      transform: translateY(0.375rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet-deal {
+      animation: none;
+    }
+  }
 }

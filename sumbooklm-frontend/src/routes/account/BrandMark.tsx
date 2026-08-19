@@ -6,7 +6,7 @@
  */
 export function BrandMark() {
   return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-jb-card border border-jb-grey-80 bg-jb-grey-95">
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-nb-raised text-nb-accent">
       <svg viewBox="0 0 20 20" className="size-5" fill="none" aria-hidden>
         <rect x="3" y="4" width="14" height="2.4" rx="1.2" fill="currentColor" opacity="0.95" />
         <rect x="3" y="8.8" width="10" height="2.4" rx="1.2" fill="currentColor" opacity="0.6" />

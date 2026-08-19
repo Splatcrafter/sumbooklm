@@ -11,7 +11,7 @@ import { WaveBackground } from '@/components/background/WaveBackground';
  */
 export function AccountLayout() {
   return (
-    <div className="dark relative isolate min-h-svh w-full overflow-hidden bg-jb-black text-jb-grey-10">
+    <div className="dark relative isolate min-h-svh w-full overflow-hidden bg-nb-ground text-nb-text">
       <WaveBackground />
       <div className="relative flex min-h-svh flex-col justify-center px-6 py-14 sm:px-10 lg:px-24">
         <div className="w-full max-w-[27rem]">

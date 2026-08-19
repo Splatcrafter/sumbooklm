@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Pin, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -9,15 +10,20 @@ import { NotebookCreateCard } from '@/routes/dashboard/NotebookCreateCard';
 import { NotebookDeleteDialog } from '@/routes/dashboard/NotebookDeleteDialog';
 import { NotebookTitleDialog } from '@/routes/dashboard/NotebookTitleDialog';
 
-const GRID_CLASSES = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+const GRID_CLASSES =
+  'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5';
 
 /**
- * Overview of the notebooks of the signed-in user.
+ * Overview of the Sumbooks of the signed-in user.
  *
- * The overview has two sections. Pinned notebooks come first and the section disappears entirely
- * when nothing is pinned, so an empty heading never occupies the top of the screen. Everything not
- * pinned follows below, led by the card that creates a notebook. A notebook appears in one section
- * only, because the same card in two places reads as two notebooks.
+ * The overview has two sections. Pinned Sumbooks come first and the section disappears entirely when
+ * nothing is pinned, so an empty heading never occupies the top of the screen. Everything not pinned
+ * follows below, led by the card that creates one. A Sumbook appears in one section only, because the
+ * same card in two places reads as two Sumbooks.
+ *
+ * Creating is offered twice on purpose: as the leading card of the shelf, where the eye lands when
+ * reading the Sumbooks, and as the one filled button of the screen, where a visitor who came to start
+ * something looks first.
  */
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -40,100 +46,111 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:px-10">
-      <header className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight text-jb-grey-5">{t('dashboard.title')}</h1>
-        <p className="text-sm leading-6 text-jb-grey-50">{t('dashboard.subtitle')}</p>
-      </header>
-
-      {status === 'failed' ? (
-        <div className="mt-10 flex flex-col items-start gap-3 rounded-jb-card border border-jb-danger/30 bg-jb-danger/10 px-5 py-4">
-          <p className="text-sm text-jb-danger">{t('dashboard.errors.load')}</p>
+    <div className="min-h-0 flex-1 overflow-y-auto bg-nb-surface">
+      <div className="mx-auto w-full max-w-[110rem] px-5 py-8 sm:px-8">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-[1.75rem] leading-9 font-medium text-nb-text">
+              {t('dashboard.title')}
+            </h1>
+            <p className="text-[0.8125rem] leading-5 text-nb-muted">{t('dashboard.subtitle')}</p>
+          </div>
           <Button
-            variant="outline"
-            className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5"
-            onClick={() => void reload()}
+            onClick={() => setCreating(true)}
+            className="h-10 rounded-full bg-nb-primary px-5 text-sm font-medium text-nb-on-primary hover:brightness-90"
           >
-            {t('dashboard.actions.retry')}
+            <Plus />
+            {t('dashboard.create.card')}
           </Button>
-        </div>
-      ) : null}
+        </header>
 
-      {status === 'loading' ? (
-        <p className="mt-10 text-sm text-jb-grey-50">{t('dashboard.loading')}</p>
-      ) : null}
-
-      {status === 'ready' ? (
-        <>
-          {pinned.length > 0 ? (
-            <section className="mt-10" aria-labelledby="pinned-sumbooks">
-              <h2
-                id="pinned-sumbooks"
-                className="mb-4 text-sm font-semibold tracking-wide text-jb-grey-40"
-              >
-                {t('dashboard.sections.pinned')}
-              </h2>
-              <div className={GRID_CLASSES}>{cards(pinned)}</div>
-            </section>
-          ) : null}
-
-          <section className="mt-10" aria-labelledby="recent-sumbooks">
-            <h2
-              id="recent-sumbooks"
-              className="mb-4 text-sm font-semibold tracking-wide text-jb-grey-40"
+        {status === 'failed' ? (
+          <div className="mt-8 flex flex-col items-start gap-3 rounded-nb-card bg-nb-ground px-5 py-4">
+            <p className="text-sm text-nb-danger">{t('dashboard.errors.load')}</p>
+            <Button
+              variant="outline"
+              className="rounded-full border-nb-line bg-transparent text-nb-body hover:bg-nb-hover hover:text-nb-text"
+              onClick={() => void reload()}
             >
-              {t('dashboard.sections.recent')}
-            </h2>
-            <div className={GRID_CLASSES}>
-              <NotebookCreateCard onClick={() => setCreating(true)} />
-              {cards(recent)}
-            </div>
-          </section>
-        </>
-      ) : null}
+              {t('dashboard.actions.retry')}
+            </Button>
+          </div>
+        ) : null}
 
-      <NotebookTitleDialog
-        open={creating}
-        onOpenChange={setCreating}
-        heading={t('dashboard.create.heading')}
-        description={t('dashboard.create.description')}
-        submitLabel={t('dashboard.create.confirm')}
-        initialTitle=""
-        onSubmit={create}
-      />
+        {status === 'loading' ? (
+          <p className="mt-8 text-sm text-nb-muted">{t('dashboard.loading')}</p>
+        ) : null}
 
-      <NotebookTitleDialog
-        open={renaming !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRenaming(null);
-          }
-        }}
-        heading={t('dashboard.rename.heading')}
-        description={t('dashboard.rename.description')}
-        submitLabel={t('dashboard.rename.confirm')}
-        initialTitle={renaming?.title ?? ''}
-        onSubmit={async (title) => {
-          if (renaming) {
-            await rename(renaming.id, title);
-          }
-        }}
-      />
+        {status === 'ready' ? (
+          <>
+            {pinned.length > 0 ? (
+              <section className="mt-8" aria-labelledby="pinned-sumbooks">
+                <h2
+                  id="pinned-sumbooks"
+                  className="mb-4 flex items-center gap-2 text-sm font-medium text-nb-body"
+                >
+                  <Pin className="size-4" aria-hidden />
+                  {t('dashboard.sections.pinned')}
+                </h2>
+                <div className={GRID_CLASSES}>{cards(pinned)}</div>
+              </section>
+            ) : null}
 
-      <NotebookDeleteDialog
-        open={deleting !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleting(null);
-          }
-        }}
-        title={deleting?.title ?? ''}
-        onConfirm={async () => {
-          if (deleting) {
-            await remove(deleting.id);
-          }
-        }}
-      />
+            <section className="mt-8" aria-labelledby="recent-sumbooks">
+              <h2 id="recent-sumbooks" className="mb-4 text-sm font-medium text-nb-body">
+                {t('dashboard.sections.recent')}
+              </h2>
+              <div className={GRID_CLASSES}>
+                <NotebookCreateCard onClick={() => setCreating(true)} />
+                {cards(recent)}
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        <NotebookTitleDialog
+          open={creating}
+          onOpenChange={setCreating}
+          heading={t('dashboard.create.heading')}
+          description={t('dashboard.create.description')}
+          submitLabel={t('dashboard.create.confirm')}
+          initialTitle=""
+          onSubmit={create}
+        />
+
+        <NotebookTitleDialog
+          open={renaming !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setRenaming(null);
+            }
+          }}
+          heading={t('dashboard.rename.heading')}
+          description={t('dashboard.rename.description')}
+          submitLabel={t('dashboard.rename.confirm')}
+          initialTitle={renaming?.title ?? ''}
+          onSubmit={async (title) => {
+            if (renaming) {
+              await rename(renaming.id, title);
+            }
+          }}
+        />
+
+        <NotebookDeleteDialog
+          open={deleting !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleting(null);
+            }
+          }}
+          title={deleting?.title ?? ''}
+          onConfirm={async () => {
+            if (deleting) {
+              await remove(deleting.id);
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }

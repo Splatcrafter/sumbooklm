@@ -8,7 +8,7 @@ export function NotFoundPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8 lg:px-10">
-      <p className="text-sm text-jb-grey-50">{t('errors.routeNotFound')}</p>
+      <p className="text-sm text-nb-muted">{t('errors.routeNotFound')}</p>
     </div>
   );
 }

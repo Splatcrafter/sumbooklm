@@ -501,3 +501,37 @@ and started against the same file, and the source is retrievable again in ninety
 
 The frontend is untouched by this change. The hash was never part of a response, so the generated
 client and the interface are the same as before.
+
+## Verification of the transport rule and the bound on answers on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 77 tests. `sumbooklm-workspace` has tests for the
+first time.
+
+`SecureTransportIntegrationTest` runs a context that declares itself served over HTTPS and then makes
+every request over plain HTTP. Registration, the notebook collection, a transcript and the cookie
+parameter endpoint are all refused with `426`; the refusal is a problem document rather than an empty
+body; and the application shell is still served, so a visitor of a misconfigured deployment reaches
+something that can tell them what is wrong.
+
+`ConcurrentAnswerLimitTest` states the bound as arithmetic: three permits and no more, a returned
+permit can be taken again, an account that returned everything starts over, returning a permit that
+was never taken changes nothing, and two accounts are counted apart.
+
+The bound itself needs answers that do not arrive, so the chat suite runs a provider that accepts a
+request and holds it. Three questions are asked and waited for until all three have reached the
+provider, a fourth is refused with `429`, and the transcript is asserted to hold three questions and
+not the fourth. The provider is then released, and the transcript is asserted to reach six messages,
+which is what states that no accepted answer was lost.
+
+That last assertion exists because writing this test found two defects, neither of them caused by the
+limit and both of them only reachable once several requests hit one notebook at once. Two questions in
+one notebook failed with an optimistic locking error, because both refreshed its activity timestamp
+through the entity. And two answers arriving together lost one of them, because a transcript is
+appended to by decoding a payload, adding to it and encoding it again, and the second writer was told
+it had lost. The timestamp is now written by a statement that does not touch the counter and does take
+a row lock, and the answer is appended under a pessimistic lock on the session.
+
+The streaming harness and the generated client harness were both re-run afterwards, since the locking
+sits directly under them, and both still pass. The message rendering harness gained the refused turn:
+it says that too many answers are being written rather than reporting a failure, in all three
+languages.

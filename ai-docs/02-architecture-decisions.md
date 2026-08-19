@@ -879,3 +879,67 @@ deleted and added again cannot have the two overtake each other.
 **Cost.** A removal that fails now leaves segments nobody will collect, since the rebuild at startup
 indexes the sources that exist rather than reconciling the store against them. That is the trade
 above, taken deliberately.
+
+## ADR-048: A deployment that is served over HTTPS refuses everything else
+
+**Decision.** `sumbooklm.security.require-secure-transport` installs a filter that answers `426` to
+every request below the API prefix that did not arrive over a secure connection. It is off by default
+and on in the production profile. Requests outside the prefix are unaffected.
+
+**Reason.** Every request below that prefix carries a credential: an access token, a password, or the
+API key the user handed in for one question. A deployment reachable from elsewhere without TLS
+publishes all three.
+
+It refuses rather than redirects, which is the part worth arguing. A redirect is the usual answer and
+it is wrong here: by the time it is written the secret has already crossed the network, and telling
+the client to send it again does nothing about the copy that was made. Refusing at least does not ask
+for a second transmission.
+
+The application shell stays reachable so that a visitor of a misconfigured deployment gets something
+that can tell them what is wrong rather than a blank refusal.
+
+**Cost.** The property is a claim about the deployment that the application cannot check. Setting it
+where TLS is not actually terminated makes the API unreachable, which is loud rather than silent, and
+that is the correct direction for this mistake.
+
+## ADR-049: One account may have three answers being generated at once
+
+**Decision.** A permit is taken before the question is stored and returned when the answer ends. An
+account beyond its permits is refused with `429`, and nothing about the question is written.
+
+**Reason.** An answer holds a thread of the answering pool for as long as the provider takes, which
+can be minutes. Without a bound, one account asking forty questions and forty accounts asking one look
+identical to the pool, and the first of them fills it. The tokens are the user's problem either way;
+the threads are everyone's.
+
+Three, because a reader with two Sumbooks open should not wait, and because it is far enough below the
+pool that one account cannot take it. Refused rather than queued, because a queued request holds the
+connection open for the length of an answer that has not started, which is indistinguishable from a
+server that stopped responding.
+
+Taking the permit before the question is stored is what keeps a refused question out of the transcript.
+The permit is returned by whichever ending the answer reaches and by only one of them, so a provider
+reporting both cannot hand the account a permit it does not hold.
+
+**Cost.** The count is per instance, so two instances permit twice the limit. That is the right shape
+for a bound on threads, and the wrong one for a bound on spending; see open question 34.
+
+## ADR-050: The notebook row is what serialises the work inside it
+
+**Decision.** Everything that changes what a notebook holds refreshes its activity timestamp with a
+bulk update, and does so before reading what it is about to change. The transcript is additionally
+read under a pessimistic lock when an answer is appended.
+
+**Reason.** The timestamp had been written through the entity, which put concurrent touches against
+the optimistic locking counter and failed one of them, although the two do not disagree about
+anything. A statement that writes the column without reading the counter removes the conflict, and it
+takes a write lock that turns concurrent work inside one notebook into a queue.
+
+That ordering is what makes the rest safe. A transcript is appended to by decoding, adding and
+encoding, and two of those at once lose a message. Opening a turn is covered by the notebook lock;
+storing an answer is not, because it happens later and on another thread, so it takes the lock on the
+session itself.
+
+**Cost.** Work inside one notebook is serialised even where it need not be, and the lock is held for
+the length of a short transaction. Both are cheaper than the alternative, which is a user losing a
+message they paid a provider to generate.

@@ -9,6 +9,7 @@ spring:
 
 sumbooklm:
   security:
+    require-secure-transport: ${SUMBOOKLM_REQUIRE_HTTPS:true}
     jwt:
       secret: ${SUMBOOKLM_JWT_SECRET}
     cookie:

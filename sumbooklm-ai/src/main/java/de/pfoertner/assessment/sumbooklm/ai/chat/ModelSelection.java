@@ -17,6 +17,12 @@ import java.util.Objects;
  * address it is used with reaches the database or the log, which is what makes a key that is handed
  * in for one question also revoked after it.
  *
+ * <h2>The Key Is Not Printed Either</h2>
+ * The generated string form of a record contains every component, so a selection that reached a log
+ * line or the message of an exception would take the key with it. The form below replaces it with a
+ * marker, which is the only place where a rule about a value is worth more than a rule about the
+ * places that value must not go.
+ *
  * @param provider  service the model is requested from
  * @param modelName name the provider knows the model under
  * @param apiKey    key the provider is addressed with, empty for a provider that needs none
@@ -40,6 +46,19 @@ public record ModelSelection(ChatProvider provider, String modelName, String api
         Objects.requireNonNull(modelName, "modelName must not be null");
         Objects.requireNonNull(apiKey, "apiKey must not be null");
         Objects.requireNonNull(baseUrl, "baseUrl must not be null");
+    }
+
+    /**
+     * Returns a string form that names the selection without disclosing the key.
+     *
+     * @return the provider, the model and the address, with the key replaced by a marker
+     */
+    @Override
+    public String toString() {
+        return "ModelSelection[provider=" + this.provider
+                + ", modelName=" + this.modelName
+                + ", apiKey=" + (this.apiKey.isEmpty() ? "<none>" : "<present>")
+                + ", baseUrl=" + this.baseUrl + "]";
     }
 
     /**

@@ -4,6 +4,7 @@ import de.pfoertner.assessment.sumbooklm.ai.chat.UnusableModelSelectionException
 import de.pfoertner.assessment.sumbooklm.security.authentication.InvalidCredentialsException;
 import de.pfoertner.assessment.sumbooklm.security.authentication.UsernameAlreadyTakenException;
 import de.pfoertner.assessment.sumbooklm.security.token.InvalidRefreshTokenException;
+import de.pfoertner.assessment.sumbooklm.workspace.chat.TooManyQuestionsException;
 import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.DuplicateSourceException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.EmptyUploadException;
@@ -144,6 +145,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         final ProblemDetail problem =
                 ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
         problem.setTitle("Model not usable");
+        return problem;
+    }
+
+    /**
+     * Reports an account that already has as many answers in flight as it may have.
+     *
+     * @param exception failure raised by the workspace module
+     * @return a problem detail with status {@code 429}
+     */
+    @ExceptionHandler(TooManyQuestionsException.class)
+    public ProblemDetail handleTooManyQuestions(final TooManyQuestionsException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
+                "This account already has as many answers being generated as it may have");
+        problem.setTitle("Too many questions at once");
         return problem;
     }
 

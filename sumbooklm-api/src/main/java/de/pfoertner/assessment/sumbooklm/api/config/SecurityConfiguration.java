@@ -1,6 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.api.config;
 
 import de.pfoertner.assessment.sumbooklm.api.ApiPaths;
+import de.pfoertner.assessment.sumbooklm.security.config.SecurityProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,6 +10,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 /**
  * Decides which requests require an access token and how one is verified.
@@ -23,6 +25,11 @@ import org.springframework.security.web.SecurityFilterChain;
  * <h2>Everything Outside the API</h2>
  * Paths that do not belong to the API serve the single page application and its assets, and stay
  * open. The application shell is the same document for every visitor and contains no data.
+ *
+ * <h2>Transport</h2>
+ * A deployment that is served over HTTPS refuses API requests that arrive without it, before anything
+ * reads the credentials they carry. The check is a refusal rather than a redirect, because a redirect
+ * is written after the secret has already crossed the network; see {@link SecureTransportFilter}.
  *
  * <h2>Stateless by Construction</h2>
  * No session is created and no session is read. Authentication state travels in the access token
@@ -51,14 +58,19 @@ public class SecurityConfiguration {
     /**
      * Builds the filter chain of the application.
      *
-     * @param http              builder the chain is assembled on
+     * @param http               builder the chain is assembled on
      * @param accessTokenDecoder verifier that accepts access tokens
+     * @param properties         settings deciding whether a secure connection is required
      * @return the assembled filter chain
      * @throws Exception if the chain cannot be built
      */
     @Bean
     public SecurityFilterChain apiSecurityFilterChain(final HttpSecurity http,
-                                                      final JwtDecoder accessTokenDecoder) throws Exception {
+                                                      final JwtDecoder accessTokenDecoder,
+                                                      final SecurityProperties properties) throws Exception {
+        if (properties.requireSecureTransport()) {
+            http.addFilterBefore(new SecureTransportFilter(), SecurityContextHolderFilter.class);
+        }
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

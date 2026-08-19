@@ -137,6 +137,7 @@ class CookieCryptographyServiceTest {
     private static SecurityProperties properties(final String secret) {
         return new SecurityProperties(
                 new SecurityProperties.Jwt("", "sumbooklm", Duration.ofMinutes(5), Duration.ofDays(90)),
-                new SecurityProperties.Cookie(secret, "sumbooklm_key_handle", "sumbooklm_auth", false));
+                new SecurityProperties.Cookie(secret, "sumbooklm_key_handle", "sumbooklm_auth", false),
+                false);
     }
 }

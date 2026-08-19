@@ -913,6 +913,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The account already has as many answers being generated as it may have. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     logout: {

@@ -148,6 +148,7 @@
       "send": "Send question",
       "thinking": "Reading your sources...",
       "failed": "The answer could not be generated.",
+      "tooMany": "Too many answers are being written at once. Ask again when one of them has arrived.",
       "noModel": "No model is set up yet, so questions cannot be answered.",
       "chooseModel": "Choose model",
       "historyFailed": "The conversation could not be loaded."

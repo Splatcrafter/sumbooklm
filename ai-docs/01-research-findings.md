@@ -622,3 +622,28 @@ into the status the caller should get, and the transaction is already being roll
 `saveAndFlush` moves the write to the point of the call, so `DataIntegrityViolationException` is
 thrown inside the method that can translate it. The cost is one statement that cannot be batched with
 whatever else the transaction writes, which is nothing here.
+
+### 48. A versioned row cannot be touched concurrently
+
+`@Version` on the notebook made two questions asked in one notebook at the same time fail with
+`ObjectOptimisticLockingFailureException`, because both refreshed its activity timestamp through the
+entity. The counter did its job: it reported that two writers had the row at once. It is the wrong
+job for this column, since the two do not disagree about anything and both mean now.
+
+A `@Modifying` bulk update writes the column without reading or raising the counter, so the writers
+stop colliding. It also takes a write lock on the row until the transaction commits, which is worth
+more than the update itself: a caller that touches the notebook before reading what it is about to
+change has serialised everything that happens inside that notebook.
+
+This only appeared once a test drove several requests at one notebook at the same time. Nothing about
+the code changed to cause it.
+
+### 49. An appended payload needs a lock, not a version
+
+Adding a message decodes a transcript, appends to it and encodes it again. Two of those at once end
+with one transcript missing the other's message, and with `@Version` the second writer is told that it
+lost, which for a generated answer means the answer is gone.
+
+`@Lock(LockModeType.PESSIMISTIC_WRITE)` on the finder that starts the read turns the two into a
+queue. The distinction is what the counter is for: optimistic locking suits state a user edits and
+can be asked to re-enter, and suits nothing that was produced at cost and cannot be produced again.

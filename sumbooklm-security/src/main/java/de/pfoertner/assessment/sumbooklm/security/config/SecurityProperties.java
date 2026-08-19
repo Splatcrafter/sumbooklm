@@ -12,13 +12,23 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * Neither secret has a default. A missing or too short secret fails the startup rather than falling
  * back to a value that would be identical across installations.
  *
- * @param jwt    settings of the issued tokens
- * @param cookie settings of the client side token storage
+ * <h2>Transport</h2>
+ * Whether the application is reached over a secure connection is a fact about the deployment rather
+ * than something it can detect, which is why it is configured. It defaults to false so that a
+ * developer running the application locally is not locked out, and every deployment that is reachable
+ * from elsewhere has to set it.
+ *
+ * @param jwt                    settings of the issued tokens
+ * @param cookie                 settings of the client side token storage
+ * @param requireSecureTransport whether requests to the API are refused unless they arrived over a
+ *                               secure connection
  * @author Erik Pförtner
  * @since 0.1.0
  */
 @ConfigurationProperties("sumbooklm.security")
-public record SecurityProperties(@DefaultValue Jwt jwt, @DefaultValue Cookie cookie) {
+public record SecurityProperties(@DefaultValue Jwt jwt,
+                                 @DefaultValue Cookie cookie,
+                                 @DefaultValue("false") boolean requireSecureTransport) {
 
     /**
      * Settings of the issued tokens.

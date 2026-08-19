@@ -226,26 +226,36 @@ dropped.
 
 The leftover is not collected by anything, which is recorded as question 33.
 
-## 24. The key is handed to the server on every question
+## 24. Resolved: the API refuses to be reached without TLS
 
-Bring your own key means the browser sends the key to this application, which forwards it to the
-provider. The application stores it nowhere and logs it nowhere, but it does see it, and a request
-made over plain HTTP carries it in the clear.
+A deployment now declares whether it is served over HTTPS, and one that is refuses every API request
+that arrived without it. The refusal is a status rather than a redirect, because a redirect is written
+after the secret has already crossed the network.
 
-The honest alternative is for the browser to call the provider directly, which removes the server from
-the path entirely, and with it the retrieval that made the question worth asking. The middle ground is
-to require HTTPS for the chat endpoint outside development, which is a deployment decision this
-scaffold does not make yet.
+The rule covers everything below the API prefix rather than the chat endpoint alone. A key is a
+credential and so is an access token, and the token opens a session that lasts ninety days.
 
-## 25. Nothing bounds how many questions one account may ask
+The other half of the question is closed differently: the application does see the key, and the only
+way it would not is for the browser to call the provider directly, which removes the retrieval that
+made the question worth asking. What it does instead is make sure the key cannot leak on its way
+through. It is never stored, never logged, and the record that carries it prints itself with the key
+replaced by a marker, so a selection that ever reached a log line or the message of an exception takes
+nothing with it.
 
-A question occupies a thread of the chat pool for as long as the provider takes. Eight of them can be
-in flight, another thirty-two wait, and after that the caller answers its own question on a request
-thread. Nothing distinguishes one account asking forty questions from forty accounts asking one.
+## 25. Resolved: an account may have three answers being generated at once
 
-The cost is the user's rather than the operator's, which is what makes this less urgent than it looks,
-but the threads are not. A limit per account is the shape to add, and the pool is where it would be
-enforced.
+A permit is taken before the question is stored and returned when the answer ends, and an account
+beyond its permits is refused with `429` without anything being written. One account can therefore no
+longer fill the pool.
+
+Writing the test for it turned up two defects that had nothing to do with the limit and everything to
+do with what the limit now permits. Two questions in one notebook at the same time failed, because
+both refreshed its activity timestamp through a versioned entity. And two answers arriving at once
+lost one of them, because a transcript is appended to by decoding, adding and encoding. Both are
+fixed, and both were invisible until something asked several things of one notebook at once.
+
+What remains is recorded as questions 34 and 35: the count is per instance, and a bound on answers in
+flight is not a bound on questions over time.
 
 ## 26. A cancelled answer is generated to the end
 
@@ -330,3 +340,24 @@ Collecting them means a pass that compares the store against the sources that ex
 rebuild at startup would be if it cleared the store first instead of replacing one source at a time.
 It does not, because a rebuild asked for at runtime would then briefly empty an index that is being
 searched.
+
+## 34. The bound on answers is per instance and per moment
+
+The permits live in the heap of one instance, so two instances behind a load balancer permit twice the
+limit. For a bound whose purpose is protecting the thread pool of the instance that took the request,
+that is correct: each pool is protected by its own count.
+
+It stops being correct the moment the bound is meant to protect something shared, which is what a
+bound on spending would be. That needs the count somewhere both instances can see, and it needs to be
+a rate rather than a concurrency, because an account that asks one question at a time forever is
+bounded by nothing today.
+
+## 35. Nothing bounds questions over time
+
+Three answers at once is a bound on what an account occupies, not on what it asks. A client asking one
+question, waiting for it, and asking the next is inside the limit for as long as it likes.
+
+That is deliberate, because what an answer costs is paid by the user with their own key, and the
+threads are already protected. It becomes a real question the moment something the operator pays for
+sits behind the same endpoint, at which point a rate limit belongs in front of the whole API rather
+than in the chat service.

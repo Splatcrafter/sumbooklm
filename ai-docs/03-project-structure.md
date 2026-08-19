@@ -108,7 +108,8 @@ de.pfoertner.assessment.sumbooklm
 │   │                                            startup rebuild, the index cleanup listener,
 │   │                                            fingerprints and failures
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
-│                                                the turn context, the stream handler, failures
+│                                                the turn context, the stream handler, the bound on
+│                                                answers in flight, failures
 ├── ingestion
 │   ├── extraction                              file and web extractors, the address resolver every
 │   │                                            fetch connects through, their result and failures
@@ -119,7 +120,8 @@ de.pfoertner.assessment.sumbooklm
 │                                                GroundedPrompt, GroundedChatEngine, its handler
 └── api
     ├── ApiPaths
-    ├── config                                  OpenApiConfiguration, SecurityConfiguration
+    ├── config                                  OpenApiConfiguration, SecurityConfiguration,
+    │                                            SecureTransportFilter
     ├── error                                   ApiExceptionHandler
     ├── support                                 ClientAddressResolver, KeyHandleCookieFactory,
     │                                            AuthenticatedUserResolver
@@ -210,6 +212,23 @@ sharing a layout with the signed-in application would have meant undoing that la
 Build output goes to `target/dist` rather than `dist` so that `mvn clean` removes it and so the
 frontend module obeys the same directory conventions as the Java modules.
 
+## Locking
+
+`notebook` and `chat_session` carry an optimistic locking counter, which is what should guard state a
+user edits: a title, a pin, a topic icon. It is the wrong guard for two other things, and both are
+handled explicitly.
+
+The activity timestamp of a notebook is refreshed by everything that happens inside it, and by several
+things at once when a user works in two places. It is written by a statement that neither reads nor
+raises the counter, so concurrent touches do not collide. That statement also takes a write lock on
+the row, and everything that changes what a notebook holds runs it before reading what it is about to
+change, which turns concurrent work inside one notebook into a queue (ADR-050).
+
+The transcript of a conversation is appended to by decoding a payload, adding to it and encoding it
+again. Opening a turn is covered by the notebook lock; storing a finished answer happens later and on
+another thread, so it reads the session under a pessimistic write lock instead. Losing there would
+mean losing an answer a provider was paid to generate.
+
 ## Configuration profiles
 
 `application.yml` holds everything profile independent: application name and version, multipart
@@ -220,7 +239,8 @@ for the application packages.
 
 `application-prod.yml` — PostgreSQL from `SUMBOOKLM_DATASOURCE_*` environment variables,
 `ddl-auto: validate`, Swagger UI disabled, `server.forward-headers-strategy: framework` so that the
-recorded caller address is the one a reverse proxy reports rather than the proxy itself.
+recorded caller address is the one a reverse proxy reports rather than the proxy itself, and
+`require-secure-transport` on, which the same forwarded headers are what makes decidable.
 
 The `sumbooklm.security` namespace is split across the profiles on purpose. The issuer and the two
 token lifetimes are profile independent and live in `application.yml`. The two secrets are not: the
@@ -229,6 +249,11 @@ environment variable, and the production profile has no default at all, so a mis
 `SUMBOOKLM_JWT_SECRET` or `SUMBOOKLM_COOKIE_SECRET` fails the startup instead of silently using a
 secret that is identical in every checkout. Secrets shorter than 32 characters are rejected as well,
 because HMAC with SHA-256 would otherwise be keyed below its digest length.
+
+`sumbooklm.security.require-secure-transport` is a claim about the deployment rather than something
+the application can check, which is why it is a property and why it defaults to false. A developer
+running the application locally is not locked out; every deployment reachable from elsewhere sets it,
+and setting it where TLS is not terminated makes the API unreachable rather than quietly insecure.
 
 No LangChain4j model properties are configured yet. Configuring
 `langchain4j.open-ai.chat-model.api-key` would eagerly construct a model bean at startup, which
@@ -248,7 +273,9 @@ The sequence below is what the integration test and the manual verification both
    initialization vector and the name of the cookie the client should use.
 3. The client encrypts `{ user, tokens }`, writes `initializationVector || ciphertext` Base64 encoded
    into `sumbooklm_auth`, and keeps the session in memory.
-4. Protected requests carry `Authorization: Bearer <access token>`. The resource server verifies the
+4. Protected requests carry `Authorization: Bearer <access token>`. A deployment that declares itself
+   served over HTTPS refuses any of them that arrived without it, before the token is read (ADR-048).
+   The resource server verifies the
    signature, the issuer, the expiry and that `token_type` is `access`.
 5. When the access token has expired, the client posts its refresh token to
    `POST /api/v1/token/refresh`. The server verifies the signature and the `refresh` token type,
@@ -288,9 +315,11 @@ that never succeeded.
 ## Answering a question
 
 1. `POST /api/v1/notebooks/{id}/chat` carries the question in its body and the model in its headers.
-   The selection is validated first, then the notebook is resolved for the account of the access
-   token, the question is appended to the conversation of that notebook, and the transaction commits.
-   Both failures that can still be a status code have happened by now (ADR-037).
+   A permit is taken first, so an account that already has three answers being generated is refused
+   with `429` before anything is written (ADR-049). The selection is validated next, then the notebook
+   is touched, which resolves it for the account of the access token and locks its row (ADR-050), the
+   question is appended to the conversation of that notebook, and the transaction commits. Every
+   failure that can still be a status code has happened by now (ADR-037).
 2. The request returns an `SseEmitter`. Everything after this point runs on the chat executor.
 3. The retriever of that notebook embeds the question and reads the segments whose `notebookId`
    metadata matches, above the relevance floor (ADR-035). Their sources are named from the source
@@ -298,9 +327,10 @@ that never succeeded.
 4. A client is built for the presented provider, and the model is asked with the rules, the numbered
    passages, the last messages of the conversation and the question. Each part it generates is
    written to the stream as a `token` event.
-5. The finished answer is handed to the asynchronous recorder and sent as the `done` event, after
-   which the stream is closed. A failure at any point after step 2 becomes an `error` event instead,
-   and the question stays in the transcript without an answer.
+5. The finished answer is handed to the asynchronous recorder, which appends it under a lock on the
+   session row, and is sent as the `done` event, after which the stream is closed. A failure at any
+   point after step 2 becomes an `error` event instead, and the question stays in the transcript
+   without an answer. Either ending returns the permit, and only one of them does.
 
 ## Database tables
 

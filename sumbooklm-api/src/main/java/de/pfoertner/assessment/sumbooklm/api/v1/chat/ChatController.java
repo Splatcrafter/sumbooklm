@@ -29,9 +29,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * Endpoints of the conversation held inside one notebook of the authenticated account.
  *
  * <h2>Order of the Checks</h2>
- * The presented model access is validated before the question is stored. A caller whose settings are
- * incomplete therefore receives a rejected request rather than a transcript that has grown a question
- * nobody could answer.
+ * The presented model access is validated before the question is stored, and the permit that bounds
+ * how many answers an account may have at once is taken before that. A caller whose settings are
+ * incomplete, or who is already waiting for as many answers as they may, therefore receives a
+ * rejected request rather than a transcript that has grown a question nobody could answer.
  *
  * <h2>Answering Off the Request Thread</h2>
  * The request returns as soon as the stream exists. Everything after that, from retrieval to the last
@@ -126,6 +127,9 @@ public class ChatController {
             @ApiResponse(responseCode = "401", description = "No valid access token was presented.",
                     content = @Content),
             @ApiResponse(responseCode = "404", description = "The account owns no such notebook.",
+                    content = @Content),
+            @ApiResponse(responseCode = "429",
+                    description = "The account already has as many answers being generated as it may have.",
                     content = @Content)
     })
     @PostMapping(value = ApiPaths.V1_NOTEBOOK_CHAT,
@@ -144,7 +148,14 @@ public class ChatController {
                 this.notebookChatService.beginTurn(userId, notebookId, body.question().strip());
 
         final SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
-        this.notebookChatService.answer(userId, context, selection, new SseChatStreamHandler(emitter));
+        try {
+            this.notebookChatService.answer(userId, context, selection, new SseChatStreamHandler(emitter));
+        } catch (final RuntimeException e) {
+            // The permit taken while the question was stored is returned by whichever ending the
+            // answer reaches. A hand-off that never started has no ending, so it is returned here.
+            this.notebookChatService.abandonTurn(userId);
+            throw e;
+        }
         return emitter;
     }
 }

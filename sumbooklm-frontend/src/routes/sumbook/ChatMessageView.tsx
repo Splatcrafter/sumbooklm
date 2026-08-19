@@ -161,6 +161,12 @@ export function ChatMessageView({ message }: { message: ChatMessage }) {
           </ul>
         ) : null}
 
+        {message.limited ? (
+          <p className="mt-2 text-xs text-jb-grey-40" role="status">
+            {t('sumbook.chat.tooMany')}
+          </p>
+        ) : null}
+
         {message.failure !== undefined ? (
           <p className="mt-2 text-xs text-jb-danger" role="alert">
             {t('sumbook.chat.failed')}

@@ -17,7 +17,6 @@ import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentEnti
 import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentMapper;
 import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.document.SourceReference;
-import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookEntity;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
 import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
@@ -38,6 +37,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Adding a source stores it, marks it as uploaded and answers. The work that makes it searchable is
  * announced as an event and performed once the storing transaction has committed, because a listener
  * that started earlier would look for a row that is not visible yet.
+ *
+ * <h2>One Notebook at a Time</h2>
+ * Everything that changes what a notebook holds refreshes its activity timestamp, and does so before
+ * it reads what it is about to change. That statement takes a write lock on the notebook, which makes
+ * two uploads into one Sumbook follow one another rather than race.
  *
  * <h2>Duplicates Are a Constraint, Not a Check</h2>
  * A source is refused when its notebook already holds the same content, which the database answers
@@ -205,10 +209,9 @@ public class SourceDocumentService {
      */
     @Transactional
     public void delete(final UUID userId, final UUID notebookId, final UUID sourceId) {
-        final NotebookEntity notebook = requireNotebook(userId, notebookId);
+        touchNotebook(userId, notebookId, now());
         final SourceDocumentEntity entity = requireSource(userId, notebookId, sourceId);
         this.sourceDocumentRepository.delete(entity);
-        notebook.setLastActivityAt(now());
 
         this.eventPublisher.publishEvent(new SourceRemovedEvent(sourceId));
     }
@@ -320,13 +323,13 @@ public class SourceDocumentService {
                                final String documentHash,
                                final byte[] content,
                                final DocumentPayload payload) {
-        final NotebookEntity notebook = requireNotebook(userId, notebookId);
+        final Instant now = now();
+        touchNotebook(userId, notebookId, now);
         if (this.sourceDocumentRepository
                 .existsByNotebookIdAndUserIdAndDocumentHash(notebookId, userId, documentHash)) {
             throw new DuplicateSourceException(notebookId);
         }
 
-        final Instant now = now();
         final SourceDocumentEntity entity = new SourceDocumentEntity(
                 UUID.randomUUID(),
                 userId,
@@ -346,7 +349,6 @@ public class SourceDocumentService {
             // still refused here instead of failing the request after the response was decided.
             throw new DuplicateSourceException(notebookId);
         }
-        notebook.setLastActivityAt(now);
 
         this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, stored.getId()));
         return this.sourceDocumentMapper.toDomain(stored, payload);
@@ -364,16 +366,29 @@ public class SourceDocumentService {
     }
 
     /**
-     * Loads one notebook of an account.
+     * Reads one notebook of an account, only to establish that it exists.
      *
      * @param userId     identifier of the account the notebook belongs to
-     * @param notebookId identifier of the notebook to load
-     * @return the row of the notebook
+     * @param notebookId identifier of the notebook to check
      * @throws NotebookNotFoundException if the account holds no notebook with that identifier
      */
-    private NotebookEntity requireNotebook(final UUID userId, final UUID notebookId) {
-        return this.notebookRepository.findByIdAndUserId(notebookId, userId)
+    private void requireNotebook(final UUID userId, final UUID notebookId) {
+        this.notebookRepository.findByIdAndUserId(notebookId, userId)
                 .orElseThrow(() -> new NotebookNotFoundException(notebookId));
+    }
+
+    /**
+     * Refreshes the activity timestamp of one notebook of an account and locks its row.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to touch
+     * @param at         point in time to record as the most recent activity
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    private void touchNotebook(final UUID userId, final UUID notebookId, final Instant at) {
+        if (this.notebookRepository.touch(notebookId, userId, at) == 0) {
+            throw new NotebookNotFoundException(notebookId);
+        }
     }
 
     /**

@@ -110,10 +110,12 @@ export function useChat(notebookId: string): ChatValue {
         );
       } catch (error) {
         if (!controller.signal.aborted) {
+          const limited = error instanceof ChatRequestError && error.status === 429;
           update(answerKey, (message) => ({
             ...message,
             streaming: false,
-            failure: error instanceof ChatRequestError ? error.message : '',
+            limited,
+            failure: limited ? undefined : error instanceof ChatRequestError ? error.message : '',
           }));
         }
       } finally {

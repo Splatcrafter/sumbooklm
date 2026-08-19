@@ -21,8 +21,12 @@ export interface ChatSource {
  * addressable messages. It only has to be stable while the list is on screen, which is what a render
  * needs it for.
  *
- * The three optional fields describe a message that is still being generated: what it may cite, that
- * it is not finished, and why it stopped early. A stored message carries none of them.
+ * The optional fields describe a message that is still being generated: what it may cite, that it is
+ * not finished, and why it stopped early. A stored message carries none of them.
+ *
+ * A turn the backend refused because too many answers are already being generated is its own kind of
+ * ending. It is not a failure of the question, so it is marked rather than described, and the sentence
+ * the reader gets is written in their own language instead of taken from the response.
  */
 export interface ChatMessage {
   key: string;
@@ -32,6 +36,7 @@ export interface ChatMessage {
   sources?: ChatSource[];
   streaming?: boolean;
   failure?: string;
+  limited?: boolean;
 }
 
 /**

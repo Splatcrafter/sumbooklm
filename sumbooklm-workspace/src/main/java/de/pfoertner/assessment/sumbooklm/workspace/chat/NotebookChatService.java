@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import de.pfoertner.assessment.sumbooklm.ai.chat.ContextPassage;
 import de.pfoertner.assessment.sumbooklm.ai.chat.GroundedChatEngine;
@@ -40,6 +41,11 @@ import org.springframework.stereotype.Service;
  * A retrieved passage whose document is no longer listed in the notebook is dropped rather than shown
  * under a placeholder. The two can disagree only while a removal is in flight, and answering out of a
  * document the user has just deleted is worse than answering out of one document less.
+ *
+ * <h2>How Many at Once</h2>
+ * A permit is taken before the question is stored and returned when the answer ends, so an account
+ * that already has as many answers in flight as it may have is refused before anything is written.
+ * Taking it first is what keeps a refused question out of the transcript.
  *
  * <h2>Asking Anyway</h2>
  * A question that retrieves nothing still reaches the model. The refusal then arrives in the language
@@ -89,6 +95,11 @@ public class NotebookChatService {
     private final ChatTranscriptRecorder chatTranscriptRecorder;
 
     /**
+     * Bound on how many answers one account may have in flight.
+     */
+    private final ConcurrentAnswerLimit concurrentAnswerLimit;
+
+    /**
      * Creates the service.
      *
      * @param chatSessionService     service that owns the transcript of a conversation
@@ -96,17 +107,20 @@ public class NotebookChatService {
      * @param notebookIndex          retrieval index the passages of a notebook are read from
      * @param groundedChatEngine     engine that generates an answer from the retrieved passages
      * @param chatTranscriptRecorder writer of the finished answer
+     * @param concurrentAnswerLimit  bound on how many answers one account may have in flight
      */
     public NotebookChatService(final ChatSessionService chatSessionService,
                                final SourceDocumentService sourceDocumentService,
                                final NotebookIndex notebookIndex,
                                final GroundedChatEngine groundedChatEngine,
-                               final ChatTranscriptRecorder chatTranscriptRecorder) {
+                               final ChatTranscriptRecorder chatTranscriptRecorder,
+                               final ConcurrentAnswerLimit concurrentAnswerLimit) {
         this.chatSessionService = chatSessionService;
         this.sourceDocumentService = sourceDocumentService;
         this.notebookIndex = notebookIndex;
         this.groundedChatEngine = groundedChatEngine;
         this.chatTranscriptRecorder = chatTranscriptRecorder;
+        this.concurrentAnswerLimit = concurrentAnswerLimit;
     }
 
     /**
@@ -128,10 +142,33 @@ public class NotebookChatService {
      * @param notebookId identifier of the notebook the question was asked in
      * @param question   question that was asked
      * @return the conversation as it was before the question, together with its identifier
-     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     * @throws NotebookNotFoundException  if the account holds no notebook with that identifier
+     * @throws TooManyQuestionsException  if the account already has as many answers in flight as it
+     *                                    may have
      */
     public ChatTurnContext beginTurn(final UUID userId, final UUID notebookId, final String question) {
-        return this.chatSessionService.beginTurn(userId, notebookId, question);
+        if (!this.concurrentAnswerLimit.tryAcquire(userId)) {
+            throw new TooManyQuestionsException(userId);
+        }
+        try {
+            return this.chatSessionService.beginTurn(userId, notebookId, question);
+        } catch (final RuntimeException e) {
+            this.concurrentAnswerLimit.release(userId);
+            throw e;
+        }
+    }
+
+    /**
+     * Gives up a turn whose answer was never started.
+     *
+     * <p>The permit is taken when the question is stored and returned when the answer ends. The one
+     * moment in between that has no ending is the hand-off to the executor, which is where this is
+     * called from.
+     *
+     * @param userId identifier of the account the turn belongs to
+     */
+    public void abandonTurn(final UUID userId) {
+        this.concurrentAnswerLimit.release(userId);
     }
 
     /**
@@ -147,17 +184,17 @@ public class NotebookChatService {
                        final ChatTurnContext context,
                        final ModelSelection selection,
                        final ChatStreamHandler handler) {
+        final ChatStreamHandler ending = new AnswerRecorder(userId, context.sessionId(), handler);
         final List<ContextPassage> passages;
         try {
-            passages = retrieve(userId, context, handler);
+            passages = retrieve(userId, context, ending);
         } catch (final RuntimeException e) {
             LOG.warn("Retrieving passages for notebook {} failed", context.notebookId(), e);
-            handler.onFailed(e);
+            ending.onFailed(e);
             return;
         }
 
-        this.groundedChatEngine.answer(selection, passages, context.history(), context.question(),
-                new AnswerRecorder(userId, context.sessionId(), handler));
+        this.groundedChatEngine.answer(selection, passages, context.history(), context.question(), ending);
     }
 
     /**
@@ -207,6 +244,11 @@ public class NotebookChatService {
      * rather than awaited. A client that reloads immediately afterwards can therefore still be ahead
      * of the transcript, which is the price of not making the reader wait for a transaction.
      *
+     * <h2>Exactly One Ending</h2>
+     * The permit of the account is returned by whichever ending arrives, and by only one of them. A
+     * provider that reported both would otherwise return a permit it does not hold, and the account
+     * would end up allowed one more answer than the limit says.
+     *
      * @author Erik Pförtner
      * @since 0.1.0
      */
@@ -226,6 +268,11 @@ public class NotebookChatService {
          * Receiver the calls are passed on to.
          */
         private final ChatStreamHandler delegate;
+
+        /**
+         * Whether an ending has already been handled.
+         */
+        private final AtomicBoolean ended = new AtomicBoolean();
 
         /**
          * Creates the receiver.
@@ -252,12 +299,20 @@ public class NotebookChatService {
 
         @Override
         public void onCompleted(final String answer) {
+            if (!this.ended.compareAndSet(false, true)) {
+                return;
+            }
+            NotebookChatService.this.concurrentAnswerLimit.release(this.userId);
             NotebookChatService.this.chatTranscriptRecorder.record(this.userId, this.sessionId, answer);
             this.delegate.onCompleted(answer);
         }
 
         @Override
         public void onFailed(final Throwable error) {
+            if (!this.ended.compareAndSet(false, true)) {
+                return;
+            }
+            NotebookChatService.this.concurrentAnswerLimit.release(this.userId);
             this.delegate.onFailed(error);
         }
     }

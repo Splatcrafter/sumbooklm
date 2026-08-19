@@ -15,7 +15,6 @@ import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionEntity;
 import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionMapper;
 import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionPayload;
 import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionRepository;
-import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookEntity;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
 import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
@@ -33,6 +32,12 @@ import org.springframework.transaction.annotation.Transactional;
  * The first question of a notebook creates its conversation; reading one that does not exist creates
  * nothing. Opening a notebook is therefore free of writes, which matters because it happens on every
  * navigation while asking happens deliberately.
+ *
+ * <h2>Two Questions at Once</h2>
+ * Opening a turn appends to a payload it has just read, and a user with two Sumbooks open can do
+ * that twice at the same moment. The notebook is therefore touched first, which takes a write lock on
+ * its row and makes the two turns follow one another instead of both writing a transcript that is
+ * missing the other's question.
  *
  * <h2>How Much History the Model Sees</h2>
  * A turn is opened with the most recent messages rather than with all of them. The whole transcript
@@ -126,7 +131,9 @@ public class ChatSessionService {
      */
     @Transactional
     public ChatTurnContext beginTurn(final UUID userId, final UUID notebookId, final String question) {
-        final NotebookEntity notebook = requireNotebook(userId, notebookId);
+        final Instant now = now();
+        touchNotebook(userId, notebookId, now);
+
         final ChatSessionEntity entity = this.chatSessionRepository
                 .findFirstByNotebookIdAndUserIdOrderByCreatedAtAsc(notebookId, userId)
                 .orElseGet(() -> create(userId, notebookId));
@@ -134,7 +141,6 @@ public class ChatSessionService {
         final ChatSessionPayload payload = this.chatSessionMapper.readPayload(entity);
         final List<ChatTurn> history = recentTurns(payload);
 
-        final Instant now = now();
         ChatSessionPayload updated =
                 payload.withMessage(new ChatMessagePayload(ChatRole.USER, question, now));
         if (updated.title().isBlank()) {
@@ -142,7 +148,6 @@ public class ChatSessionService {
         }
         store(entity, updated);
         entity.setLastMessageAt(now);
-        notebook.setLastActivityAt(now);
 
         return new ChatTurnContext(entity.getId(), notebookId, question, history);
     }
@@ -224,16 +229,29 @@ public class ChatSessionService {
     }
 
     /**
-     * Loads one notebook of an account.
+     * Reads one notebook of an account, only to establish that it exists.
      *
      * @param userId     identifier of the account the notebook belongs to
-     * @param notebookId identifier of the notebook to load
-     * @return the row of the notebook
+     * @param notebookId identifier of the notebook to check
      * @throws NotebookNotFoundException if the account holds no notebook with that identifier
      */
-    private NotebookEntity requireNotebook(final UUID userId, final UUID notebookId) {
-        return this.notebookRepository.findByIdAndUserId(notebookId, userId)
+    private void requireNotebook(final UUID userId, final UUID notebookId) {
+        this.notebookRepository.findByIdAndUserId(notebookId, userId)
                 .orElseThrow(() -> new NotebookNotFoundException(notebookId));
+    }
+
+    /**
+     * Refreshes the activity timestamp of one notebook of an account and locks its row.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to touch
+     * @param at         point in time to record as the most recent activity
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    private void touchNotebook(final UUID userId, final UUID notebookId, final Instant at) {
+        if (this.notebookRepository.touch(notebookId, userId, at) == 0) {
+            throw new NotebookNotFoundException(notebookId);
+        }
     }
 
     /**

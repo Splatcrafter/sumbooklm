@@ -1,13 +1,24 @@
 package de.pfoertner.assessment.sumbooklm.persistence.notebook;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Data access for notebooks.
+ *
+ * <h2>Touching Is Not Editing</h2>
+ * The activity timestamp is refreshed by everything that happens inside a notebook, and by several
+ * things at once when a user works in two places. Refreshing it through the entity would put those
+ * writes against the optimistic locking counter and let one of them fail, although they do not
+ * disagree about anything: both mean now. It is therefore written by a statement that neither reads
+ * nor raises that counter.
  *
  * <h2>Owner Scoped Queries</h2>
  * Every method below carries the owner as a parameter, including the ones that already receive an
@@ -36,4 +47,25 @@ public interface NotebookRepository extends JpaRepository<NotebookEntity, UUID> 
      * @return the notebook, or an empty result if the account owns no notebook with that identifier
      */
     Optional<NotebookEntity> findByIdAndUserId(UUID id, UUID userId);
+
+    /**
+     * Refreshes the activity timestamp of one notebook of an account.
+     *
+     * <p>The statement takes a write lock on the row for the rest of the transaction, which is what
+     * serialises everything that happens inside one notebook. A caller that touches the notebook
+     * before it reads what it is about to change therefore sees the result of whatever else was
+     * doing the same, instead of both of them writing over one another.
+     *
+     * @param id     identifier of the notebook
+     * @param userId identifier of the owning account
+     * @param at     point in time to record as the most recent activity
+     * @return number of updated rows, which is zero when the account owns no such notebook
+     */
+    @Modifying
+    @Query("""
+            update NotebookEntity notebook
+            set notebook.lastActivityAt = :at
+            where notebook.id = :id and notebook.userId = :userId
+            """)
+    int touch(@Param("id") UUID id, @Param("userId") UUID userId, @Param("at") Instant at);
 }

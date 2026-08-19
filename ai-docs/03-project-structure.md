@@ -44,7 +44,8 @@ pipeline that turns a stored source into segments. Like `security` it takes comm
 domain objects and knows nothing about HTTP. Every one of its methods carries the account it acts
 for; see ADR-025. The pipeline runs after the storing transaction commits; see ADR-028.
 
-**`sumbooklm-ingestion`** — jsoup for fetching and cleaning web sources, the LangChain4j Apache Tika
+**`sumbooklm-ingestion`** — Apache HttpClient for fetching web sources through an address rule that
+decides at the moment of connecting (ADR-044), jsoup for cleaning them, the LangChain4j Apache Tika
 document parser for extracting text from PDF, Markdown, HTML and plain text uploads, and the splitter
 that cuts the extracted text into segments. Produces text and segments, and knows nothing about where
 either came from or goes.
@@ -82,8 +83,9 @@ de.pfoertner.assessment.sumbooklm
 │   └── H2ConsoleSecurityConfiguration          (dev profile only)
 ├── domain
 │   ├── user                                    UserAccount, UserProfile, AccountActivity
-│   └── workspace                               Notebook, SourceDocument, DocumentStatus, SourceKind,
-│                                                ChatSession, ChatMessage, ChatRole
+│   └── workspace                               Notebook, SourceDocument, DocumentStatus,
+│                                                DocumentFailure, SourceKind, ChatSession,
+│                                                ChatMessage, ChatRole
 ├── persistence
 │   ├── schema.PayloadSchemaVersion
 │   ├── payload                                 PayloadTypes, PayloadCodec, PayloadDataFixerBootstrap
@@ -106,7 +108,8 @@ de.pfoertner.assessment.sumbooklm
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
 │                                                the turn context, the stream handler, failures
 ├── ingestion
-│   ├── extraction                              file and web extractors, their result and failure
+│   ├── extraction                              file and web extractors, the address resolver every
+│   │                                            fetch connects through, their result and failures
 │   └── chunking                                TextChunker
 ├── ai
 │   ├── embedding                               model and store beans, NotebookIndex, metadata keys
@@ -265,12 +268,14 @@ even though the access token itself is verified by signature alone.
 2. The run marks the source `INDEXING` and reads what it needs in one short transaction, including
    the text an earlier run extracted.
 3. If that text is there it is used as it is. If it is not, the source is read: Apache Tika for the
-   stored bytes of an upload, jsoup for the address of a page. A source is therefore read exactly once
-   for as long as reading it succeeded (ADR-041).
+   stored bytes of an upload, and for a page an HTTP request whose every hop resolves through the rule
+   that refuses addresses inside this server's networks (ADR-044), parsed by jsoup. A source is
+   therefore read exactly once for as long as reading it succeeded (ADR-041).
 4. The text is cut into overlapping segments, and `NotebookIndex` embeds them under the notebook and
    the source, replacing whatever was stored for that source before (ADR-043).
-5. The run stores the token count the model reported, the extracted text, and the stage `READY`, or
-   `ERROR` if anything above threw.
+5. The run stores the token count the model reported, the extracted text, and the stage `READY`. If
+   anything above threw, it stores `ERROR` together with the cause the extractor named, which is one
+   of seven constants rather than the message the library failed with (ADR-045).
 
 Once the application is ready, `IndexRestoreJob` puts every source of every account through that
 sequence again, because the store it writes to did not survive the process while the sources did
@@ -316,7 +321,8 @@ token is usable), `issued_to_ip`.
 `source_document` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
 `content` (the uploaded bytes, null for a web source, see ADR-032), `extracted_text` (the text the last
 successful run read, null while there was none, see ADR-041), `payload`, `payload_version`,
-`record_version`. Name, kind, origin, stage, token count and content hash live in `payload`.
+`record_version`. Name, kind, origin, stage, failure cause, token count and content hash live in
+`payload`.
 
 `chat_session` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
 `last_message_at`, `payload`, `payload_version`, `record_version`. The title and the whole transcript

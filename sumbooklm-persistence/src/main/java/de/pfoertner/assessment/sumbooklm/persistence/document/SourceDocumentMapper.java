@@ -81,6 +81,7 @@ public class SourceDocumentMapper {
                 payload.origin(),
                 payload.status(),
                 payload.tokenCount(),
+                payload.failure(),
                 entity.getCreatedAt());
     }
 }

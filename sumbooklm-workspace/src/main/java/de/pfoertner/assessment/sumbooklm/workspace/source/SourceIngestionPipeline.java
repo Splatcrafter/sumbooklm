@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import de.pfoertner.assessment.sumbooklm.ai.embedding.NotebookIndex;
+import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentFailure;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.SourceKind;
 import de.pfoertner.assessment.sumbooklm.ingestion.chunking.TextChunker;
 import de.pfoertner.assessment.sumbooklm.ingestion.extraction.ExtractedContent;
@@ -41,8 +42,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * <h2>Failures End on the Source</h2>
  * A source that cannot be read is recorded as failed rather than retried or dropped. The user is the
- * only one who can act on it, by removing it or by adding it in another form, so the state has to
- * reach them.
+ * only one who can act on it, by removing it, by asking for it again or by adding it in another form,
+ * so the state has to reach them.
+ *
+ * <h2>Why It Failed</h2>
+ * The cause a source is recorded under comes from the extractor that raised it, because only the
+ * extractor knows whether an address was refused, unreachable or merely empty. Anything that fails
+ * outside an extractor is recorded as unexpected rather than guessed at, which keeps the causes
+ * meaning what they say.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -146,9 +153,13 @@ public class SourceIngestionPipeline {
         } catch (final SourceNotFoundException e) {
             LOG.debug("Source {} was removed while it was being indexed", sourceId);
             return false;
+        } catch (final TextExtractionException e) {
+            LOG.warn("Indexing source {} failed as {}: {}", sourceId, e.failure(), e.getMessage());
+            recordFailure(userId, sourceId, e.failure());
+            return false;
         } catch (final RuntimeException e) {
             LOG.warn("Indexing source {} failed", sourceId, e);
-            recordFailure(userId, sourceId);
+            recordFailure(userId, sourceId, DocumentFailure.UNEXPECTED);
             return false;
         }
     }
@@ -181,7 +192,8 @@ public class SourceIngestionPipeline {
         }
         final byte[] content = input.content();
         if (content == null) {
-            throw new TextExtractionException("The uploaded file " + input.origin() + " holds no bytes");
+            throw new TextExtractionException(
+                    DocumentFailure.EMPTY, "The uploaded file " + input.origin() + " holds no bytes");
         }
         return this.fileTextExtractor.extract(content, input.origin());
     }
@@ -209,10 +221,11 @@ public class SourceIngestionPipeline {
      *
      * @param userId   identifier of the account the source belongs to
      * @param sourceId identifier of the source the run failed on
+     * @param cause    reason the source could not be indexed
      */
-    private void recordFailure(final UUID userId, final UUID sourceId) {
+    private void recordFailure(final UUID userId, final UUID sourceId, final DocumentFailure cause) {
         try {
-            this.sourceDocumentService.failIndexing(userId, sourceId);
+            this.sourceDocumentService.failIndexing(userId, sourceId, cause);
         } catch (final SourceNotFoundException e) {
             LOG.debug("Source {} was removed before its failure could be recorded", sourceId);
         }

@@ -109,8 +109,16 @@
         "uploaded": "Wartet auf die Indexierung",
         "indexing": "Wird indexiert ...",
         "ready_one": "Indexiert, {{count}} Token",
-        "ready_other": "Indexiert, {{count}} Token",
-        "error": "Konnte nicht gelesen werden"
+        "ready_other": "Indexiert, {{count}} Token"
+      },
+      "failure": {
+        "NONE": "Konnte nicht gelesen werden",
+        "BLOCKED": "Diese Adresse darf nicht abgerufen werden",
+        "UNREACHABLE": "Die Adresse war nicht erreichbar",
+        "UNREADABLE": "Das Format konnte nicht gelesen werden",
+        "EMPTY": "Es wurde kein Text darin gefunden",
+        "TOO_LARGE": "Größer als die zulässige Größe",
+        "UNEXPECTED": "Konnte nicht gelesen werden"
       }
     },
     "add": {

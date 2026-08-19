@@ -21,6 +21,11 @@ import java.util.UUID;
  * The count is what the embedding model reported for the segments of this source and is therefore
  * zero until indexing has finished. It describes the indexed text, not the uploaded bytes.
  *
+ * <h2>Failure</h2>
+ * The failure says why a source in {@link DocumentStatus#ERROR} could not be indexed and is
+ * {@link DocumentFailure#NONE} in every other stage. It is a cause rather than a message, because it
+ * is shown to the user and the text a parser or an HTTP client fails with is not theirs to read.
+ *
  * @param id          stable identifier of the source, never {@code null}
  * @param notebookId  identifier of the notebook the source belongs to, never {@code null}
  * @param ownerId     identifier of the account the source belongs to, never {@code null}
@@ -30,6 +35,7 @@ import java.util.UUID;
  * @param status      stage the source has reached on its way into the retrieval index, never
  *                    {@code null}
  * @param tokenCount  number of tokens the indexed text was counted as, zero while unknown
+ * @param failure     reason the source could not be indexed, never {@code null}
  * @param createdAt   point in time the source was added to its notebook, never {@code null}
  * @author Erik Pförtner
  * @since 0.1.0
@@ -42,6 +48,7 @@ public record SourceDocument(UUID id,
                              String origin,
                              DocumentStatus status,
                              int tokenCount,
+                             DocumentFailure failure,
                              Instant createdAt) {
 
     /**
@@ -55,6 +62,7 @@ public record SourceDocument(UUID id,
      * @param origin      name of the uploaded file or address of the page
      * @param status      stage the source has reached on its way into the retrieval index
      * @param tokenCount  number of tokens the indexed text was counted as, zero while unknown
+     * @param failure     reason the source could not be indexed
      * @param createdAt   point in time the source was added to its notebook
      * @throws NullPointerException     if any reference argument is {@code null}
      * @throws IllegalArgumentException if {@code tokenCount} is negative
@@ -67,6 +75,7 @@ public record SourceDocument(UUID id,
         Objects.requireNonNull(kind, "kind must not be null");
         Objects.requireNonNull(origin, "origin must not be null");
         Objects.requireNonNull(status, "status must not be null");
+        Objects.requireNonNull(failure, "failure must not be null");
         Objects.requireNonNull(createdAt, "createdAt must not be null");
         if (tokenCount < 0) {
             throw new IllegalArgumentException("tokenCount must not be negative");

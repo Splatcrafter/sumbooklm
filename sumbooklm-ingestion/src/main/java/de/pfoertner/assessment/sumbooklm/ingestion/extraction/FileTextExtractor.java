@@ -3,6 +3,7 @@ package de.pfoertner.assessment.sumbooklm.ingestion.extraction;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 
+import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentFailure;
 import dev.langchain4j.data.document.BlankDocumentException;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser;
@@ -52,15 +53,18 @@ public class FileTextExtractor {
             final Document document = this.parser.parse(stream);
             final String text = document.text().strip();
             if (text.isEmpty()) {
-                throw new TextExtractionException("The file " + fileName + " holds no readable text");
+                throw new TextExtractionException(
+                        DocumentFailure.EMPTY, "The file " + fileName + " holds no readable text");
             }
             return new ExtractedContent("", text);
         } catch (final BlankDocumentException e) {
-            throw new TextExtractionException("The file " + fileName + " holds no readable text", e);
+            throw new TextExtractionException(
+                    DocumentFailure.EMPTY, "The file " + fileName + " holds no readable text", e);
         } catch (final TextExtractionException e) {
             throw e;
         } catch (final Exception e) {
-            throw new TextExtractionException("The file " + fileName + " cannot be parsed", e);
+            throw new TextExtractionException(
+                    DocumentFailure.UNREADABLE, "The file " + fileName + " cannot be parsed", e);
         }
     }
 }

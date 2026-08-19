@@ -171,27 +171,32 @@ That is question 4's problem now rather than this one's: a store that survives t
 rebuild instead of speeding it up, and the code that reconciles a store against the database is now
 in place for it.
 
-## 20. The guard against internal addresses is not airtight
+## 20. Resolved: the address guard decides at the moment of connecting
 
-A submitted address is resolved and refused when it points into a private range, and the address the
-request finally landed on is checked again before the page is read. Two gaps remain. The name is
-resolved once for the check and again for the request, so a name that changes between the two is not
-covered. And a redirect into a private range is followed before it is judged, so the request is made
-even though its content is discarded.
+Both gaps came from the same thing: the rule was applied next to the request instead of inside it.
+The check now lives in the resolver the HTTP client connects through, so the addresses that are judged
+are the addresses that are used, and there is no second resolution to differ from the first.
 
-Closing both means resolving the name once and connecting to the resolved address, with redirects
-handled by the application rather than by the library. That is the right shape once sources may be
-added by somebody other than the person running the server.
+Redirects needed no separate treatment after that. Each hop is a connection and therefore passes the
+same resolver, which is why the client may follow them again. The recorded plan was to drive redirects
+by hand; moving the check one layer down made that unnecessary rather than merely easier.
 
-## 21. A failed source says that it failed, not why
+What replaced the two gaps is one that no resolver can close, recorded as question 31.
 
-`DocumentStatus.ERROR` carries no reason. A user whose upload failed sees that it failed and can only
-guess whether the file was scanned, the format unsupported or the page unreachable, and the log is not
-theirs to read.
+## 21. Resolved: a failed source reports which of seven things went wrong
 
-Storing the reason in the payload is easy; deciding what may be shown is the actual question. The
-message of a text extraction failure names hosts and file names, and the message of an unexpected
-failure names internals, so it needs a small set of causes rather than a free text field.
+`DocumentFailure` is stored next to the stage and returned with the source, and the interface turns it
+into a sentence in the language of its user. The set is closed, as the question asked for, and the
+constants are drawn along the lines that change what the user does next: a refused address and an
+unreachable one are two of them, while an unsupported format and a damaged document are one.
+
+The extractor that raised the failure chooses the constant rather than something later deriving it,
+because only the extractor knows what actually happened. The message it also carries stays in the log,
+where the host names and file paths in it are not a problem.
+
+What is not covered is a failure that never reaches an extractor, which is recorded as `UNEXPECTED`
+and tells the user nothing beyond the fact that it happened. That is the correct answer for a defect
+in this application, and it is meant to stay rare rather than to become informative.
 
 ## 22. Duplicate detection decodes every payload of the notebook
 
@@ -282,3 +287,25 @@ is no way to see how far it has come other than the two lines it logs.
 Chunking it by notebook and rebuilding the ones being opened first would fix the part the user
 notices, which is that their own Sumbook is not answerable yet. That needs a priority the current
 executor does not have.
+
+## 31. The address guard cannot see a firewall
+
+The rule refuses the ranges a private network is built from, which is what an address can be judged
+by. It cannot judge a public address that happens to be reachable only from this machine, because
+nothing about the address says so: a service behind a firewall that admits this server and nobody else
+is a perfectly ordinary address to everyone who looks at it.
+
+Closing that means an allow list of hosts a source may be fetched from, which turns adding a web
+source from something a user does into something an operator permits. That is the right trade for a
+deployment where the two are different people, and the wrong one for a notebook a person runs for
+themselves.
+
+## 32. An unexpected failure is a cause without information
+
+`DocumentFailure.UNEXPECTED` is what a source is recorded under when something failed outside an
+extractor. It is honest and it is useless: the user is told that it did not work and can do nothing
+with that beyond trying again.
+
+That is deliberate, because the alternative is showing them an internal message. What would make it
+better is not another constant but fewer occurrences, so the value worth watching is how often it is
+recorded at all.

@@ -431,3 +431,50 @@ Every translated key used in the interface was checked against all three locale 
 hundred keys, none missing in any language.
 
 All harnesses live outside the repository; see open question 17.
+
+## Verification of the address guard and the failure reasons on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 65 tests. `sumbooklm-ingestion` has tests for the
+first time, so the JavaDoc gate now applies to its test sources as well.
+
+`PublicAddressResolverTest` states the rule as a list of addresses rather than as the behaviour of a
+request: loopback in both families, the wildcard address, `localhost`, the three private ranges, the
+link local range including `169.254.169.254`, and multicast are all refused; a public literal is
+returned unchanged; and a name that does not resolve is reported as unknown rather than as refused,
+because the two become different reasons on the source. The addresses are literals, so the cases need
+no name server and describe the rule rather than the network the build runs on.
+
+`WebPageTextExtractorTest` runs a server inside the test. A server a test can start is reachable only
+on loopback, which is exactly what the real rule refuses, so the rule is stubbed with one that names
+two hosts: the server, and a host standing for everything the real rule refuses.
+
+| Case | Asserted |
+| --- | --- |
+| A page | retrieved, title read, navigation and scripts left out of the text |
+| A redirect to the refused host | the retrieval ends as `BLOCKED` |
+| The refused host directly | `BLOCKED`, with no request attempted |
+| `file:///etc/passwd` | `BLOCKED` |
+| A response served as `application/pdf` | `UNREADABLE` |
+| A page with an empty body | `EMPTY` |
+| A `404` | `UNREACHABLE` |
+| A body of nine megabytes | `TOO_LARGE`, refused rather than truncated |
+
+The redirect case is the one the whole change is for. The extractor lets the client follow redirects
+rather than driving them, and what makes that safe is that every hop is a connection and therefore
+passes the resolver. The stub is what makes it observable: the first hop is allowed, the second is
+not, and the retrieval has to end as refused.
+
+The source suite gained three cases at the level of the API: an address in the loopback range is
+reported as `BLOCKED` rather than merely failed, a name that does not resolve as `UNREACHABLE`, a file
+of nothing but whitespace as `EMPTY`, and an indexed source as `NONE`.
+
+The dependency added for this changes what Spring Boot builds for every `RestClient`, which is the
+transport the chat providers are reached through, so the streaming harness was re-run against the fake
+Ollama server: the answer still arrives part by part and ends up in the transcript. That was checked
+rather than assumed.
+
+The source list item was rendered in all three languages for each of the six causes: every one reads
+as a sentence rather than as a key, an indexed source shows its token count instead of a reason, and
+the retry control is offered on a failed source and on no other.
+
+All harnesses live outside the repository; see open question 17.

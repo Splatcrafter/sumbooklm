@@ -12,6 +12,22 @@ export type SourceStatus = 'UPLOADED' | 'INDEXING' | 'READY' | 'ERROR';
 export type SourceKind = 'FILE' | 'WEB';
 
 /**
+ * Reason a source could not be indexed.
+ *
+ * The backend reports a cause rather than a message, so that what the user reads is written here and
+ * in their own language. An unknown value is narrowed to `UNEXPECTED`, which is what a client of an
+ * older version does with a cause that was added after it.
+ */
+export type SourceFailure =
+  | 'NONE'
+  | 'BLOCKED'
+  | 'UNREACHABLE'
+  | 'UNREADABLE'
+  | 'EMPTY'
+  | 'TOO_LARGE'
+  | 'UNEXPECTED';
+
+/**
  * One source of a Sumbook.
  */
 export interface Source {
@@ -24,12 +40,24 @@ export interface Source {
   status: SourceStatus;
   /** Number of tokens the indexed text was counted as, zero until the status is `READY`. */
   tokenCount: number;
+  /** Reason the source could not be indexed, `NONE` unless the status is `ERROR`. */
+  failure: SourceFailure;
   createdAt: string;
 }
 
 const STATUSES: readonly string[] = ['UPLOADED', 'INDEXING', 'READY', 'ERROR'];
 
 const KINDS: readonly string[] = ['FILE', 'WEB'];
+
+const FAILURES: readonly string[] = [
+  'NONE',
+  'BLOCKED',
+  'UNREACHABLE',
+  'UNREADABLE',
+  'EMPTY',
+  'TOO_LARGE',
+  'UNEXPECTED',
+];
 
 /**
  * Reports whether a source is still on its way into the index, which is what the view polls on.
@@ -61,6 +89,7 @@ export function toSource(source: components['schemas']['SourceResponse'] | undef
     origin: requireString(source.origin, 'source.origin'),
     status: status as SourceStatus,
     tokenCount: requireNumber(source.tokenCount, 'source.tokenCount'),
+    failure: FAILURES.includes(source.failure ?? '') ? (source.failure as SourceFailure) : 'UNEXPECTED',
     createdAt: requireString(source.createdAt, 'source.createdAt'),
   };
 }

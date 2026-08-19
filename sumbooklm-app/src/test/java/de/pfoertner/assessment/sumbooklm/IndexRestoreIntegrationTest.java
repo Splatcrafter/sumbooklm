@@ -214,7 +214,9 @@ class IndexRestoreIntegrationTest {
 
         assertThat(reindex(accessToken, notebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
 
-        assertThat(awaitSettled(accessToken, notebookId, sourceId).get("status")).isEqualTo("ERROR");
+        final Map<String, Object> failed = awaitSettled(accessToken, notebookId, sourceId);
+        assertThat(failed.get("status")).isEqualTo("ERROR");
+        assertThat(failed.get("failure")).isEqualTo("BLOCKED");
         assertThat(segmentsOf(sourceId)).isZero();
     }
 

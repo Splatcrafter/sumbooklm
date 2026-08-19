@@ -579,3 +579,36 @@ column next to it would not have been.
 which is `text` on PostgreSQL and `clob` on H2, and neither is a large object handle. `org.hibernate.
 Length` is the only Hibernate specific import in the entity, and it contributes an integer rather than
 a behaviour.
+
+### 44. jsoup resolves the host inside the call that fetches
+
+`Jsoup.connect(url).execute()` opens the connection itself, and nothing in its API sits between
+resolving the name and connecting to what it resolved to. A check performed before the call is
+therefore always a second resolution, whatever it checks.
+
+Apache HttpClient 5 has the seam: `PoolingHttpClientConnectionManagerBuilder.setDnsResolver` replaces
+the resolution the connection operator performs, so the addresses that are judged are the addresses
+that are connected to. TLS is unaffected, because the client keeps the host name for the certificate
+and for the server name indication and only takes the address from the resolver.
+
+The resolver is also called for every hop of a redirect, since each hop is a new route. Letting the
+client follow redirects is therefore safe once the resolver is in place, which is the opposite of the
+usual advice and follows from where the check sits.
+
+### 45. Apache HttpClient 5 on the classpath changes what Spring builds by default
+
+Spring Boot prefers `HttpComponentsClientHttpRequestFactory` for `RestClient` as soon as
+`httpclient5` is present, so adding the dependency for one feature changes the transport of every
+other caller. In this application that is the LangChain4j Spring `RestClient` the chat providers are
+reached through.
+
+It was verified rather than assumed: the streaming harness that drives a fake Ollama server through
+the real client was re-run after the dependency was added, and the answer still arrives part by part.
+Apache HttpClient hands out the response body as a stream like the JDK client does.
+
+### 46. `httpclient5` and `httpcore5` are versioned separately
+
+Spring Boot 4.1.0 manages `httpclient5` 5.6.1, which depends on `httpcore5` 5.4.2. A local repository
+that already held `httpclient5` 5.6.1 and `httpcore5` 5.4 as transitive artifacts of something else
+therefore still fails an offline build, because the pair does not match. The two are released on
+their own cadence and a resolved client version does not imply a resolved core version.

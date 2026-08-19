@@ -204,7 +204,7 @@ class SourceApiIntegrationTest {
 
     /**
      * Verifies that an address inside the loopback range is stored but never retrieved, and that the
-     * source it produced ends up marked as failed rather than as indexed.
+     * source it produced says that the address was refused rather than merely that something failed.
      */
     @Test
     void anAddressInsideThePrivateRangeEndsAsFailed() {
@@ -213,7 +213,46 @@ class SourceApiIntegrationTest {
 
         final String sourceId = idOf(addWebPage(accessToken, notebookId, "http://127.0.0.1:9/secret"));
 
-        assertThat(awaitSettled(accessToken, notebookId, sourceId).get("status")).isEqualTo("ERROR");
+        final Map<String, Object> failed = awaitSettled(accessToken, notebookId, sourceId);
+        assertThat(failed.get("status")).isEqualTo("ERROR");
+        assertThat(failed.get("failure")).isEqualTo("BLOCKED");
+    }
+
+    /**
+     * Verifies that a name which does not resolve is reported as unreachable rather than as refused,
+     * because the two are different things for the user to act on.
+     */
+    @Test
+    void anAddressThatCannotBeResolvedEndsAsUnreachable() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+
+        final String sourceId =
+                idOf(addWebPage(accessToken, notebookId, "http://sumbooklm-no-such-host.invalid/page"));
+
+        final Map<String, Object> failed = awaitSettled(accessToken, notebookId, sourceId);
+        assertThat(failed.get("status")).isEqualTo("ERROR");
+        assertThat(failed.get("failure")).isEqualTo("UNREACHABLE");
+    }
+
+    /**
+     * Verifies that a file which parses but holds no text is reported as empty, and that a source
+     * which was indexed reports no failure at all.
+     */
+    @Test
+    void aFileWithoutTextEndsAsEmptyAndAnIndexedOneReportsNoFailure() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+
+        final String blank = idOf(uploadFile(accessToken, notebookId, "blank.txt", "   \n   \n  "));
+        final Map<String, Object> failed = awaitSettled(accessToken, notebookId, blank);
+        assertThat(failed.get("status")).isEqualTo("ERROR");
+        assertThat(failed.get("failure")).isEqualTo("EMPTY");
+
+        final String readable = idOf(uploadFile(accessToken, notebookId, "readable.txt", DOCUMENT_TEXT));
+        final Map<String, Object> indexed = awaitSettled(accessToken, notebookId, readable);
+        assertThat(indexed.get("status")).isEqualTo("READY");
+        assertThat(indexed.get("failure")).isEqualTo("NONE");
     }
 
     /**

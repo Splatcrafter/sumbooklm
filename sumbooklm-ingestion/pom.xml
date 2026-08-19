@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>SumbookLM :: Ingestion</name>
-    <description>Source acquisition and text extraction based on jsoup and Apache Tika.</description>
+    <description>Source acquisition and text extraction based on Apache HttpClient, jsoup and Apache Tika.</description>
 
     <dependencies>
         <dependency>
@@ -38,6 +38,10 @@
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
         </dependency>
 
         <dependency>

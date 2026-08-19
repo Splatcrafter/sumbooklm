@@ -82,7 +82,7 @@ function statusLabel(source: Source, t: (key: string, options?: Record<string, u
     return t('sumbook.sources.status.ready', { count: source.tokenCount });
   }
   if (source.status === 'ERROR') {
-    return t('sumbook.sources.status.error');
+    return t(`sumbook.sources.failure.${source.failure}`);
   }
   if (source.status === 'INDEXING') {
     return t('sumbook.sources.status.indexing');

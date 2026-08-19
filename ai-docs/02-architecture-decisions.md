@@ -790,3 +790,49 @@ that can forget it, which is the same reason the notebook identifier is a parame
 **Cost.** A rebuild that fails after the removal leaves the source with no segments at all, where
 before it had stale ones. Stale segments are worse: they answer questions from a version of a document
 the application no longer believes in.
+
+## ADR-044: The address guard sits in the resolver, not in front of the request
+
+**Decision.** Web sources are fetched with Apache HttpClient 5, whose connection manager is given a
+`DnsResolver` that refuses every name leading into a network of this server. jsoup keeps the parsing.
+Redirects are followed by the client, up to five hops.
+
+**Reason.** Checking an address and then fetching it are two resolutions of the same name, and a name
+that answers differently the second time is the whole of a rebinding attack. Inside the resolver there
+is only one resolution, and it is the one the connection uses.
+
+The same seam removes the reason to drive redirects by hand. Every hop is a connection, so every hop
+passes the resolver, and a redirect cannot reach an address the first request was not allowed to
+reach. The recorded plan was to handle redirects in the application; putting the check one layer lower
+made that unnecessary rather than merely easier.
+
+jsoup could not host the rule because it resolves the host inside the call that fetches, which leaves
+no seam at all. It stays for what it is good at, which is turning bytes into a document.
+
+**Cost.** A second HTTP stack in the application, and with it a changed default for every Spring
+`RestClient`, which was verified rather than assumed (finding 45). The rule still cannot see a public
+address that only this machine can reach, which no resolver can; see open question 31.
+
+## ADR-045: A failed source reports a cause, not a message
+
+**Decision.** `DocumentFailure` is a closed set of seven constants stored in the payload next to the
+stage. The extractor that raised the failure chooses the constant, and the interface turns it into a
+sentence in the language of its user.
+
+**Reason.** What a parser or an HTTP client says when it fails names hosts, file paths and internals
+of a library. None of that may be handed to a user, and translating it is not possible either, so a
+message field would have produced a reason that is either unsafe or unshown.
+
+The set is small because a cause is only worth reporting if it changes what the user does next. Seven
+constants are what remained after collapsing everything that leads to the same action, which is why an
+unsupported format and a damaged document are one constant and a refused address and an unreachable
+one are two.
+
+The cause travels with the exception rather than being derived from it afterwards. Only the extractor
+knows whether an address was refused, unreachable or merely empty, and reconstructing that from a
+message or from the type of an underlying exception would be guesswork about a fact that was known.
+
+**Cost.** A cause added later is a value an older client does not know, which is why the client
+narrows anything unfamiliar to `UNEXPECTED` rather than rendering a key. And the payload grew a field
+inside schema `V1_0_0` again, which is the last change that can be made that way once the application
+has been deployed anywhere.

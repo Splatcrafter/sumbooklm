@@ -462,6 +462,11 @@ export interface components {
              */
             tokenCount?: number;
             /**
+             * @description Reason the source could not be indexed, NONE unless it failed.
+             * @enum {string}
+             */
+            failure?: "NONE" | "BLOCKED" | "UNREACHABLE" | "UNREADABLE" | "EMPTY" | "TOO_LARGE" | "UNEXPECTED";
+            /**
              * Format: date-time
              * @description Point in time the source was added to its notebook.
              */

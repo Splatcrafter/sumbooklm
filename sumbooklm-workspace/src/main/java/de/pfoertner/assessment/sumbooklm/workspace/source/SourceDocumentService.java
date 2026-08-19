@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import de.pfoertner.assessment.sumbooklm.ai.embedding.NotebookIndex;
+import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentFailure;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentStatus;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.SourceDocument;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.SourceKind;
@@ -174,7 +175,7 @@ public class SourceDocumentService {
         }
         return add(userId, notebookId, content,
                 new DocumentPayload(name, SourceKind.FILE, name, DocumentStatus.UPLOADED, 0,
-                        SourceFingerprint.ofContent(content)));
+                        DocumentFailure.NONE, SourceFingerprint.ofContent(content)));
     }
 
     /**
@@ -192,7 +193,7 @@ public class SourceDocumentService {
         final String trimmed = address.strip();
         return add(userId, notebookId, null,
                 new DocumentPayload(trimmed, SourceKind.WEB, trimmed, DocumentStatus.UPLOADED, 0,
-                        SourceFingerprint.ofAddress(trimmed)));
+                        DocumentFailure.NONE, SourceFingerprint.ofAddress(trimmed)));
     }
 
     /**
@@ -290,16 +291,17 @@ public class SourceDocumentService {
     }
 
     /**
-     * Marks a source as one that could not be indexed.
+     * Marks a source as one that could not be indexed, and records why.
      *
      * @param userId   identifier of the account the source belongs to
      * @param sourceId identifier of the source the run failed on
+     * @param cause    reason the source could not be indexed
      * @throws SourceNotFoundException if the account holds no source with that identifier
      */
     @Transactional
-    public void failIndexing(final UUID userId, final UUID sourceId) {
+    public void failIndexing(final UUID userId, final UUID sourceId, final DocumentFailure cause) {
         final SourceDocumentEntity entity = requireSource(userId, sourceId);
-        store(entity, this.sourceDocumentMapper.readPayload(entity).withStatus(DocumentStatus.ERROR));
+        store(entity, this.sourceDocumentMapper.readPayload(entity).withFailure(cause));
     }
 
     /**

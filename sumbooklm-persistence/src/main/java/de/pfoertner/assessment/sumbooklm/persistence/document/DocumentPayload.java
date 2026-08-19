@@ -3,6 +3,7 @@ package de.pfoertner.assessment.sumbooklm.persistence.document;
 import java.util.Locale;
 import java.util.Objects;
 
+import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentFailure;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentStatus;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.SourceKind;
 import de.splatgames.aether.datafixers.api.codec.Codec;
@@ -25,6 +26,12 @@ import de.splatgames.aether.datafixers.api.result.DataResult;
  * one notebook rather than asking the database for a match; promoting the hash to an indexed column
  * is the change to make once detection has to span notebooks.
  *
+ * <h2>Failure Next to Status</h2>
+ * The stage says that a source could not be indexed and the failure says why. The two are kept apart
+ * rather than folded into one enumeration of stages, because the stage drives what the pipeline and
+ * the interface do next while the failure is only ever displayed, and a stage per cause would make
+ * every switch over the stages grow with every cause that is added.
+ *
  * <h2>Display Name Against Origin</h2>
  * Both are kept because they answer different questions. The origin is where the content came from
  * and never changes, so it stays usable for recognising a source. The display name is what a list
@@ -35,6 +42,8 @@ import de.splatgames.aether.datafixers.api.result.DataResult;
  * @param origin       name of the uploaded file or address of the page
  * @param status       stage the source has reached on its way into the retrieval index
  * @param tokenCount   number of tokens the indexed text was counted as, zero while unknown
+ * @param failure      reason the source could not be indexed, {@link DocumentFailure#NONE} unless it
+ *                     failed
  * @param documentHash hash identifying the content of the source, empty while unknown
  * @author Erik Pförtner
  * @since 0.1.0
@@ -44,6 +53,7 @@ public record DocumentPayload(String displayName,
                               String origin,
                               DocumentStatus status,
                               int tokenCount,
+                              DocumentFailure failure,
                               String documentHash) {
 
     /**
@@ -60,6 +70,12 @@ public record DocumentPayload(String displayName,
             DocumentPayload::parseKind, SourceKind::name);
 
     /**
+     * Codec of the failure cause, written by name for the same reason as the processing stage.
+     */
+    private static final Codec<DocumentFailure> FAILURE_CODEC = Codecs.STRING.comapFlatMap(
+            DocumentPayload::parseFailure, DocumentFailure::name);
+
+    /**
      * Codec that maps the payload onto the format independent tree the migration pipeline operates
      * on. The field names below are part of the persisted format and must only be changed together
      * with a schema version and a data fix that performs the rename.
@@ -71,6 +87,7 @@ public record DocumentPayload(String displayName,
                     Codecs.STRING.fieldOf("origin").forGetter(DocumentPayload::origin),
                     STATUS_CODEC.fieldOf("status").forGetter(DocumentPayload::status),
                     Codecs.INT.fieldOf("tokenCount").forGetter(DocumentPayload::tokenCount),
+                    FAILURE_CODEC.fieldOf("failure").forGetter(DocumentPayload::failure),
                     Codecs.STRING.fieldOf("documentHash").forGetter(DocumentPayload::documentHash)
             ).apply(instance, DocumentPayload::new));
 
@@ -82,6 +99,7 @@ public record DocumentPayload(String displayName,
      * @param origin       name of the uploaded file or address of the page
      * @param status       stage the source has reached on its way into the retrieval index
      * @param tokenCount   number of tokens the indexed text was counted as, zero while unknown
+     * @param failure      reason the source could not be indexed
      * @param documentHash hash identifying the content of the source, empty while unknown
      * @throws NullPointerException     if any reference argument is {@code null}
      * @throws IllegalArgumentException if {@code tokenCount} is negative
@@ -91,6 +109,7 @@ public record DocumentPayload(String displayName,
         Objects.requireNonNull(kind, "kind must not be null");
         Objects.requireNonNull(origin, "origin must not be null");
         Objects.requireNonNull(status, "status must not be null");
+        Objects.requireNonNull(failure, "failure must not be null");
         Objects.requireNonNull(documentHash, "documentHash must not be null");
         if (tokenCount < 0) {
             throw new IllegalArgumentException("tokenCount must not be negative");
@@ -98,14 +117,30 @@ public record DocumentPayload(String displayName,
     }
 
     /**
-     * Returns a copy that has reached another processing stage.
+     * Returns a copy that has reached another processing stage and carries no failure.
+     *
+     * <p>Every stage this is used for means that the source is on its way rather than stopped, so a
+     * failure recorded by an earlier run is cleared with the move. A source is only ever failed
+     * through {@link #withFailure(DocumentFailure)}.
      *
      * @param newStatus stage the source has reached
-     * @return a payload equal to this one except for its stage
+     * @return a payload equal to this one except for its stage and its failure
      */
     public DocumentPayload withStatus(final DocumentStatus newStatus) {
-        return new DocumentPayload(
-                this.displayName, this.kind, this.origin, newStatus, this.tokenCount, this.documentHash);
+        return new DocumentPayload(this.displayName, this.kind, this.origin, newStatus,
+                this.tokenCount, DocumentFailure.NONE, this.documentHash);
+    }
+
+    /**
+     * Returns a copy that failed for the given reason.
+     *
+     * @param cause reason the source could not be indexed
+     * @return a payload equal to this one except for its stage, which becomes
+     *         {@link DocumentStatus#ERROR}, and its failure
+     */
+    public DocumentPayload withFailure(final DocumentFailure cause) {
+        return new DocumentPayload(this.displayName, this.kind, this.origin, DocumentStatus.ERROR,
+                this.tokenCount, cause, this.documentHash);
     }
 
     /**
@@ -117,8 +152,8 @@ public record DocumentPayload(String displayName,
      *         becomes {@link DocumentStatus#READY}
      */
     public DocumentPayload withIndexingResult(final String newDisplayName, final int newTokenCount) {
-        return new DocumentPayload(
-                newDisplayName, this.kind, this.origin, DocumentStatus.READY, newTokenCount, this.documentHash);
+        return new DocumentPayload(newDisplayName, this.kind, this.origin, DocumentStatus.READY,
+                newTokenCount, DocumentFailure.NONE, this.documentHash);
     }
 
     /**
@@ -132,6 +167,20 @@ public record DocumentPayload(String displayName,
             return DataResult.success(DocumentStatus.valueOf(name.toUpperCase(Locale.ROOT)));
         } catch (final IllegalArgumentException e) {
             return DataResult.error("Unknown document status: " + name);
+        }
+    }
+
+    /**
+     * Resolves a stored failure cause into its constant.
+     *
+     * @param name name as it was read from a stored payload
+     * @return the matching constant, or a failure if the name belongs to no constant
+     */
+    private static DataResult<DocumentFailure> parseFailure(final String name) {
+        try {
+            return DataResult.success(DocumentFailure.valueOf(name.toUpperCase(Locale.ROOT)));
+        } catch (final IllegalArgumentException e) {
+            return DataResult.error("Unknown document failure: " + name);
         }
     }
 

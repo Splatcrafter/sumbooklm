@@ -105,8 +105,16 @@
       "status": {
         "uploaded": "インデックス作成を待機中",
         "indexing": "インデックスを作成しています ...",
-        "ready_other": "インデックス済み、{{count}} トークン",
-        "error": "読み取れませんでした"
+        "ready_other": "インデックス済み、{{count}} トークン"
+      },
+      "failure": {
+        "NONE": "読み取れませんでした",
+        "BLOCKED": "このアドレスは取得できません",
+        "UNREACHABLE": "アドレスに接続できませんでした",
+        "UNREADABLE": "形式を読み取れませんでした",
+        "EMPTY": "テキストが見つかりませんでした",
+        "TOO_LARGE": "許容サイズを超えています",
+        "UNEXPECTED": "読み取れませんでした"
       }
     },
     "add": {

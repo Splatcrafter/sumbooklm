@@ -151,7 +151,12 @@
       "tooMany": "Es werden gerade zu viele Antworten gleichzeitig geschrieben. Frage erneut, sobald eine davon da ist.",
       "noModel": "Es ist noch kein Modell eingerichtet, daher können Fragen nicht beantwortet werden.",
       "chooseModel": "Modell wählen",
-      "historyFailed": "Das Gespräch konnte nicht geladen werden."
+      "historyFailed": "Das Gespräch konnte nicht geladen werden.",
+      "conversations": "Gespräche",
+      "newConversation": "Neues Gespräch",
+      "deleteConversation": "Gespräch löschen",
+      "untitled": "Neues Gespräch",
+      "stop": "Antwort stoppen"
     },
     "studio": {
       "heading": "Studio",

@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import de.pfoertner.assessment.sumbooklm.ai.chat.ChatTurn;
@@ -22,22 +21,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Keeps the transcript of the conversation held inside a notebook.
+ * Keeps the conversations held inside a notebook.
  *
  * <h2>Reached Through the Notebook</h2>
  * As with every aggregate below a notebook, a conversation is resolved for the requesting account
- * first. A caller who knows the identifier of a foreign conversation is told that there is none.
+ * first, and a conversation that belongs to another notebook of the same account is treated as
+ * missing. A caller who knows an identifier is therefore not able to reach anything with it.
  *
- * <h2>One Conversation, Created When It Is Needed</h2>
- * The first question of a notebook creates its conversation; reading one that does not exist creates
- * nothing. Opening a notebook is therefore free of writes, which matters because it happens on every
- * navigation while asking happens deliberately.
+ * <h2>Several Conversations</h2>
+ * A notebook holds as many conversations as its user starts. Each is its own row with its own
+ * transcript, so a second question about a different subject does not have to carry the first one as
+ * context, and neither has to be deleted to get away from it.
+ *
+ * <h2>Nothing Is Created by Reading</h2>
+ * Opening a notebook lists what is there and creates nothing. A conversation exists because somebody
+ * asked for it, which is what keeps a notebook that is only being read free of writes.
  *
  * <h2>Two Questions at Once</h2>
- * Opening a turn appends to a payload it has just read, and a user with two Sumbooks open can do
- * that twice at the same moment. The notebook is therefore touched first, which takes a write lock on
- * its row and makes the two turns follow one another instead of both writing a transcript that is
- * missing the other's question.
+ * Opening a turn appends to a payload it has just read, and a user with two Sumbooks open can do that
+ * twice at the same moment. The notebook is therefore touched first, which takes a write lock on its
+ * row and makes the two turns follow one another instead of both writing a transcript that is missing
+ * the other's question.
  *
  * <h2>How Much History the Model Sees</h2>
  * A turn is opened with the most recent messages rather than with all of them. The whole transcript
@@ -105,19 +109,76 @@ public class ChatSessionService {
     }
 
     /**
-     * Reads the conversation of one notebook of an account.
+     * Lists the conversations of one notebook of an account, most recently used first.
      *
      * @param userId     identifier of the account the notebook belongs to
-     * @param notebookId identifier of the notebook to read the conversation of
-     * @return the conversation, or empty if nothing has been asked in this notebook yet
+     * @param notebookId identifier of the notebook to list the conversations of
+     * @return the conversations of the notebook, each with its whole transcript
      * @throws NotebookNotFoundException if the account holds no notebook with that identifier
      */
     @Transactional(readOnly = true)
-    public Optional<ChatSession> conversation(final UUID userId, final UUID notebookId) {
+    public List<ChatSession> conversations(final UUID userId, final UUID notebookId) {
         requireNotebook(userId, notebookId);
         return this.chatSessionRepository
-                .findFirstByNotebookIdAndUserIdOrderByCreatedAtAsc(notebookId, userId)
-                .map(this.chatSessionMapper::toDomain);
+                .findAllByNotebookIdAndUserIdOrderByLastMessageAtDesc(notebookId, userId)
+                .stream()
+                .map(this.chatSessionMapper::toDomain)
+                .toList();
+    }
+
+    /**
+     * Reads one conversation of one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook the conversation belongs to
+     * @param sessionId  identifier of the conversation to read
+     * @return the conversation with its whole transcript
+     * @throws NotebookNotFoundException    if the account holds no notebook with that identifier
+     * @throws ChatSessionNotFoundException if that notebook holds no such conversation
+     */
+    @Transactional(readOnly = true)
+    public ChatSession conversation(final UUID userId, final UUID notebookId, final UUID sessionId) {
+        requireNotebook(userId, notebookId);
+        return this.chatSessionMapper.toDomain(requireSession(userId, notebookId, sessionId));
+    }
+
+    /**
+     * Starts a conversation in one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook the conversation belongs to
+     * @return the new conversation, without a title and without messages
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    @Transactional
+    public ChatSession create(final UUID userId, final UUID notebookId) {
+        final Instant now = now();
+        touchNotebook(userId, notebookId, now);
+
+        final ChatSessionEntity entity = this.chatSessionRepository.save(new ChatSessionEntity(
+                UUID.randomUUID(),
+                userId,
+                notebookId,
+                now,
+                now,
+                this.chatSessionMapper.writePayload(ChatSessionPayload.empty()),
+                PayloadSchemaVersion.CURRENT));
+        return this.chatSessionMapper.toDomain(entity);
+    }
+
+    /**
+     * Removes one conversation of one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook the conversation belongs to
+     * @param sessionId  identifier of the conversation to remove
+     * @throws NotebookNotFoundException    if the account holds no notebook with that identifier
+     * @throws ChatSessionNotFoundException if that notebook holds no such conversation
+     */
+    @Transactional
+    public void delete(final UUID userId, final UUID notebookId, final UUID sessionId) {
+        touchNotebook(userId, notebookId, now());
+        this.chatSessionRepository.delete(requireSession(userId, notebookId, sessionId));
     }
 
     /**
@@ -125,18 +186,24 @@ public class ChatSessionService {
      *
      * @param userId     identifier of the account the notebook belongs to
      * @param notebookId identifier of the notebook the question was asked in
+     * @param sessionId  identifier of the conversation the question continues
      * @param question   question that was asked
      * @return the conversation as it was before the question, together with its identifier
-     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     * @throws NotebookNotFoundException    if the account holds no notebook with that identifier
+     * @throws ChatSessionNotFoundException if that notebook holds no such conversation
      */
     @Transactional
-    public ChatTurnContext beginTurn(final UUID userId, final UUID notebookId, final String question) {
+    public ChatTurnContext beginTurn(final UUID userId,
+                                     final UUID notebookId,
+                                     final UUID sessionId,
+                                     final String question) {
         final Instant now = now();
         touchNotebook(userId, notebookId, now);
 
         final ChatSessionEntity entity = this.chatSessionRepository
-                .findFirstByNotebookIdAndUserIdOrderByCreatedAtAsc(notebookId, userId)
-                .orElseGet(() -> create(userId, notebookId));
+                .findForUpdateByIdAndUserId(sessionId, userId)
+                .filter(session -> session.getNotebookId().equals(notebookId))
+                .orElseThrow(() -> new ChatSessionNotFoundException(sessionId));
 
         final ChatSessionPayload payload = this.chatSessionMapper.readPayload(entity);
         final List<ChatTurn> history = recentTurns(payload);
@@ -162,31 +229,13 @@ public class ChatSessionService {
      */
     @Transactional
     public void recordAnswer(final UUID userId, final UUID sessionId, final String answer) {
-        final ChatSessionEntity entity = this.chatSessionRepository.findByIdAndUserId(sessionId, userId)
+        final ChatSessionEntity entity = this.chatSessionRepository
+                .findForUpdateByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new ChatSessionNotFoundException(sessionId));
         final Instant now = now();
         store(entity, this.chatSessionMapper.readPayload(entity)
                 .withMessage(new ChatMessagePayload(ChatRole.ASSISTANT, answer, now)));
         entity.setLastMessageAt(now);
-    }
-
-    /**
-     * Creates the conversation of a notebook that has not been asked anything yet.
-     *
-     * @param userId     identifier of the account the notebook belongs to
-     * @param notebookId identifier of the notebook the conversation belongs to
-     * @return the stored row of the new conversation
-     */
-    private ChatSessionEntity create(final UUID userId, final UUID notebookId) {
-        final Instant now = now();
-        return this.chatSessionRepository.save(new ChatSessionEntity(
-                UUID.randomUUID(),
-                userId,
-                notebookId,
-                now,
-                now,
-                this.chatSessionMapper.writePayload(ChatSessionPayload.empty()),
-                PayloadSchemaVersion.CURRENT));
     }
 
     /**
@@ -226,6 +275,21 @@ public class ChatSessionService {
     private void store(final ChatSessionEntity entity, final ChatSessionPayload payload) {
         entity.setPayload(this.chatSessionMapper.writePayload(payload));
         entity.setPayloadVersion(PayloadSchemaVersion.CURRENT);
+    }
+
+    /**
+     * Loads one conversation of one notebook of an account.
+     *
+     * @param userId     identifier of the account the conversation belongs to
+     * @param notebookId identifier of the notebook the conversation has to belong to
+     * @param sessionId  identifier of the conversation to load
+     * @return the row of the conversation
+     * @throws ChatSessionNotFoundException if that notebook holds no such conversation
+     */
+    private ChatSessionEntity requireSession(final UUID userId, final UUID notebookId, final UUID sessionId) {
+        return this.chatSessionRepository.findByIdAndUserId(sessionId, userId)
+                .filter(session -> session.getNotebookId().equals(notebookId))
+                .orElseThrow(() -> new ChatSessionNotFoundException(sessionId));
     }
 
     /**

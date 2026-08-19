@@ -1,5 +1,6 @@
 package de.pfoertner.assessment.sumbooklm.persistence.chat;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,17 +28,22 @@ import org.springframework.data.jpa.repository.Lock;
 public interface ChatSessionRepository extends JpaRepository<ChatSessionEntity, UUID> {
 
     /**
-     * Reads the conversation of one notebook of an account.
+     * Reads the conversations of one notebook of an account, most recently used first.
      *
-     * <p>A notebook holds at most one conversation today, and the query returns the oldest should a
-     * second one ever be created, so that the conversation a user sees does not change when the model
-     * behind it grows a second session.
-     *
-     * @param notebookId identifier of the notebook the session belongs to
+     * @param notebookId identifier of the notebook the sessions belong to
      * @param userId     identifier of the owning account
-     * @return the conversation of the notebook, or empty if none was started yet
+     * @return the conversations of the notebook, ordered by their most recent message descending
      */
-    Optional<ChatSessionEntity> findFirstByNotebookIdAndUserIdOrderByCreatedAtAsc(UUID notebookId, UUID userId);
+    List<ChatSessionEntity> findAllByNotebookIdAndUserIdOrderByLastMessageAtDesc(UUID notebookId, UUID userId);
+
+    /**
+     * Reads one session of an account.
+     *
+     * @param id     identifier of the session to read
+     * @param userId identifier of the owning account
+     * @return the session, or empty if the account holds no session with that identifier
+     */
+    Optional<ChatSessionEntity> findByIdAndUserId(UUID id, UUID userId);
 
     /**
      * Reads one session of an account and locks it against other writers.
@@ -47,7 +53,7 @@ public interface ChatSessionRepository extends JpaRepository<ChatSessionEntity, 
      * @return the session, or empty if the account holds no session with that identifier
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<ChatSessionEntity> findByIdAndUserId(UUID id, UUID userId);
+    Optional<ChatSessionEntity> findForUpdateByIdAndUserId(UUID id, UUID userId);
 
     /**
      * Deletes every session of a notebook.

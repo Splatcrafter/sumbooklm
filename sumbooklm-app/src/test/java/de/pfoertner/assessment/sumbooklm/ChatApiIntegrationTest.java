@@ -13,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -50,6 +51,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The bound on how many answers an account may have at once can only be observed while several are
  * in flight, and an answer against a refused connection is over before the next request is sent. That
  * case therefore runs a provider that accepts the request and holds it until the test lets go.
+ *
+ * <h2>Stopping Needs an Answer That Is Arriving</h2>
+ * A stop can only be observed on a stream that has started producing, because the provider offers a
+ * handle to cancel only once it has. The case that covers it therefore runs a provider that keeps
+ * writing until it is stopped, which is the shape of a model that is generating a long answer.
  *
  * <h2>Isolation Is the Point</h2>
  * Two notebooks of one account hold different documents, and the sources reported for a question are
@@ -146,18 +152,64 @@ class ChatApiIntegrationTest {
     }
 
     /**
-     * Verifies that a notebook nobody has asked anything answers with an empty conversation rather
-     * than with a missing one.
+     * Verifies that a notebook nobody has asked anything holds no conversations, and that reading it
+     * creates none.
      */
     @Test
-    void conversationOfAFreshNotebookIsEmpty() {
+    void aFreshNotebookHoldsNoConversations() {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
 
-        final Map<String, Object> conversation = readConversation(accessToken, notebookId);
+        assertThat(listConversations(accessToken, notebookId)).isEmpty();
+        assertThat(listConversations(accessToken, notebookId)).isEmpty();
+    }
 
-        assertThat(conversation.get("title")).isEqualTo("");
-        assertThat((List<?>) conversation.get("messages")).isEmpty();
+    /**
+     * Verifies that a notebook holds as many conversations as its user starts, that each keeps its own
+     * transcript, and that removing one leaves the others alone.
+     */
+    @Test
+    void aNotebookHoldsSeveralConversations() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+
+        final String first = startConversation(accessToken, notebookId);
+        final String second = startConversation(accessToken, notebookId);
+        assertThat(first).isNotEqualTo(second);
+        assertThat(listConversations(accessToken, notebookId)).hasSize(2);
+
+        ask(accessToken, notebookId, first, "What is entropy?", "OLLAMA", "llama3");
+        ask(accessToken, notebookId, second, "What is a sourdough starter?", "OLLAMA", "llama3");
+
+        assertThat(messagesOf(readConversation(accessToken, notebookId, first)))
+                .singleElement()
+                .extracting(message -> message.get("text"))
+                .isEqualTo("What is entropy?");
+        assertThat(readConversation(accessToken, notebookId, second).get("title"))
+                .isEqualTo("What is a sourdough starter?");
+
+        assertThat(deleteConversation(accessToken, notebookId, first)).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(listConversations(accessToken, notebookId)).singleElement()
+                .extracting(conversation -> conversation.get("id"))
+                .isEqualTo(second);
+        assertThat(deleteConversation(accessToken, notebookId, first)).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Verifies that a conversation of another notebook of the same account cannot be asked in, so
+     * that the two identifiers of a question have to agree.
+     */
+    @Test
+    void aConversationBelongsToOneNotebook() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+        final String otherNotebookId = createNotebook(accessToken);
+        final String sessionId = startConversation(accessToken, notebookId);
+
+        assertThat(ask(accessToken, otherNotebookId, sessionId, "What is entropy?", "OLLAMA", "llama3")
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ask(accessToken, notebookId, UUID.randomUUID().toString(), "What is entropy?",
+                "OLLAMA", "llama3").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     /**
@@ -168,17 +220,18 @@ class ChatApiIntegrationTest {
     void aQuestionWithoutAModelIsRejectedAndNotStored() {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
+        final String sessionId = startConversation(accessToken, notebookId);
 
-        assertThat(ask(accessToken, notebookId, "What is entropy?", null, null).getStatusCode())
+        assertThat(ask(accessToken, notebookId, sessionId, "What is entropy?", null, null).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(ask(accessToken, notebookId, "What is entropy?", "OLLAMA", null).getStatusCode())
+        assertThat(ask(accessToken, notebookId, sessionId, "What is entropy?", "OLLAMA", null).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(ask(accessToken, notebookId, "What is entropy?", "OPENAI", "gpt-4o-mini").getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(ask(accessToken, notebookId, "What is entropy?", "TAROT", "major-arcana").getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ask(accessToken, notebookId, sessionId, "What is entropy?", "OPENAI", "gpt-4o-mini")
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ask(accessToken, notebookId, sessionId, "What is entropy?", "TAROT", "major-arcana")
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
-        assertThat((List<?>) readConversation(accessToken, notebookId).get("messages")).isEmpty();
+        assertThat((List<?>) readConversation(accessToken, notebookId, sessionId).get("messages")).isEmpty();
     }
 
     /**
@@ -189,14 +242,15 @@ class ChatApiIntegrationTest {
     void aQuestionIsRecordedEvenWhenTheProviderFails() {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
+        final String sessionId = startConversation(accessToken, notebookId);
 
         final ResponseEntity<String> response =
-                ask(accessToken, notebookId, "What is entropy?", "OLLAMA", "llama3");
+                ask(accessToken, notebookId, sessionId, "What is entropy?", "OLLAMA", "llama3");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(eventNames(response)).containsExactly("sources", "error");
 
-        final Map<String, Object> conversation = readConversation(accessToken, notebookId);
+        final Map<String, Object> conversation = readConversation(accessToken, notebookId, sessionId);
         assertThat(conversation.get("title")).isEqualTo("What is entropy?");
         final List<Map<String, Object>> messages = messagesOf(conversation);
         assertThat(messages).hasSize(1);
@@ -216,10 +270,12 @@ class ChatApiIntegrationTest {
         indexDocument(accessToken, physics, "thermodynamics.txt", THERMODYNAMICS);
         indexDocument(accessToken, baking, "sourdough.txt", BAKING);
 
-        final List<String> fromPhysics = sourceNamesOf(
-                ask(accessToken, physics, "What does the second law say about entropy?", "OLLAMA", "llama3"));
-        final List<String> fromBaking = sourceNamesOf(
-                ask(accessToken, baking, "What does the second law say about entropy?", "OLLAMA", "llama3"));
+        final List<String> fromPhysics = sourceNamesOf(ask(accessToken, physics,
+                startConversation(accessToken, physics),
+                "What does the second law say about entropy?", "OLLAMA", "llama3"));
+        final List<String> fromBaking = sourceNamesOf(ask(accessToken, baking,
+                startConversation(accessToken, baking),
+                "What does the second law say about entropy?", "OLLAMA", "llama3"));
 
         assertThat(fromPhysics).containsExactly("thermodynamics.txt");
         assertThat(fromBaking).isEmpty();
@@ -233,9 +289,10 @@ class ChatApiIntegrationTest {
     void aNotebookWithoutSourcesReportsNoSourcesAndStillStreams() {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
+        final String sessionId = startConversation(accessToken, notebookId);
 
         final ResponseEntity<String> response =
-                ask(accessToken, notebookId, "What is entropy?", "OLLAMA", "llama3");
+                ask(accessToken, notebookId, sessionId, "What is entropy?", "OLLAMA", "llama3");
 
         assertThat(sourceNamesOf(response)).isEmpty();
         assertThat(eventNames(response)).containsExactly("sources", "error");
@@ -250,10 +307,12 @@ class ChatApiIntegrationTest {
         final String owner = registerAccount();
         final String stranger = registerAccount();
         final String notebookId = createNotebook(owner);
+        final String sessionId = startConversation(owner, notebookId);
 
         assertThat(conversationStatus(stranger, notebookId)).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(ask(stranger, notebookId, "What is entropy?", "OLLAMA", "llama3").getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ask(stranger, notebookId, sessionId, "What is entropy?", "OLLAMA", "llama3")
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(deleteConversation(stranger, notebookId, sessionId)).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(conversationStatus(owner, UUID.randomUUID().toString())).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -268,6 +327,11 @@ class ChatApiIntegrationTest {
     void anAccountIsRefusedBeyondTheAnswersItMayHaveInFlight() throws Exception {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
+        final List<String> sessions = List.of(
+                startConversation(accessToken, notebookId),
+                startConversation(accessToken, notebookId),
+                startConversation(accessToken, notebookId));
+        final String extra = startConversation(accessToken, notebookId);
 
         final CountDownLatch release = new CountDownLatch(1);
         final AtomicInteger arrived = new AtomicInteger();
@@ -277,25 +341,29 @@ class ChatApiIntegrationTest {
         try {
             for (int question = 0; question < ANSWER_LIMIT; question += 1) {
                 final String text = "What is entropy, take " + question + "?";
-                askers.submit(() -> ask(accessToken, notebookId, text, "OLLAMA", "stalling", address));
+                final String session = sessions.get(question);
+                askers.submit(() ->
+                        ask(accessToken, notebookId, session, text, "OLLAMA", "stalling", address));
             }
-            awaitArrival(arrived);
+            awaitArrival(arrived, ANSWER_LIMIT);
 
-            final ResponseEntity<String> refused =
-                    ask(accessToken, notebookId, "One question too many?", "OLLAMA", "stalling", address);
+            final ResponseEntity<String> refused = ask(accessToken, notebookId, extra,
+                    "One question too many?", "OLLAMA", "stalling", address);
 
             assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-            final List<Map<String, Object>> asked = messagesOf(readConversation(accessToken, notebookId));
-            assertThat(asked).hasSize(ANSWER_LIMIT);
-            assertThat(asked).noneMatch(message -> "One question too many?".equals(message.get("text")));
+            assertThat(messagesOf(readConversation(accessToken, notebookId, extra)))
+                    .describedAs("a refused question is not written")
+                    .isEmpty();
 
             release.countDown();
             askers.shutdown();
             assertThat(askers.awaitTermination(1, TimeUnit.MINUTES)).isTrue();
 
-            assertThat(awaitTranscript(accessToken, notebookId, 2 * ANSWER_LIMIT))
-                    .describedAs("every accepted answer has to reach the transcript")
-                    .hasSize(2 * ANSWER_LIMIT);
+            for (final String session : sessions) {
+                assertThat(awaitTranscript(accessToken, notebookId, session, 2))
+                        .describedAs("every accepted answer has to reach its transcript")
+                        .hasSize(2);
+            }
         } finally {
             release.countDown();
             askers.shutdown();
@@ -307,21 +375,42 @@ class ChatApiIntegrationTest {
      * Waits until the transcript of a notebook has reached a length.
      *
      * @param accessToken access token to present
-     * @param notebookId  identifier of the notebook to read the conversation of
+     * @param notebookId  identifier of the notebook the conversation belongs to
+     * @param sessionId   identifier of the conversation to read
      * @param messages    number of messages to wait for
      * @return the transcript as it is once the length is reached or the wait is given up on
      * @throws InterruptedException if the waiting is interrupted
      */
     private List<Map<String, Object>> awaitTranscript(final String accessToken,
                                                       final String notebookId,
+                                                      final String sessionId,
                                                       final int messages) throws InterruptedException {
         final Instant deadline = Instant.now().plus(START_TIMEOUT);
-        List<Map<String, Object>> transcript = messagesOf(readConversation(accessToken, notebookId));
+        List<Map<String, Object>> transcript = messagesOf(readConversation(accessToken, notebookId, sessionId));
         while (transcript.size() < messages && Instant.now().isBefore(deadline)) {
             Thread.sleep(Duration.ofMillis(50));
-            transcript = messagesOf(readConversation(accessToken, notebookId));
+            transcript = messagesOf(readConversation(accessToken, notebookId, sessionId));
         }
         return transcript;
+    }
+
+    /**
+     * Removes a conversation and returns the status of the request.
+     *
+     * @param accessToken access token to present
+     * @param notebookId  identifier of the notebook the conversation belongs to
+     * @param sessionId   identifier of the conversation to remove
+     * @return the status the endpoint answered with
+     */
+    private HttpStatusCode deleteConversation(final String accessToken,
+                                              final String notebookId,
+                                              final String sessionId) {
+        return this.client.delete()
+                .uri("/api/v1/notebooks/" + notebookId + "/chats/" + sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .toBodilessEntity()
+                .getStatusCode();
     }
 
     /**
@@ -361,16 +450,141 @@ class ChatApiIntegrationTest {
     /**
      * Waits until every started answer has reached the provider and is therefore in flight.
      *
-     * @param arrived counter the provider raises
+     * @param arrived  counter the provider raises
+     * @param expected number of answers that have to have reached it
      * @throws InterruptedException if the waiting is interrupted
      */
-    private static void awaitArrival(final AtomicInteger arrived) throws InterruptedException {
+    private static void awaitArrival(final AtomicInteger arrived, final int expected)
+            throws InterruptedException {
         final Instant deadline = Instant.now().plus(START_TIMEOUT);
-        while (arrived.get() < ANSWER_LIMIT && Instant.now().isBefore(deadline)) {
+        while (arrived.get() < expected && Instant.now().isBefore(deadline)) {
             Thread.sleep(Duration.ofMillis(50));
         }
         assertThat(arrived.get()).describedAs("the answers did not reach the provider in time")
-                .isEqualTo(ANSWER_LIMIT);
+                .isEqualTo(expected);
+    }
+
+    /**
+     * Verifies that an answer can be stopped, that what was generated before is kept rather than
+     * discarded, and that the stream ends as finished rather than as failed.
+     *
+     * @throws Exception if the provider cannot be started or the waiting is interrupted
+     */
+    @Test
+    void anAnswerCanBeStoppedAndWhatArrivedIsKept() throws Exception {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+        final String sessionId = startConversation(accessToken, notebookId);
+
+        final CountDownLatch release = new CountDownLatch(1);
+        final AtomicInteger arrived = new AtomicInteger();
+        final HttpServer provider = writingProvider(arrived, release);
+        final String address = "http://127.0.0.1:" + provider.getAddress().getPort();
+        final ExecutorService asker = Executors.newSingleThreadExecutor();
+        try {
+            final Future<ResponseEntity<String>> answering = asker.submit(() ->
+                    ask(accessToken, notebookId, sessionId, "Explain entropy at length.",
+                            "OLLAMA", "writing", address));
+            awaitArrival(arrived, 1);
+            Thread.sleep(Duration.ofMillis(500));
+
+            assertThat(stopAnswer(accessToken, notebookId, sessionId)).isEqualTo(HttpStatus.NO_CONTENT);
+
+            final ResponseEntity<String> stopped = answering.get(1, TimeUnit.MINUTES);
+            assertThat(eventNames(stopped)).endsWith("done");
+            assertThat(bodyOf(stopped)).contains("tick").doesNotContain("the ending nobody reads");
+
+            final List<Map<String, Object>> transcript =
+                    awaitTranscript(accessToken, notebookId, sessionId, 2);
+            assertThat(transcript).hasSize(2);
+            assertThat((String) transcript.get(1).get("text")).contains("tick");
+        } finally {
+            release.countDown();
+            asker.shutdownNow();
+            provider.stop(0);
+        }
+    }
+
+    /**
+     * Verifies that stopping a conversation nothing is being generated in is not an error, because an
+     * answer that has just finished and one that never started are the same thing to ask about.
+     */
+    @Test
+    void stoppingNothingIsNotAnError() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+        final String sessionId = startConversation(accessToken, notebookId);
+
+        assertThat(stopAnswer(accessToken, notebookId, sessionId)).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(stopAnswer(accessToken, notebookId, UUID.randomUUID().toString()))
+                .isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    /**
+     * Asks for the answer of a conversation to stop.
+     *
+     * @param accessToken access token to present
+     * @param notebookId  identifier of the notebook the conversation belongs to
+     * @param sessionId   identifier of the conversation whose answer is to stop
+     * @return the status the endpoint answered with
+     */
+    private HttpStatusCode stopAnswer(final String accessToken,
+                                      final String notebookId,
+                                      final String sessionId) {
+        return this.client.post()
+                .uri("/api/v1/notebooks/" + notebookId + "/chats/" + sessionId + "/stop")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .toBodilessEntity()
+                .getStatusCode();
+    }
+
+    /**
+     * Starts a provider that keeps writing parts of an answer until it is let go.
+     *
+     * @param arrived counter raised as each request reaches the provider
+     * @param release latch the provider stops writing at
+     * @return the started provider
+     * @throws java.io.IOException if the provider cannot be started
+     */
+    private static HttpServer writingProvider(final AtomicInteger arrived, final CountDownLatch release)
+            throws java.io.IOException {
+        final HttpServer provider =
+                HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        provider.setExecutor(Executors.newFixedThreadPool(2));
+        provider.createContext("/api/chat", exchange -> {
+            arrived.incrementAndGet();
+            exchange.getResponseHeaders().add("Content-Type", "application/x-ndjson");
+            exchange.sendResponseHeaders(200, 0);
+            try (OutputStream stream = exchange.getResponseBody()) {
+                while (!release.await(50, TimeUnit.MILLISECONDS)) {
+                    stream.write(part("tick "));
+                    stream.flush();
+                }
+                stream.write(part("the ending nobody reads"));
+                stream.write(("{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true}\n")
+                        .getBytes(StandardCharsets.UTF_8));
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (final java.io.IOException e) {
+                // The client stopped reading, which is what the case asserts. Writing the rest of an
+                // answer nobody is waiting for is not part of it.
+            }
+            exchange.close();
+        });
+        provider.start();
+        return provider;
+    }
+
+    /**
+     * Builds one part of a streamed answer in the form the provider speaks.
+     *
+     * @param text text the part carries
+     * @return the encoded line
+     */
+    private static byte[] part(final String text) {
+        return ("{\"message\":{\"role\":\"assistant\",\"content\":\"" + text + "\"},\"done\":false}\n")
+                .getBytes(StandardCharsets.UTF_8);
     }
 
     /**
@@ -379,7 +593,7 @@ class ChatApiIntegrationTest {
     @Test
     void endpointsRequireAnAccessToken() {
         final ResponseEntity<Map<String, Object>> response = this.client.get()
-                .uri("/api/v1/notebooks/" + UUID.randomUUID() + "/chat/messages")
+                .uri("/api/v1/notebooks/" + UUID.randomUUID() + "/chats")
                 .retrieve()
                 .toEntity(JSON_OBJECT);
 
@@ -391,6 +605,7 @@ class ChatApiIntegrationTest {
      *
      * @param accessToken access token to present
      * @param notebookId  identifier of the notebook the question is asked in
+     * @param sessionId   identifier of the conversation the question continues
      * @param question    question to ask
      * @param provider    value of the provider header, or {@code null} to omit it
      * @param model       value of the model header, or {@code null} to omit it
@@ -398,10 +613,11 @@ class ChatApiIntegrationTest {
      */
     private ResponseEntity<String> ask(final String accessToken,
                                        final String notebookId,
+                                       final String sessionId,
                                        final String question,
                                        final String provider,
                                        final String model) {
-        return ask(accessToken, notebookId, question, provider, model, UNREACHABLE_PROVIDER);
+        return ask(accessToken, notebookId, sessionId, question, provider, model, UNREACHABLE_PROVIDER);
     }
 
     /**
@@ -409,6 +625,7 @@ class ChatApiIntegrationTest {
      *
      * @param accessToken access token to present
      * @param notebookId  identifier of the notebook the question is asked in
+     * @param sessionId   identifier of the conversation the question continues
      * @param question    question to ask
      * @param provider    value of the provider header, or {@code null} to omit it
      * @param model       value of the model header, or {@code null} to omit it
@@ -417,12 +634,13 @@ class ChatApiIntegrationTest {
      */
     private ResponseEntity<String> ask(final String accessToken,
                                        final String notebookId,
+                                       final String sessionId,
                                        final String question,
                                        final String provider,
                                        final String model,
                                        final String address) {
         final RestClient.RequestBodySpec request = this.client.post()
-                .uri("/api/v1/notebooks/" + notebookId + "/chat")
+                .uri("/api/v1/notebooks/" + notebookId + "/chats/" + sessionId + "/questions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .header("X-AI-Base-Url", address)
                 .contentType(MediaType.APPLICATION_JSON);
@@ -494,12 +712,15 @@ class ChatApiIntegrationTest {
      * Reads the conversation of a notebook.
      *
      * @param accessToken access token to present
-     * @param notebookId  identifier of the notebook to read the conversation of
+     * @param notebookId  identifier of the notebook the conversation belongs to
+     * @param sessionId   identifier of the conversation to read
      * @return the conversation as the endpoint describes it
      */
-    private Map<String, Object> readConversation(final String accessToken, final String notebookId) {
+    private Map<String, Object> readConversation(final String accessToken,
+                                                 final String notebookId,
+                                                 final String sessionId) {
         final ResponseEntity<Map<String, Object>> response = this.client.get()
-                .uri("/api/v1/notebooks/" + notebookId + "/chat/messages")
+                .uri("/api/v1/notebooks/" + notebookId + "/chats/" + sessionId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
                 .toEntity(JSON_OBJECT);
@@ -510,7 +731,7 @@ class ChatApiIntegrationTest {
     }
 
     /**
-     * Reads the status of a request for a conversation, without parsing its body.
+     * Reads the status of a request for the conversations of a notebook, without parsing its body.
      *
      * @param accessToken access token to present
      * @param notebookId  identifier of the notebook to read the conversation of
@@ -518,7 +739,7 @@ class ChatApiIntegrationTest {
      */
     private HttpStatusCode conversationStatus(final String accessToken, final String notebookId) {
         return this.client.get()
-                .uri("/api/v1/notebooks/" + notebookId + "/chat/messages")
+                .uri("/api/v1/notebooks/" + notebookId + "/chats")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
                 .toBodilessEntity()
@@ -642,6 +863,44 @@ class ChatApiIntegrationTest {
         final Map<String, Object> body = response.getBody();
         assertThat(body).describedAs("the registration carries no body").isNotNull();
         return (String) ((Map<?, ?>) body.get("tokens")).get("accessToken");
+    }
+
+    /**
+     * Starts a conversation and returns its identifier.
+     *
+     * @param accessToken access token to present
+     * @param notebookId  identifier of the notebook the conversation belongs to
+     * @return the identifier of the started conversation
+     */
+    private String startConversation(final String accessToken, final String notebookId) {
+        final ResponseEntity<Map<String, Object>> response = this.client.post()
+                .uri("/api/v1/notebooks/" + notebookId + "/chats")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .toEntity(JSON_OBJECT);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        final Map<String, Object> body = response.getBody();
+        assertThat(body).describedAs("the conversation carries no body").isNotNull();
+        return (String) body.get("id");
+    }
+
+    /**
+     * Lists the conversations of a notebook.
+     *
+     * @param accessToken access token to present
+     * @param notebookId  identifier of the notebook to list the conversations of
+     * @return the conversations as the endpoint describes them
+     */
+    private List<Map<String, Object>> listConversations(final String accessToken, final String notebookId) {
+        final ResponseEntity<List<Map<String, Object>>> response = this.client.get()
+                .uri("/api/v1/notebooks/" + notebookId + "/chats")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .toEntity(JSON_ARRAY);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        final List<Map<String, Object>> body = response.getBody();
+        assertThat(body).describedAs("the conversations carry no body").isNotNull();
+        return body;
     }
 
     /**

@@ -146,7 +146,12 @@
       "tooMany": "同時に生成中の回答が多すぎます。いずれかが届いてから、もう一度質問してください。",
       "noModel": "モデルがまだ設定されていないため、質問に回答できません。",
       "chooseModel": "モデルを選択",
-      "historyFailed": "会話を読み込めませんでした。"
+      "historyFailed": "会話を読み込めませんでした。",
+      "conversations": "会話",
+      "newConversation": "新しい会話",
+      "deleteConversation": "会話を削除",
+      "untitled": "新しい会話",
+      "stop": "回答を停止"
     },
     "studio": {
       "heading": "スタジオ",

@@ -6,6 +6,17 @@ import type { components } from '@/api/schema';
 export type ChatRole = 'USER' | 'ASSISTANT';
 
 /**
+ * One conversation of a Sumbook, as a list shows it.
+ */
+export interface ChatSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  lastMessageAt: string;
+  messageCount: number;
+}
+
+/**
  * One source an answer was allowed to cite, as the stream announced it.
  */
 export interface ChatSource {
@@ -51,6 +62,21 @@ export function toChatMessage(
     role: message.role === 'ASSISTANT' ? 'ASSISTANT' : 'USER',
     text: message.text ?? '',
     createdAt: message.createdAt ?? new Date().toISOString(),
+  };
+}
+
+/**
+ * Narrows a conversation of a backend response into its client side form.
+ */
+export function toChatSummary(
+  summary: components['schemas']['ChatSummaryResponse'],
+): ChatSummary {
+  return {
+    id: summary.id ?? '',
+    title: summary.title ?? '',
+    createdAt: summary.createdAt ?? new Date().toISOString(),
+    lastMessageAt: summary.lastMessageAt ?? new Date().toISOString(),
+    messageCount: summary.messageCount ?? 0,
   };
 }
 

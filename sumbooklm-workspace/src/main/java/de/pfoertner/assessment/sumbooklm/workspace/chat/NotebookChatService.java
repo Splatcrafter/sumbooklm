@@ -4,10 +4,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import de.pfoertner.assessment.sumbooklm.ai.chat.AnswerCancellation;
 import de.pfoertner.assessment.sumbooklm.ai.chat.ContextPassage;
 import de.pfoertner.assessment.sumbooklm.ai.chat.GroundedChatEngine;
 import de.pfoertner.assessment.sumbooklm.ai.chat.ModelSelection;
@@ -41,6 +41,11 @@ import org.springframework.stereotype.Service;
  * A retrieved passage whose document is no longer listed in the notebook is dropped rather than shown
  * under a placeholder. The two can disagree only while a removal is in flight, and answering out of a
  * document the user has just deleted is worse than answering out of one document less.
+ *
+ * <h2>Stopping</h2>
+ * An answer being generated is registered under its conversation so that a later request can stop it.
+ * A stopped answer ends as complete rather than as failed, carrying what was generated: the reader
+ * has already read it, and it was already paid for.
  *
  * <h2>How Many at Once</h2>
  * A permit is taken before the question is stored and returned when the answer ends, so an account
@@ -100,6 +105,11 @@ public class NotebookChatService {
     private final ConcurrentAnswerLimit concurrentAnswerLimit;
 
     /**
+     * Registry of the answers being generated, so that one of them can be stopped.
+     */
+    private final RunningAnswers runningAnswers;
+
+    /**
      * Creates the service.
      *
      * @param chatSessionService     service that owns the transcript of a conversation
@@ -108,31 +118,85 @@ public class NotebookChatService {
      * @param groundedChatEngine     engine that generates an answer from the retrieved passages
      * @param chatTranscriptRecorder writer of the finished answer
      * @param concurrentAnswerLimit  bound on how many answers one account may have in flight
+     * @param runningAnswers         registry of the answers being generated
      */
     public NotebookChatService(final ChatSessionService chatSessionService,
                                final SourceDocumentService sourceDocumentService,
                                final NotebookIndex notebookIndex,
                                final GroundedChatEngine groundedChatEngine,
                                final ChatTranscriptRecorder chatTranscriptRecorder,
-                               final ConcurrentAnswerLimit concurrentAnswerLimit) {
+                               final ConcurrentAnswerLimit concurrentAnswerLimit,
+                               final RunningAnswers runningAnswers) {
         this.chatSessionService = chatSessionService;
         this.sourceDocumentService = sourceDocumentService;
         this.notebookIndex = notebookIndex;
         this.groundedChatEngine = groundedChatEngine;
         this.chatTranscriptRecorder = chatTranscriptRecorder;
         this.concurrentAnswerLimit = concurrentAnswerLimit;
+        this.runningAnswers = runningAnswers;
     }
 
     /**
-     * Reads the conversation of one notebook of an account.
+     * Lists the conversations of one notebook of an account, most recently used first.
      *
      * @param userId     identifier of the account the notebook belongs to
-     * @param notebookId identifier of the notebook to read the conversation of
-     * @return the conversation, or empty if nothing has been asked in this notebook yet
+     * @param notebookId identifier of the notebook to list the conversations of
+     * @return the conversations of the notebook
      * @throws NotebookNotFoundException if the account holds no notebook with that identifier
      */
-    public Optional<ChatSession> conversation(final UUID userId, final UUID notebookId) {
-        return this.chatSessionService.conversation(userId, notebookId);
+    public List<ChatSession> conversations(final UUID userId, final UUID notebookId) {
+        return this.chatSessionService.conversations(userId, notebookId);
+    }
+
+    /**
+     * Reads one conversation of one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook the conversation belongs to
+     * @param sessionId  identifier of the conversation to read
+     * @return the conversation with its whole transcript
+     * @throws NotebookNotFoundException    if the account holds no notebook with that identifier
+     * @throws ChatSessionNotFoundException if that notebook holds no such conversation
+     */
+    public ChatSession conversation(final UUID userId, final UUID notebookId, final UUID sessionId) {
+        return this.chatSessionService.conversation(userId, notebookId, sessionId);
+    }
+
+    /**
+     * Starts a conversation in one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook the conversation belongs to
+     * @return the new conversation, without a title and without messages
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    public ChatSession startConversation(final UUID userId, final UUID notebookId) {
+        return this.chatSessionService.create(userId, notebookId);
+    }
+
+    /**
+     * Removes one conversation of one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook the conversation belongs to
+     * @param sessionId  identifier of the conversation to remove
+     * @throws NotebookNotFoundException    if the account holds no notebook with that identifier
+     * @throws ChatSessionNotFoundException if that notebook holds no such conversation
+     */
+    public void deleteConversation(final UUID userId, final UUID notebookId, final UUID sessionId) {
+        this.runningAnswers.stop(userId, sessionId);
+        this.chatSessionService.delete(userId, notebookId, sessionId);
+    }
+
+    /**
+     * Stops the answer being generated in one conversation.
+     *
+     * @param userId    identifier of the account the conversation belongs to
+     * @param sessionId identifier of the conversation whose answer is to stop
+     * @return {@code true} if an answer was stopped, {@code false} if none was running
+     */
+    public boolean stopAnswer(final UUID userId, final UUID sessionId) {
+        return this.runningAnswers.stop(userId, sessionId);
     }
 
     /**
@@ -140,18 +204,23 @@ public class NotebookChatService {
      *
      * @param userId     identifier of the account the notebook belongs to
      * @param notebookId identifier of the notebook the question was asked in
+     * @param sessionId  identifier of the conversation the question continues
      * @param question   question that was asked
      * @return the conversation as it was before the question, together with its identifier
-     * @throws NotebookNotFoundException  if the account holds no notebook with that identifier
-     * @throws TooManyQuestionsException  if the account already has as many answers in flight as it
-     *                                    may have
+     * @throws NotebookNotFoundException    if the account holds no notebook with that identifier
+     * @throws ChatSessionNotFoundException if that notebook holds no such conversation
+     * @throws TooManyQuestionsException    if the account already has as many answers in flight as it
+     *                                      may have
      */
-    public ChatTurnContext beginTurn(final UUID userId, final UUID notebookId, final String question) {
+    public ChatTurnContext beginTurn(final UUID userId,
+                                     final UUID notebookId,
+                                     final UUID sessionId,
+                                     final String question) {
         if (!this.concurrentAnswerLimit.tryAcquire(userId)) {
             throw new TooManyQuestionsException(userId);
         }
         try {
-            return this.chatSessionService.beginTurn(userId, notebookId, question);
+            return this.chatSessionService.beginTurn(userId, notebookId, sessionId, question);
         } catch (final RuntimeException e) {
             this.concurrentAnswerLimit.release(userId);
             throw e;
@@ -184,7 +253,11 @@ public class NotebookChatService {
                        final ChatTurnContext context,
                        final ModelSelection selection,
                        final ChatStreamHandler handler) {
-        final ChatStreamHandler ending = new AnswerRecorder(userId, context.sessionId(), handler);
+        final AnswerCancellation cancellation = new AnswerCancellation();
+        final ChatStreamHandler ending =
+                new AnswerRecorder(userId, context.sessionId(), cancellation, handler);
+        this.runningAnswers.register(userId, context.sessionId(), cancellation);
+
         final List<ContextPassage> passages;
         try {
             passages = retrieve(userId, context, ending);
@@ -193,8 +266,13 @@ public class NotebookChatService {
             ending.onFailed(e);
             return;
         }
+        if (cancellation.isRequested()) {
+            ending.onCompleted("");
+            return;
+        }
 
-        this.groundedChatEngine.answer(selection, passages, context.history(), context.question(), ending);
+        this.groundedChatEngine.answer(
+                selection, passages, context.history(), context.question(), ending, cancellation);
     }
 
     /**
@@ -265,6 +343,11 @@ public class NotebookChatService {
         private final UUID sessionId;
 
         /**
+         * The way this answer was to be stopped, used to take it out of the registry again.
+         */
+        private final AnswerCancellation cancellation;
+
+        /**
          * Receiver the calls are passed on to.
          */
         private final ChatStreamHandler delegate;
@@ -277,13 +360,18 @@ public class NotebookChatService {
         /**
          * Creates the receiver.
          *
-         * @param userId    identifier of the account the conversation belongs to
-         * @param sessionId identifier of the conversation the answer belongs to
-         * @param delegate  receiver the calls are passed on to
+         * @param userId       identifier of the account the conversation belongs to
+         * @param sessionId    identifier of the conversation the answer belongs to
+         * @param cancellation the way this answer was to be stopped
+         * @param delegate     receiver the calls are passed on to
          */
-        private AnswerRecorder(final UUID userId, final UUID sessionId, final ChatStreamHandler delegate) {
+        private AnswerRecorder(final UUID userId,
+                               final UUID sessionId,
+                               final AnswerCancellation cancellation,
+                               final ChatStreamHandler delegate) {
             this.userId = userId;
             this.sessionId = sessionId;
+            this.cancellation = cancellation;
             this.delegate = delegate;
         }
 
@@ -302,8 +390,10 @@ public class NotebookChatService {
             if (!this.ended.compareAndSet(false, true)) {
                 return;
             }
-            NotebookChatService.this.concurrentAnswerLimit.release(this.userId);
-            NotebookChatService.this.chatTranscriptRecorder.record(this.userId, this.sessionId, answer);
+            end();
+            if (!answer.isBlank()) {
+                NotebookChatService.this.chatTranscriptRecorder.record(this.userId, this.sessionId, answer);
+            }
             this.delegate.onCompleted(answer);
         }
 
@@ -312,8 +402,16 @@ public class NotebookChatService {
             if (!this.ended.compareAndSet(false, true)) {
                 return;
             }
-            NotebookChatService.this.concurrentAnswerLimit.release(this.userId);
+            end();
             this.delegate.onFailed(error);
+        }
+
+        /**
+         * Gives up what this answer was holding.
+         */
+        private void end() {
+            NotebookChatService.this.runningAnswers.unregister(this.sessionId, this.cancellation);
+            NotebookChatService.this.concurrentAnswerLimit.release(this.userId);
         }
     }
 }

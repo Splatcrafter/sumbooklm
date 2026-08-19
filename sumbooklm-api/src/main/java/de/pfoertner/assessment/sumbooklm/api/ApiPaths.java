@@ -85,14 +85,24 @@ public final class ApiPaths {
     public static final String V1_NOTEBOOK_SOURCE_REINDEX = V1_NOTEBOOK_SOURCE + "/reindex";
 
     /**
-     * Endpoint that answers a question about the sources of one notebook.
+     * Collection of the conversations held inside one notebook.
      */
-    public static final String V1_NOTEBOOK_CHAT = V1_NOTEBOOK + "/chat";
+    public static final String V1_NOTEBOOK_CHATS = V1_NOTEBOOK + "/chats";
 
     /**
-     * Transcript of the conversation held inside one notebook.
+     * One conversation of one notebook, addressed by its identifier.
      */
-    public static final String V1_NOTEBOOK_CHAT_MESSAGES = V1_NOTEBOOK_CHAT + "/messages";
+    public static final String V1_NOTEBOOK_CHAT = V1_NOTEBOOK_CHATS + "/{sessionId}";
+
+    /**
+     * Endpoint that answers a question inside one conversation.
+     */
+    public static final String V1_NOTEBOOK_CHAT_QUESTIONS = V1_NOTEBOOK_CHAT + "/questions";
+
+    /**
+     * Endpoint that stops the answer being generated inside one conversation.
+     */
+    public static final String V1_NOTEBOOK_CHAT_STOP = V1_NOTEBOOK_CHAT + "/stop";
 
     /**
      * Endpoint that hands a client the parameters its stored token pair is encrypted with. The

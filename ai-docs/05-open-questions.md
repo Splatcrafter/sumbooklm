@@ -257,24 +257,32 @@ fixed, and both were invisible until something asked several things of one noteb
 What remains is recorded as questions 34 and 35: the count is per instance, and a bound on answers in
 flight is not a bound on questions over time.
 
-## 26. A cancelled answer is generated to the end
+## 26. Resolved: an answer can be stopped, and what arrived is kept
 
-Leaving a Sumbook aborts the request, and the server keeps generating. That is deliberate: the answer
-is already paid for and is worth storing for the next visit. It also means a user cannot stop an
-answer they no longer want, and that every abandoned question still costs them tokens.
+The composer offers a stop while an answer is being written. The stop ends the answer for the reader,
+keeps what had arrived, stores it as the answer and gives the account its permit back.
 
-Stopping it needs the cancellation handle LangChain4j exposes on the streaming callbacks, plus a
-decision about what a half generated answer is worth storing as. Both are cheap; deciding which of the
-two behaviours a user expects is not.
+The two behaviours the question asked about are now separate on purpose. Leaving a Sumbook still lets
+the answer finish and be stored, because it was already paid for and will be there on the next visit.
+Pressing stop is the deliberate act, and only that one ends it.
 
-## 27. The transcript is one conversation per notebook
+The half that could not be done is the half the question cared most about. The cancellation handle
+cancels by closing the body of the response, and the HTTP stack drains a chunked body before it closes
+it, so calling it waits for the provider rather than stopping it; from the thread handling the stop it
+hangs that request outright. What is left is question 36.
 
-A notebook holds one conversation, created by its first question. The table already carries an
-identifier and its own timestamps, and the payload already carries a title, so several conversations
-about one set of sources are a change to the service rather than to the schema.
+## 27. Resolved: a notebook holds as many conversations as its user starts
 
-What is missing is the interface for it. A list of conversations is a fourth thing competing for the
-width of a Sumbook, and until there is a reason to have two, one is the honest model.
+Conversations are listed, started and removed below `/notebooks/{id}/chats`, and a question names the
+one it continues. The schema needed nothing: the row already had an identifier, its own timestamps and
+a title in its payload, and what changed is that the service stopped using exactly one of them.
+
+The interface question is answered by not adding a column. The conversations are reached through a
+menu above the transcript, because a fourth column would take width from the one panel whose content
+needs it, and a reader works in one conversation at a time.
+
+What is left over is that listing them decodes every transcript in order to count its messages, which
+is question 37.
 
 ## 28. History is trimmed by count, not by size
 
@@ -361,3 +369,25 @@ That is deliberate, because what an answer costs is paid by the user with their 
 threads are already protected. It becomes a real question the moment something the operator pays for
 sits behind the same endpoint, at which point a rate limit belongs in front of the whole API rather
 than in the chat service.
+
+## 36. A stopped answer is still being generated somewhere
+
+Stopping ends the answer for the reader and frees everything this application was holding for it. It
+does not reach the provider, because the client cannot abort a request: its cancellation closes the
+response body, and the HTTP stack drains a chunked body before closing it, which waits for the
+provider rather than stopping it.
+
+So the tokens for whatever is generated after the stop are still spent, and a thread reads them to the
+end. Closing it properly means aborting the exchange, which either the client has to offer or the
+application has to reach around it for, by holding the request itself rather than handing it to the
+model abstraction.
+
+## 37. Listing conversations decodes every transcript
+
+A list of conversations shows how many messages each holds, and the count is in the payload, so
+answering it decodes every transcript of the notebook. That is the same shape as the content hash
+before it became a column, and the same answer would apply.
+
+It is cheap for the number of conversations a person keeps, and it stops being cheap at the point
+where somebody keeps hundreds. What makes it worth leaving is that the count is the only thing being
+decoded for, and dropping it from the list would remove the problem without a schema change.

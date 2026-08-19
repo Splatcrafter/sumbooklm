@@ -128,7 +128,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/notebooks/{notebookId}/chat": {
+    "/api/v1/notebooks/{notebookId}/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the conversations of a notebook
+         * @description Returns every conversation of the notebook, most recently used first, with its title and its timestamps but without its messages.
+         */
+        get: operations["conversations"];
+        put?: never;
+        /**
+         * Start a conversation
+         * @description Creates an empty conversation in the notebook. It has no title until the first question is asked in it.
+         */
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebookId}/chats/{sessionId}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop an answer
+         * @description Stops the answer being generated in the conversation. What was generated so far is kept, because the reader has already seen it. The response is the same whether or not an answer was running.
+         */
+        post: operations["stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebookId}/chats/{sessionId}/questions": {
         parameters: {
             query?: never;
             header?: never;
@@ -256,7 +300,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/notebooks/{notebookId}/chat/messages": {
+    "/api/v1/notebooks/{notebookId}/chats/{sessionId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -264,13 +308,17 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Read the conversation of a notebook
-         * @description Returns every message of the conversation, oldest first. A notebook that has not been asked anything answers with an empty conversation.
+         * Read a conversation
+         * @description Returns the conversation with every message it holds, oldest first.
          */
         get: operations["conversation"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a conversation
+         * @description Removes the conversation and its transcript. An answer being generated in it is stopped.
+         */
+        delete: operations["delete_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -290,7 +338,7 @@ export interface paths {
          * Delete a source
          * @description Removes the source and its segments from the retrieval index. The session of the presented access token has to be open, which is verified against the database.
          */
-        delete: operations["delete_1"];
+        delete: operations["delete_2"];
         options?: never;
         head?: never;
         patch?: never;
@@ -480,6 +528,43 @@ export interface components {
              */
             url: string;
         };
+        /** @description One conversation held inside a notebook, with its whole transcript. */
+        ChatConversationResponse: {
+            /**
+             * Format: uuid
+             * @description Stable identifier of the conversation.
+             */
+            id?: string;
+            /** @description Name the conversation is listed under, empty until the first question. */
+            title?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the conversation was started.
+             */
+            createdAt?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the most recent message was exchanged.
+             */
+            lastMessageAt?: string;
+            /** @description Messages of the conversation, oldest first. */
+            messages?: components["schemas"]["ChatMessageResponse"][];
+        };
+        /** @description One message of the conversation held inside a notebook. */
+        ChatMessageResponse: {
+            /**
+             * @description Author of the message.
+             * @enum {string}
+             */
+            role?: "USER" | "ASSISTANT";
+            /** @description Content of the message, in Markdown for a generated answer. */
+            text?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the message was appended to the conversation.
+             */
+            createdAt?: string;
+        };
         /** @description A question about the sources of one notebook. */
         ChatQuestionRequest: {
             /**
@@ -543,27 +628,30 @@ export interface components {
             /** @description Base64 encoded vector to use for the next encryption. */
             initializationVector?: string;
         };
-        /** @description The conversation held inside one notebook. */
-        ChatConversationResponse: {
-            /** @description Name the conversation is listed under, empty while unused. */
-            title?: string;
-            /** @description Messages of the conversation, oldest first. */
-            messages?: components["schemas"]["ChatMessageResponse"][];
-        };
-        /** @description One message of the conversation held inside a notebook. */
-        ChatMessageResponse: {
+        /** @description One conversation held inside a notebook, without its transcript. */
+        ChatSummaryResponse: {
             /**
-             * @description Author of the message.
-             * @enum {string}
+             * Format: uuid
+             * @description Stable identifier of the conversation.
              */
-            role?: "USER" | "ASSISTANT";
-            /** @description Content of the message, in Markdown for a generated answer. */
-            text?: string;
+            id?: string;
+            /** @description Name the conversation is listed under, empty until the first question. */
+            title?: string;
             /**
              * Format: date-time
-             * @description Point in time the message was appended to the conversation.
+             * @description Point in time the conversation was started.
              */
             createdAt?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the most recent message was exchanged.
+             */
+            lastMessageAt?: string;
+            /**
+             * Format: int32
+             * @description Number of messages the conversation holds.
+             */
+            messageCount?: number;
         };
     };
     responses: never;
@@ -863,6 +951,106 @@ export interface operations {
             };
         };
     };
+    conversations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversations were returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ChatSummaryResponse"][];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation was started. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ChatConversationResponse"];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nothing is being generated any more. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ask: {
         parameters: {
             query?: never;
@@ -874,6 +1062,7 @@ export interface operations {
             };
             path: {
                 notebookId: string;
+                sessionId: string;
             };
             cookie?: never;
         };
@@ -906,7 +1095,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The account owns no such notebook. */
+            /** @description The notebook holds no such conversation. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1185,6 +1374,7 @@ export interface operations {
             header?: never;
             path: {
                 notebookId: string;
+                sessionId: string;
             };
             cookie?: never;
         };
@@ -1206,7 +1396,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The account owns no such notebook. */
+            /** @description The notebook holds no such conversation. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1216,6 +1406,41 @@ export interface operations {
         };
     };
     delete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation was removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The notebook holds no such conversation. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_2: {
         parameters: {
             query?: never;
             header?: never;

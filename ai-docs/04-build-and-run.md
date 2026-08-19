@@ -535,3 +535,36 @@ The streaming harness and the generated client harness were both re-run afterwar
 sits directly under them, and both still pass. The message rendering harness gained the refused turn:
 it says that too many answers are being written rather than reporting a failure, in all three
 languages.
+
+## Verification of several conversations and of stopping on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 81 tests.
+
+The chat suite grew four cases. A fresh notebook holds no conversations and reading it creates none. A
+notebook holds several, each keeps its own transcript, removing one leaves the others, and removing it
+twice is a `404`. A conversation belongs to one notebook, so asking through another notebook of the
+same account is a `404` as well. And the bound on answers in flight now uses one conversation per
+question, which is what a client would do.
+
+Stopping needs an answer that is arriving, because the provider only offers something to cancel once
+it has produced something. The case runs a provider that keeps writing until it is let go: the
+question is asked on another thread, the test waits until it has reached the provider, asks for the
+stop, and then asserts that the stream ended as `done` rather than `error`, that it carries what had
+arrived, that it does not carry what was written afterwards, and that the transcript holds the partial
+answer. Stopping a conversation with nothing running answers the same way, because an answer that has
+just finished and one that never started are the same thing to ask about.
+
+Writing that case is what found the mechanism. The first attempt called the cancellation handle of the
+chat client from the thread handling the stop, and the stop request hung for three minutes until the
+read timed out: the handle cancels by closing the body of the response, and Apache drains a chunked
+body before it closes it. The handle is not used any more, and what a stop does and does not do is
+recorded rather than assumed.
+
+Both harnesses were re-run against the packaged jar. The generated client one now starts a conversation
+before it asks. The streaming one gained a second conversation with its own transcript, a removal, and
+a stop driven through the real client against a provider that ticks: the answer ends as finished,
+carries the ticks, does not carry the ending, and the transcript holds it.
+
+The interface harness gained the stop control and the switcher: an answer being written offers a stop
+instead of a send, pressing it reports the stop, a Sumbook without conversations shows no switcher, and
+one with two names the open conversation. All translated keys are present in all three languages.

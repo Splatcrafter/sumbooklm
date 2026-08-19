@@ -1,6 +1,13 @@
 import { apiClient } from '@/api/client';
 import { modelHeaders, type ModelSettings } from '@/byok/modelSettings';
-import { toChatMessage, toChatSource, type ChatMessage, type ChatSource } from '@/chat/chatMessage';
+import {
+  toChatMessage,
+  toChatSource,
+  toChatSummary,
+  type ChatMessage,
+  type ChatSource,
+  type ChatSummary,
+} from '@/chat/chatMessage';
 
 /**
  * Raised when the backend rejects a chat request before an answer is streamed.
@@ -33,20 +40,95 @@ function authorization(accessToken: string): { Authorization: string } {
 }
 
 /**
- * Reads the conversation of one Sumbook, oldest message first.
+ * Lists the conversations of one Sumbook, most recently used first.
  */
-export async function loadConversation(
+export async function listConversations(
   accessToken: string,
   notebookId: string,
-): Promise<ChatMessage[]> {
-  const { data, response } = await apiClient.GET('/api/v1/notebooks/{notebookId}/chat/messages', {
+): Promise<ChatSummary[]> {
+  const { data, response } = await apiClient.GET('/api/v1/notebooks/{notebookId}/chats', {
     headers: authorization(accessToken),
     params: { path: { notebookId } },
   });
   if (!response.ok || !data) {
     throw new ChatRequestError(response.status);
   }
+  return data.map(toChatSummary);
+}
+
+/**
+ * Starts a conversation in one Sumbook and returns it, empty.
+ */
+export async function startConversation(
+  accessToken: string,
+  notebookId: string,
+): Promise<ChatSummary> {
+  const { data, response } = await apiClient.POST('/api/v1/notebooks/{notebookId}/chats', {
+    headers: authorization(accessToken),
+    params: { path: { notebookId } },
+  });
+  if (!response.ok || !data) {
+    throw new ChatRequestError(response.status);
+  }
+  return toChatSummary({ ...data, messageCount: (data.messages ?? []).length });
+}
+
+/**
+ * Reads one conversation of one Sumbook, oldest message first.
+ */
+export async function loadConversation(
+  accessToken: string,
+  notebookId: string,
+  sessionId: string,
+): Promise<ChatMessage[]> {
+  const { data, response } = await apiClient.GET('/api/v1/notebooks/{notebookId}/chats/{sessionId}', {
+    headers: authorization(accessToken),
+    params: { path: { notebookId, sessionId } },
+  });
+  if (!response.ok || !data) {
+    throw new ChatRequestError(response.status);
+  }
   return (data.messages ?? []).map(toChatMessage);
+}
+
+/**
+ * Removes one conversation of one Sumbook, together with its transcript.
+ */
+export async function deleteConversation(
+  accessToken: string,
+  notebookId: string,
+  sessionId: string,
+): Promise<void> {
+  const { response } = await apiClient.DELETE('/api/v1/notebooks/{notebookId}/chats/{sessionId}', {
+    headers: authorization(accessToken),
+    params: { path: { notebookId, sessionId } },
+  });
+  if (!response.ok) {
+    throw new ChatRequestError(response.status);
+  }
+}
+
+/**
+ * Asks for the answer being generated in one conversation to stop.
+ *
+ * What was generated before the stop is kept, so the transcript holds the answer as far as it got
+ * rather than nothing at all.
+ */
+export async function stopAnswer(
+  accessToken: string,
+  notebookId: string,
+  sessionId: string,
+): Promise<void> {
+  const { response } = await apiClient.POST(
+    '/api/v1/notebooks/{notebookId}/chats/{sessionId}/stop',
+    {
+      headers: authorization(accessToken),
+      params: { path: { notebookId, sessionId } },
+    },
+  );
+  if (!response.ok) {
+    throw new ChatRequestError(response.status);
+  }
 }
 
 /**
@@ -128,13 +210,16 @@ export async function streamAnswer(
   request: {
     accessToken: string;
     notebookId: string;
+    sessionId: string;
     question: string;
     settings: ModelSettings;
     signal?: AbortSignal;
   },
   handlers: AnswerHandlers,
 ): Promise<void> {
-  const response = await fetch(`/api/v1/notebooks/${encodeURIComponent(request.notebookId)}/chat`, {
+  const path = `/api/v1/notebooks/${encodeURIComponent(request.notebookId)}`
+    + `/chats/${encodeURIComponent(request.sessionId)}/questions`;
+  const response = await fetch(path, {
     method: 'POST',
     headers: {
       ...authorization(request.accessToken),

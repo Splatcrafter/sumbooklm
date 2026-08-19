@@ -943,3 +943,49 @@ session itself.
 **Cost.** Work inside one notebook is serialised even where it need not be, and the lock is held for
 the length of a short transaction. Both are cheaper than the alternative, which is a user losing a
 message they paid a provider to generate.
+
+## ADR-051: A notebook holds conversations, and a question names the one it continues
+
+**Decision.** `GET`, `POST` and `DELETE` below `/notebooks/{id}/chats` list, start and remove
+conversations; a question is posted to `/chats/{sessionId}/questions`. A client that holds no
+conversation creates one, which is one request more on the very first question.
+
+**Reason.** One conversation per notebook meant a transcript that only ever grew and a subject that
+could never be changed. Everything the schema needed was already there: a row with its own identifier
+and timestamps and a title in its payload. What was missing was that the service used exactly one of
+them, and that the interface had no way to say which.
+
+The question names its conversation rather than the notebook resolving a current one. A server side
+notion of current would have to be stored, would have to be updated by reading, and would answer
+differently for two tabs of the same user; naming it makes the request say what it means.
+
+**Reason for the shape.** The conversations are reached through a menu above the transcript rather
+than a column beside it. A fourth column would take width from the one panel whose content actually
+needs it, and a reader works in one conversation at a time.
+
+**Cost.** Listing decodes the payload of every conversation of a notebook in order to count its
+messages, which is the same shape of problem the content hash had before it became a column. It is
+cheap for the number of conversations a person keeps and would need a column if that stopped being
+true.
+
+## ADR-052: Stopping an answer stops what this application does with it
+
+**Decision.** A stop is recorded as a flag. The thread reading the stream notices it between two
+parts, ends the answer with what has arrived, stores that, releases the permit and stops forwarding.
+The provider is not told.
+
+**Reason.** It cannot be told. The handle the chat client offers cancels by closing the body of the
+response, and the HTTP stack drains a chunked body before closing it, so calling it waits for the
+provider instead of stopping it. Calling it from the thread that asked for the stop makes that request
+hang; calling it from the reading thread is the same as reading on and ignoring the rest.
+
+What is left is worth doing on its own. The reader stops waiting, the answer they already read is
+kept rather than discarded, and the account gets its permit back immediately instead of when a model
+it no longer cares about has finished.
+
+Keeping the partial answer rather than discarding it follows from who asked. The user pressed stop
+after reading part of an answer, so that part is what the notebook said; throwing it away would delete
+something they had already been shown.
+
+**Cost.** The tokens for whatever the provider generates after the stop are still spent, and a thread
+still reads them to the end. Both are recorded as open questions rather than hidden.

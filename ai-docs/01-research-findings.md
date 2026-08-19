@@ -647,3 +647,20 @@ lost, which for a generated answer means the answer is gone.
 `@Lock(LockModeType.PESSIMISTIC_WRITE)` on the finder that starts the read turns the two into a
 queue. The distinction is what the counter is for: optimistic locking suits state a user edits and
 can be asked to re-enter, and suits nothing that was produced at cost and cannot be produced again.
+
+### 50. The cancellation handle of LangChain4j cannot abort a stream
+
+`StreamingHandle.cancel()` closes the body of the HTTP response, and Apache HttpClient drains a
+chunked body before it closes it: `ChunkedInputStream.close()` reads and discards the rest of the
+message so that the connection can be reused. Calling it therefore does not stop the provider, it
+waits for the provider.
+
+That was found the hard way. Calling it from the thread handling the stop request made that request
+hang until the read timed out, three minutes later. Calling it from the reading thread instead does
+not hang a request, but it buys nothing over reading the rest and ignoring it, which is what the
+thread would do anyway.
+
+What can be stopped is what the application does with the parts: forwarding them, storing them and
+holding the permit of the account. What cannot be stopped through this client is the provider, and
+therefore the tokens it is still spending. Aborting the request itself is the only thing that would,
+and the handle does not offer it.

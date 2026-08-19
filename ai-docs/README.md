@@ -14,7 +14,7 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 
-State as of 2026-08-19: build green across ten modules, 77 tests, and the JavaDoc gate active
+State as of 2026-08-19: build green across ten modules, 81 tests, and the JavaDoc gate active
 everywhere. The scaffold is complete and four feature areas are implemented.
 
 Authentication: registration, login, token rotation, logout, the weekly cleanup of invalidated
@@ -41,6 +41,7 @@ material and require a Markdown citation per statement. The model is not configu
 the provider, the model name and the key travel in headers, are turned into a client for one answer
 and are forgotten with the response, while the browser keeps them encrypted next to its session. The
 transcript is stored in the CBOR payload of the chat session, the question before the model is asked
-and the answer once the stream has finished. An account may have three answers being generated at
+and the answer once the stream has finished. A notebook holds as many conversations as its user
+starts, and an answer being written can be stopped, which keeps what had arrived. An account may have three answers being generated at
 once, and a deployment that declares itself served over HTTPS refuses any API request that arrived
 without it.

@@ -9,6 +9,7 @@ import type { Notebook } from '@/notebooks/notebook';
 import { TopicIcon } from '@/notebooks/TopicIcon';
 import { ChatComposer } from '@/routes/sumbook/ChatComposer';
 import { ChatMessageView } from '@/routes/sumbook/ChatMessageView';
+import { ConversationBar } from '@/routes/sumbook/ConversationBar';
 import { useSumbookMeta } from '@/routes/sumbook/SumbookMeta';
 import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
 
@@ -22,12 +23,16 @@ import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
  * Asking needs a model, and this browser is the only place one is configured. A Sumbook that has none
  * therefore says so where the question would be typed, with the way to fix it right there, rather
  * than letting the question be sent and rejected.
+ *
+ * A Sumbook can hold several conversations. Which one is open is shown above the transcript rather
+ * than beside it, because the panel that needs the width is this one.
  */
 export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourceCount: number }) {
   const { t } = useTranslation();
   const meta = useSumbookMeta();
   const { settings, configured } = useModelSettings();
-  const { status, messages, answering, ask } = useChat(notebook.id);
+  const { status, conversations, currentId, messages, answering, select, start, remove, stop, ask } =
+    useChat(notebook.id);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const transcript = useRef<HTMLDivElement | null>(null);
 
@@ -54,6 +59,14 @@ export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourc
           </p>
         </div>
       </header>
+
+      <ConversationBar
+        conversations={conversations}
+        currentId={currentId}
+        onSelect={(sessionId) => void select(sessionId)}
+        onStart={() => void start()}
+        onRemove={(sessionId) => void remove(sessionId)}
+      />
 
       <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {messages.length === 0 ? (
@@ -99,7 +112,9 @@ export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourc
         <ChatComposer
           sourceCount={sourceCount}
           disabled={!configured || answering}
+          answering={answering}
           onSubmit={(question) => void ask(question, settings)}
+          onStop={() => void stop()}
         />
       </div>
 

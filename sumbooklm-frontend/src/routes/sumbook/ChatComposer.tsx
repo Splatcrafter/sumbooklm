@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Square } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Textarea } from '@/components/ui/textarea';
@@ -13,15 +13,23 @@ import { Textarea } from '@/components/ui/textarea';
  *
  * The field is cleared as the question leaves it. What was asked is already visible in the
  * conversation above, so leaving it behind would only mean deleting it before asking the next one.
+ *
+ * While an answer is being written the same button stops it, rather than a second control appearing
+ * next to one that cannot be pressed. Sending and stopping are the two things this button ever does,
+ * and only one of them is possible at a time.
  */
 export function ChatComposer({
   sourceCount,
   disabled = false,
+  answering = false,
   onSubmit,
+  onStop,
 }: {
   sourceCount: number;
   disabled?: boolean;
+  answering?: boolean;
   onSubmit: (question: string) => void;
+  onStop?: () => void;
 }) {
   const { t } = useTranslation();
   const [question, setQuestion] = useState('');
@@ -56,19 +64,30 @@ export function ChatComposer({
       />
       <div className="flex items-center justify-end gap-3">
         <span className="text-xs text-jb-grey-50">{t('sumbook.chat.sources', { count: sourceCount })}</span>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={send}
-          aria-label={t('sumbook.chat.send')}
-          className={`flex size-9 shrink-0 items-center justify-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-jb-grey-30/40 ${
-            ready
-              ? 'bg-jb-accent text-white hover:bg-jb-accent-bright'
-              : 'cursor-not-allowed bg-jb-grey-80/70 text-jb-grey-60'
-          }`}
-        >
-          <ArrowUp className="size-4" aria-hidden />
-        </button>
+        {answering ? (
+          <button
+            type="button"
+            onClick={onStop}
+            aria-label={t('sumbook.chat.stop')}
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-jb-grey-80 text-jb-grey-10 transition-colors outline-none hover:bg-jb-grey-70 focus-visible:ring-2 focus-visible:ring-jb-grey-30/40"
+          >
+            <Square className="size-3 fill-current" aria-hidden />
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!ready}
+            onClick={send}
+            aria-label={t('sumbook.chat.send')}
+            className={`flex size-9 shrink-0 items-center justify-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-jb-grey-30/40 ${
+              ready
+                ? 'bg-jb-accent text-white hover:bg-jb-accent-bright'
+                : 'cursor-not-allowed bg-jb-grey-80/70 text-jb-grey-60'
+            }`}
+          >
+            <ArrowUp className="size-4" aria-hidden />
+          </button>
+        )}
       </div>
     </div>
   );

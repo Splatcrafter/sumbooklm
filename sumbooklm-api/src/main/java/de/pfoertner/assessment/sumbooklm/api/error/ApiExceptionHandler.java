@@ -4,6 +4,7 @@ import de.pfoertner.assessment.sumbooklm.ai.chat.UnusableModelSelectionException
 import de.pfoertner.assessment.sumbooklm.security.authentication.InvalidCredentialsException;
 import de.pfoertner.assessment.sumbooklm.security.authentication.UsernameAlreadyTakenException;
 import de.pfoertner.assessment.sumbooklm.security.token.InvalidRefreshTokenException;
+import de.pfoertner.assessment.sumbooklm.workspace.chat.ChatSessionNotFoundException;
 import de.pfoertner.assessment.sumbooklm.workspace.chat.TooManyQuestionsException;
 import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.DuplicateSourceException;
@@ -145,6 +146,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         final ProblemDetail problem =
                 ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
         problem.setTitle("Model not usable");
+        return problem;
+    }
+
+    /**
+     * Reports a conversation the requesting account does not hold.
+     *
+     * @param exception failure raised by the workspace module
+     * @return a problem detail with status {@code 404}
+     */
+    @ExceptionHandler(ChatSessionNotFoundException.class)
+    public ProblemDetail handleChatSessionNotFound(final ChatSessionNotFoundException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, "The requested conversation does not exist");
+        problem.setTitle("Conversation not found");
         return problem;
     }
 

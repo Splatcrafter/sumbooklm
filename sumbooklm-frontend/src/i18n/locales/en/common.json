@@ -151,7 +151,12 @@
       "tooMany": "Too many answers are being written at once. Ask again when one of them has arrived.",
       "noModel": "No model is set up yet, so questions cannot be answered.",
       "chooseModel": "Choose model",
-      "historyFailed": "The conversation could not be loaded."
+      "historyFailed": "The conversation could not be loaded.",
+      "conversations": "Conversations",
+      "newConversation": "New conversation",
+      "deleteConversation": "Delete conversation",
+      "untitled": "New conversation",
+      "stop": "Stop answering"
     },
     "studio": {
       "heading": "Studio",

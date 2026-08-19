@@ -109,7 +109,8 @@ de.pfoertner.assessment.sumbooklm
 │   │                                            fingerprints and failures
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
 │                                                the turn context, the stream handler, the bound on
-│                                                answers in flight, failures
+│                                                answers in flight, the registry of running answers,
+│                                                failures
 ├── ingestion
 │   ├── extraction                              file and web extractors, the address resolver every
 │   │                                            fetch connects through, their result and failures
@@ -117,7 +118,8 @@ de.pfoertner.assessment.sumbooklm
 ├── ai
 │   ├── embedding                               model and store beans, NotebookIndex, metadata keys
 │   └── chat                                    ChatProvider, ModelSelection, ChatModelFactory,
-│                                                GroundedPrompt, GroundedChatEngine, its handler
+│                                                GroundedPrompt, GroundedChatEngine, its handler and
+│                                                the cancellation it watches
 └── api
     ├── ApiPaths
     ├── config                                  OpenApiConfiguration, SecurityConfiguration,
@@ -174,9 +176,9 @@ sumbooklm-frontend
     │   ├── sourcesApi.ts     the four calls below /api/v1/notebooks/{id}/sources
     │   └── useSources.ts     the list, its actions, and the polling while indexing runs
     ├── chat
-    │   ├── chatMessage.ts    client side message and source types with their narrowing
-    │   ├── chatApi.ts        the transcript call and the fetch that reads the event stream
-    │   └── useChat.ts        the transcript, the answer being written, and asking
+    │   ├── chatMessage.ts    client side message, source and conversation types with their narrowing
+    │   ├── chatApi.ts        the conversation calls and the fetch that reads the event stream
+    │   └── useChat.ts        the conversations, the open transcript, asking and stopping
     ├── byok
     │   ├── modelSettings.ts           the settings, their rules and the headers they become
     │   ├── modelSettingsStore.ts      the encrypted cookie they live in
@@ -202,7 +204,8 @@ sumbooklm-frontend
         │                 NotebookTitleDialog, NotebookDeleteDialog, NotebookMeta
         ├── settings      ModelSettingsDialog
         └── sumbook       SumbookPage, SourcesPanel, SourceListItem, AddSourceDialog,
-                          ChatPanel, ChatComposer, ChatMessageView, StudioPanel, SumbookMeta
+                          ChatPanel, ConversationBar, ChatComposer, ChatMessageView,
+                          StudioPanel, SumbookMeta
 ```
 
 The account routes are a second top level branch of the router rather than children of `AppLayout`.
@@ -314,7 +317,8 @@ that never succeeded.
 
 ## Answering a question
 
-1. `POST /api/v1/notebooks/{id}/chat` carries the question in its body and the model in its headers.
+1. `POST /api/v1/notebooks/{id}/chats/{sessionId}/questions` carries the question in its body and the
+   model in its headers.
    A permit is taken first, so an account that already has three answers being generated is refused
    with `429` before anything is written (ADR-049). The selection is validated next, then the notebook
    is touched, which resolves it for the account of the access token and locks its row (ADR-050), the
@@ -331,6 +335,10 @@ that never succeeded.
    session row, and is sent as the `done` event, after which the stream is closed. A failure at any
    point after step 2 becomes an `error` event instead, and the question stays in the transcript
    without an answer. Either ending returns the permit, and only one of them does.
+
+`POST .../chats/{sessionId}/stop` sets a flag the reading thread notices between two parts. The answer
+then ends at step 5 with what has arrived, which is stored and sent as `done`. The provider is not
+told, because the client cannot abort a request; see ADR-052 and open question 36.
 
 ## Database tables
 
@@ -361,7 +369,8 @@ that is queried rather than displayed.
 `chat_session` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
 `last_message_at`, `payload`, `payload_version`, `record_version`. The title and the whole transcript
 live in `payload`: a message is never read without its conversation and never changes once appended,
-so a row per message would add a join without ever being addressed on its own.
+so a row per message would add a join without ever being addressed on its own. A notebook holds as
+many of these rows as its user started conversations (ADR-051).
 
 The rows below a notebook carry its identifier rather than a foreign key with a cascade. Removing a
 notebook therefore removes its sources and its conversations explicitly, in the same transaction,

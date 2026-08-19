@@ -31,9 +31,13 @@ import org.springframework.stereotype.Component;
  *
  * <h2>A Stopped Answer Has Finished</h2>
  * A stop is noticed between two parts of the answer. The run then ends as complete, carrying what
- * arrived up to that point, because the reader has already read it and it was already paid for. The
- * parts that keep arriving afterwards are read and discarded: the provider is not told, and cannot
- * be, so the only thing left to decide is whether they reach the reader.
+ * arrived up to that point, because the reader has already read it and it was already paid for.
+ *
+ * <h2>Handing Over the Way to Stop</h2>
+ * The request to the provider can be abandoned, and the handle that does it belongs to the response
+ * rather than to the client, so it exists only once the answer has begun to arrive. It is handed to the
+ * cancellation with the first part, which is what turns a stop from a decision about what reaches the
+ * reader into a request that is no longer being answered.
  *
  * <h2>What Fits</h2>
  * The request is assembled here, so this is where it is kept to a size. The instructions, the
@@ -72,7 +76,7 @@ public class GroundedChatEngine {
      * @param history   earlier messages of the conversation, oldest first
      * @param question     question that was asked
      * @param handler      receiver of the parts, of the finished answer and of a failure
-     * @param cancellation the way to stop this answer, filled in once there is something to stop
+     * @param cancellation the way to stop this answer, handed the response as soon as one arrives
      */
     public void answer(final ModelSelection selection,
                        final List<ContextPassage> passages,
@@ -112,6 +116,7 @@ public class GroundedChatEngine {
                 @Override
                 public void onPartialResponse(final PartialResponse partialResponse,
                                               final PartialResponseContext context) {
+                    cancellation.attach(context.streamingHandle());
                     onPartialResponse(partialResponse.text());
                 }
 

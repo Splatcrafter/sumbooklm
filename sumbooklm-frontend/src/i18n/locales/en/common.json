@@ -150,6 +150,8 @@
       "thinking": "Reading your sources...",
       "failed": "The answer could not be generated.",
       "tooMany": "Too many answers are being written at once. Ask again when one of them has arrived.",
+      "tooOften_one": "You have asked as many questions as this installation allows for now. Ask again in about a minute.",
+      "tooOften_other": "You have asked as many questions as this installation allows for now. Ask again in about {{count}} minutes.",
       "noModel": "No model is set up yet, so questions cannot be answered.",
       "chooseModel": "Choose model",
       "historyFailed": "The conversation could not be loaded.",

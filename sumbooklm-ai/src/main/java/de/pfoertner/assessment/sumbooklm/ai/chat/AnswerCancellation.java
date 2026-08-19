@@ -1,24 +1,35 @@
 package de.pfoertner.assessment.sumbooklm.ai.chat;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+import dev.langchain4j.model.chat.response.StreamingHandle;
 
 /**
  * The request to stop an answer that is being generated.
  *
- * <h2>A Flag, Not a Handle</h2>
- * Stopping is recorded rather than performed. The stream is being read on another thread, and that
- * thread is the only one that may act on it: it notices the request between two parts of the answer,
- * finishes what it has, and stops passing the rest on.
+ * <h2>A Flag and a Handle</h2>
+ * Stopping does two things, and both are needed. The flag is what the thread reading the stream
+ * notices, so that nothing more reaches the reader and the run ends with what arrived. The handle is
+ * what abandons the request to the provider, so that the rest of the answer is not generated at all.
+ * Without the flag the reader would keep passing parts on until the abandoned connection was noticed;
+ * without the handle the provider would finish an answer nobody is waiting for.
  *
- * <h2>Why Not the Handle of the Client</h2>
- * The chat client offers a handle whose {@code cancel} closes the body of the response, and the HTTP
- * stack underneath drains a chunked body before it closes it. Calling it from the thread that asked
- * for the stop blocks that request until the provider has finished writing an answer nobody wants,
- * and calling it from the reading thread buys nothing over reading the rest and discarding it. The
- * handle is therefore not used at all; see the open questions for what that leaves.
+ * <h2>Why the Handle Can Be Used Now</h2>
+ * Cancelling closes the body of the response, and what that costs depends on the client underneath.
+ * The client this application builds abandons the exchange, so the close returns at once and the
+ * request that asked for the stop is not made to wait for the provider. An earlier attempt called the
+ * same handle on a client whose close first read the remainder of the message, which held the stop
+ * request open for as long as the answer took; see {@link ChatModelFactory}.
+ *
+ * <h2>Arriving in Either Order</h2>
+ * The handle exists only once the provider has begun to answer, and a stop may arrive before that.
+ * Both orders end with an abandoned request: a stop that arrives first is applied by the thread that
+ * attaches the handle, and a handle that is there already is cancelled by the thread that stops.
  *
  * <h2>Threading</h2>
- * The request arrives on one thread and is read on another, so the flag is published between them.
+ * The request arrives on one thread and the answer is read on another, so both the flag and the handle
+ * are published between them.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -31,16 +42,35 @@ public final class AnswerCancellation {
     private final AtomicBoolean requested = new AtomicBoolean();
 
     /**
+     * The way to abandon the request to the provider, absent until it has begun to answer.
+     */
+    private final AtomicReference<StreamingHandle> handle = new AtomicReference<>();
+
+    /**
      * Creates a cancellation for one answer.
      */
     public AnswerCancellation() {
     }
 
     /**
-     * Asks for the answer to stop at the next part that arrives.
+     * Records the way to abandon the request, and abandons it immediately if a stop was already asked
+     * for.
+     *
+     * @param streamingHandle handle of the response that is being read
+     */
+    public void attach(final StreamingHandle streamingHandle) {
+        this.handle.set(streamingHandle);
+        if (this.requested.get()) {
+            abandon();
+        }
+    }
+
+    /**
+     * Asks for the answer to stop, and abandons the request to the provider if it has begun.
      */
     public void cancel() {
         this.requested.set(true);
+        abandon();
     }
 
     /**
@@ -50,5 +80,15 @@ public final class AnswerCancellation {
      */
     public boolean isRequested() {
         return this.requested.get();
+    }
+
+    /**
+     * Abandons the request to the provider, if there is one to abandon and it is still running.
+     */
+    private void abandon() {
+        final StreamingHandle streamingHandle = this.handle.get();
+        if (streamingHandle != null && !streamingHandle.isCancelled()) {
+            streamingHandle.cancel();
+        }
     }
 }

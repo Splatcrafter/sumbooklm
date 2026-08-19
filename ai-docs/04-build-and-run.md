@@ -644,3 +644,36 @@ noticed because every test that touches it calls the method itself.
 Enabling the scheduler for the collection pass fixes that as a side effect. Both jobs now run, and the
 lesson is the one the case above is also about: an annotation that describes when something happens says
 nothing about whether anything is listening.
+
+## Verification of the two bounds and of a stop that reaches the provider on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 98 tests.
+
+`ChatModelFactoryTest` is the case the change to the client exists for. A provider writes parts of an
+answer until writing fails, the answer is stopped once the first part has arrived, and the assertion is
+that the provider notices: a write that throws is the only way a test can tell an abandoned request from
+one that is still being read and discarded. The same class states the other half, that an address which
+refuses the connection ends the run as failed rather than leaving a reader waiting, which is what a
+client that reports nothing would have cost.
+
+`ChatApiIntegrationTest` states it once more through the whole application, and adds the part that made
+the earlier design impossible: the stop request itself has to return, and it is asserted to return in
+well under the time an answer takes. The measurement that motivated all of this was a stop that took
+185 seconds because closing the body read the rest of the message first.
+
+`QuestionRateIntegrationTest` runs with the bound configured down to two questions, because the cases
+are about the edge and not about where it is. An account asks twice and is admitted twice, is refused
+the third time with `Retry-After`, and the refused question is asserted to be absent from the transcript.
+A second account asks in the same window and is admitted, which is what states that the count is per
+account.
+
+That suite carries one lesson worth recording: its client is built on the HTTP client of the platform
+rather than the detected one, because the detected one obeys `Retry-After`. Against this refusal it slept
+for the rest of the hour and reported what came afterwards, which looked exactly like a hanging test. The
+behaviour is correct for a client and is the reason the header is worth sending; it is only a test that
+must not have it.
+
+The plural sentences of the refusal were checked through the real i18n setup in all three languages, for
+one minute and for many, since a plural key that resolves to itself is the usual way such a message is
+shipped broken. The interface harness has a case for the new sentence as well; it could not be run here,
+because the development dependency it drives a DOM with is no longer installed in this container.

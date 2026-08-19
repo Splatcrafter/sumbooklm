@@ -163,7 +163,9 @@ export function ChatMessageView({ message }: { message: ChatMessage }) {
 
         {message.limited ? (
           <p className="mt-2 text-xs text-jb-grey-40" role="status">
-            {t('sumbook.chat.tooMany')}
+            {message.limitedForMinutes === undefined
+              ? t('sumbook.chat.tooMany')
+              : t('sumbook.chat.tooOften', { count: message.limitedForMinutes })}
           </p>
         ) : null}
 

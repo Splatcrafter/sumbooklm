@@ -2,6 +2,8 @@ package de.pfoertner.assessment.sumbooklm.ai.chat;
 
 import java.time.Duration;
 
+import dev.langchain4j.http.client.HttpClientBuilder;
+import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
@@ -15,6 +17,14 @@ import org.springframework.stereotype.Component;
  * belongs to the caller rather than to the application. Caching clients would mean keeping keys in
  * memory across requests and deciding when a changed setting takes effect, which is a cache to invent
  * once the same user asks often enough for the setup cost to matter.
+ *
+ * <h2>The Client Is Chosen, Not Discovered</h2>
+ * Both models are built with an HTTP client of this application's choosing rather than with the one
+ * the framework finds on the class path. That is what makes a stop reach the provider: stopping closes
+ * the body of the response, and only a client whose close abandons the exchange turns that into an
+ * abandoned request. The client the framework would find here wraps a library whose close first reads
+ * the rest of the message, which is the same as not stopping at all, and which is on this class path
+ * because reading web sources needs it.
  *
  * <h2>Two Branches, Three Providers</h2>
  * Both cloud providers speak the OpenAI protocol and differ only in the address, so they share a
@@ -48,6 +58,17 @@ public class ChatModelFactory {
     }
 
     /**
+     * Builds the HTTP client one answer is streamed over.
+     *
+     * @return a client whose response body can be abandoned rather than drained
+     */
+    private static HttpClientBuilder abortableClient() {
+        return new JdkHttpClientBuilder()
+                .connectTimeout(TIMEOUT)
+                .readTimeout(TIMEOUT);
+    }
+
+    /**
      * Builds a client for the model a caller selected.
      *
      * @param selection model to address, already validated
@@ -56,6 +77,7 @@ public class ChatModelFactory {
     public StreamingChatModel create(final ModelSelection selection) {
         return switch (selection.provider()) {
             case OPENAI, GROQ -> OpenAiStreamingChatModel.builder()
+                    .httpClientBuilder(abortableClient())
                     .baseUrl(selection.baseUrl())
                     .apiKey(selection.apiKey())
                     .modelName(selection.modelName())
@@ -63,6 +85,7 @@ public class ChatModelFactory {
                     .timeout(TIMEOUT)
                     .build();
             case OLLAMA -> OllamaStreamingChatModel.builder()
+                    .httpClientBuilder(abortableClient())
                     .baseUrl(selection.baseUrl())
                     .modelName(selection.modelName())
                     .temperature(TEMPERATURE)

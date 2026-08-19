@@ -38,6 +38,9 @@ export interface ChatSource {
  * A turn the backend refused because too many answers are already being generated is its own kind of
  * ending. It is not a failure of the question, so it is marked rather than described, and the sentence
  * the reader gets is written in their own language instead of taken from the response.
+ *
+ * A turn refused because the account has asked too often carries how long that lasts, in minutes, so
+ * that the reader is told when to come back instead of being invited to try again immediately.
  */
 export interface ChatMessage {
   key: string;
@@ -48,6 +51,7 @@ export interface ChatMessage {
   streaming?: boolean;
   failure?: string;
   limited?: boolean;
+  limitedForMinutes?: number;
 }
 
 /**

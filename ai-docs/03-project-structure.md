@@ -111,7 +111,8 @@ de.pfoertner.assessment.sumbooklm
 │   │                                            failures
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
 │                                                the turn context, the stream handler, the bound on
-│                                                answers in flight, the registry of running answers,
+│                                                answers in flight, the bound on how often an account
+│                                                asks, its settings, the registry of running answers,
 │                                                failures
 ├── ingestion
 │   ├── extraction                              file and web extractors, the address resolver every
@@ -335,17 +336,20 @@ deletion committed but whose cleanup did not (ADR-057).
 1. `POST /api/v1/notebooks/{id}/chats/{sessionId}/questions` carries the question in its body and the
    model in its headers.
    A permit is taken first, so an account that already has three answers being generated is refused
-   with `429` before anything is written (ADR-049). The selection is validated next, then the notebook
-   is touched, which resolves it for the account of the access token and locks its row (ADR-050), the
-   question is appended to the conversation of that notebook, and the transaction commits. Every
+   with `429` before anything is written (ADR-049), and the question is then counted against what the
+   account may ask within an hour, which is recorded in the database so that every instance sees the
+   same number and refused with `429` and `Retry-After` (ADR-058). The selection is validated next, and
+   the notebook is touched, which resolves it for the account of the access token and locks its row
+   (ADR-050), the question is appended to the conversation of that notebook, and the transaction commits. Every
    failure that can still be a status code has happened by now (ADR-037).
 2. The request returns an `SseEmitter`. Everything after this point runs on the chat executor.
 3. The retriever of that notebook embeds the question and reads the segments whose `notebookId`
    metadata matches, above the relevance floor (ADR-035). Their sources are named from the source
    table, numbered per document, and sent as the `sources` event.
-4. A client is built for the presented provider, and the model is asked with the rules, the numbered
-   passages, as many of the last messages of the conversation as fit under the character budget
-   (ADR-053), and the question. Each part it generates is written to the stream as a `token` event.
+4. A client is built for the presented provider, on the HTTP client of the platform so that stopping
+   can abandon the request rather than read it to its end (ADR-059), and the model is asked with the
+   rules, the numbered passages, as many of the last messages of the conversation as fit under the
+   character budget (ADR-053), and the question. Each part it generates is written to the stream as a `token` event.
 5. The finished answer is handed to the asynchronous recorder, which appends it under a lock on the
    session row, and is sent as the `done` event, after which the stream is closed. A failure at any
    point after step 2 becomes an `error` event instead, and the question stays in the transcript

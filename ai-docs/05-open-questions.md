@@ -374,38 +374,52 @@ behind it, so the list contains it. That is why the index asks for the sources r
 them; a caller that read the list itself would be reading it too early and nothing could tell. What it
 costs is question 42.
 
-## 34. The bound on answers is per instance and per moment
+## 34. Resolved: the bound that has to be shared is a second bound
 
-The permits live in the heap of one instance, so two instances behind a load balancer permit twice the
-limit. For a bound whose purpose is protecting the thread pool of the instance that took the request,
-that is correct: each pool is protected by its own count.
+The permits stay where they were, and for the reason the question gave: what they protect is the thread
+pool of the instance that took the request, so a count in that instance is the correct shape and two
+instances protecting their own pools is not a mistake.
 
-It stops being correct the moment the bound is meant to protect something shared, which is what a
-bound on spending would be. That needs the count somewhere both instances can see, and it needs to be
-a rate rather than a concurrency, because an account that asks one question at a time forever is
-bounded by nothing today.
+What was missing is the other kind of bound, and it was added rather than moved. The questions of an
+account are counted over the last hour in a table every instance writes to, so the count is shared
+because the database is. Nothing new had to be operated for it.
 
-## 35. Nothing bounds questions over time
+The two now say what they are for. One is a concurrency about this process, the other is a rate about
+the installation, and neither pretends to be the other. What the rate still does not know is what a
+question costs, which is question 43.
 
-Three answers at once is a bound on what an account occupies, not on what it asks. A client asking one
-question, waiting for it, and asking the next is inside the limit for as long as it likes.
+## 35. Resolved: an account may ask sixty times an hour
 
-That is deliberate, because what an answer costs is paid by the user with their own key, and the
-threads are already protected. It becomes a real question the moment something the operator pays for
-sits behind the same endpoint, at which point a rate limit belongs in front of the whole API rather
-than in the chat service.
+`sumbooklm.chat.questions-per-hour` bounds how often one account may ask, counted over a window that
+moves rather than one that resets, and the default is high enough that a person reading their sources
+will not meet it. A refusal is a `429` carrying `Retry-After`, so a client learns that this one lasts
+rather than passing in a moment.
 
-## 36. A stopped answer is still being generated somewhere
+The question said such a bound belongs in front of the whole API rather than in the chat service. It is
+in the chat service, and the reason is that only one endpoint has anything behind it worth bounding: a
+question embeds text, retrieves, writes a transcript and holds a connection open, while the rest of the
+API reads rows. A bound in front of everything would have to be told all of that anyway, and it would
+still be the wrong place to know how long an account has to wait.
 
-Stopping ends the answer for the reader and frees everything this application was holding for it. It
-does not reach the provider, because the client cannot abort a request: its cancellation closes the
-response body, and the HTTP stack drains a chunked body before closing it, which waits for the
-provider rather than stopping it.
+What a bound in front of the whole API is still needed for is question 13, which is about attempts to
+log in rather than about questions, and remains open.
 
-So the tokens for whatever is generated after the stop are still spent, and a thread reads them to the
-end. Closing it properly means aborting the exchange, which either the client has to offer or the
-application has to reach around it for, by holding the request itself rather than handing it to the
-model abstraction.
+## 36. Resolved: a stop abandons the request
+
+Stopping now closes the body of the response, which abandons the exchange: the socket is closed and the
+provider is writing to nobody. The handle that does it belongs to the response rather than to the client,
+so it is handed to the cancellation with the first part of the answer, and a stop that arrives before
+that is applied by the thread that hands it over.
+
+The reason it could not be done before was not the handle but the client underneath it. The one the
+framework detects here wraps Apache HttpClient, which is on the class path because reading web sources
+needs it, and whose close first reads the remainder of the message. Cancelling therefore held the stop
+request open for as long as the answer took. Both models are now built with the JDK client instead,
+whose close abandons rather than drains, and the flag stays as what the reading thread notices.
+
+How far that reaches is the provider's business. Closing the connection is the whole of what a client
+can do; whether the generation stops and what is charged for what was generated differs between
+providers and is question 45.
 
 ## 37. Listing conversations decodes every transcript
 
@@ -470,3 +484,34 @@ and has the same answer available: work through it a notebook at a time.
 
 It is left as one pass because it runs hourly and holds the lock for a single statement, and because
 splitting it by notebook would mean the pass no longer sees a segment whose notebook is gone as well.
+
+## 43. The rate counts questions, not what they cost
+
+A question that produces four thousand tokens and one that produces twenty count the same, so the bound
+is a bound on how often somebody asks rather than on what asking costs. Where the keys belong to the
+users that is the honest unit, because the cost is not this application's to count.
+
+It stops being the right unit the moment an operator pays for anything behind the endpoint. What is then
+wanted is a bound on spending, and the number that would feed it arrives after the answer, in what the
+provider reports. Counting it means storing what each answer used and turning the bound from a decision
+made before a question into one made from what the previous ones cost.
+
+## 44. Nothing bounds the cheap endpoints
+
+The bound is on questions, which is where the expensive work is. Listing notebooks, reading transcripts
+and refreshing tokens are bounded by nothing at all, and a client that asks for them in a loop is
+answered as fast as the database can.
+
+That is deliberate for now: each of those is a query, and the first thing to run out would be the
+connection pool rather than a provider or a bill. A bound in front of the whole API is the answer, and
+it is the same answer question 13 has been waiting for, so the two belong together.
+
+## 45. A stopped answer may still cost what it already generated
+
+Closing the connection is how far a client can reach. Whether the provider notices at once, whether it
+stops generating, and what it charges for what it generated before it noticed are its own behaviour, and
+they differ between providers.
+
+Reporting that honestly to a reader would mean knowing what each provider does, which is a table this
+application would have to keep current. What it says instead is what it knows: the answer stopped, and
+what arrived is kept.

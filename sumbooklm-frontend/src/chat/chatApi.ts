@@ -13,16 +13,36 @@ import {
  * Raised when the backend rejects a chat request before an answer is streamed.
  *
  * The status is kept so that a view can tell a rejected configuration from a Sumbook that is gone,
- * without parsing a message.
+ * without parsing a message. A refusal that lasts a known time also carries how long that is, which is
+ * what separates the two reasons a question can be refused: being busy with one's own answers passes
+ * within seconds, having asked too often does not.
  */
 export class ChatRequestError extends Error {
   readonly status: number;
 
-  constructor(status: number, detail?: string) {
+  readonly retryAfterSeconds?: number;
+
+  constructor(status: number, detail?: string, retryAfterSeconds?: number) {
     super(detail && detail !== '' ? detail : `The chat request failed with status ${status}`);
     this.name = 'ChatRequestError';
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+/**
+ * Reads how long a refusal lasts, in seconds, from the header the backend states it in.
+ *
+ * A value that is not a number of seconds is treated as absent rather than as zero, because a date is
+ * also a legal value of that header and this application never sends one.
+ */
+function retryAfterOf(response: Response): number | undefined {
+  const header = response.headers.get('Retry-After');
+  if (header === null) {
+    return undefined;
+  }
+  const seconds = Number.parseInt(header, 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
 /**
@@ -232,7 +252,7 @@ export async function streamAnswer(
   });
 
   if (!response.ok || !response.body) {
-    throw new ChatRequestError(response.status, await detailOf(response));
+    throw new ChatRequestError(response.status, await detailOf(response), retryAfterOf(response));
   }
 
   const reader = response.body.getReader();

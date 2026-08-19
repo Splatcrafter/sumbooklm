@@ -150,6 +150,8 @@
       "thinking": "Deine Quellen werden gelesen ...",
       "failed": "Die Antwort konnte nicht erzeugt werden.",
       "tooMany": "Es werden gerade zu viele Antworten gleichzeitig geschrieben. Frage erneut, sobald eine davon da ist.",
+      "tooOften_one": "Du hast für den Moment so viele Fragen gestellt, wie diese Installation erlaubt. Frage in etwa einer Minute erneut.",
+      "tooOften_other": "Du hast für den Moment so viele Fragen gestellt, wie diese Installation erlaubt. Frage in etwa {{count}} Minuten erneut.",
       "noModel": "Es ist noch kein Modell eingerichtet, daher können Fragen nicht beantwortet werden.",
       "chooseModel": "Modell wählen",
       "historyFailed": "Das Gespräch konnte nicht geladen werden.",

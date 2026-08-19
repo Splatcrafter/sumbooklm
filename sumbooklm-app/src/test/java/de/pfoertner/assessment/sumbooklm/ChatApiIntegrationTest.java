@@ -15,6 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.net.httpserver.HttpServer;
@@ -98,6 +99,17 @@ class ChatApiIntegrationTest {
      * connection immediately, so a failing answer costs no waiting.
      */
     private static final String UNREACHABLE_PROVIDER = "http://127.0.0.1:9";
+
+    /**
+     * Longest a stop may take. A stop that waited for the provider would take as long as the answer,
+     * so the value only has to be far below that and far above a request to this machine.
+     */
+    private static final Duration STOP_TIMEOUT = Duration.ofSeconds(10);
+
+    /**
+     * Longest a test waits for the provider to notice that its answer is no longer being read.
+     */
+    private static final Duration CUT_OFF_TIMEOUT = Duration.ofSeconds(15);
 
     /**
      * Text uploaded into the notebook the questions are asked in.
@@ -465,8 +477,9 @@ class ChatApiIntegrationTest {
     }
 
     /**
-     * Verifies that an answer can be stopped, that what was generated before is kept rather than
-     * discarded, and that the stream ends as finished rather than as failed.
+     * Verifies that an answer can be stopped, that stopping does not wait for the provider, that the
+     * request to the provider is abandoned rather than read to its end, that what was generated before
+     * is kept rather than discarded, and that the stream ends as finished rather than as failed.
      *
      * @throws Exception if the provider cannot be started or the waiting is interrupted
      */
@@ -478,7 +491,8 @@ class ChatApiIntegrationTest {
 
         final CountDownLatch release = new CountDownLatch(1);
         final AtomicInteger arrived = new AtomicInteger();
-        final HttpServer provider = writingProvider(arrived, release);
+        final AtomicBoolean cutOff = new AtomicBoolean();
+        final HttpServer provider = writingProvider(arrived, release, cutOff);
         final String address = "http://127.0.0.1:" + provider.getAddress().getPort();
         final ExecutorService asker = Executors.newSingleThreadExecutor();
         try {
@@ -488,7 +502,15 @@ class ChatApiIntegrationTest {
             awaitArrival(arrived, 1);
             Thread.sleep(Duration.ofMillis(500));
 
+            final Instant asked = Instant.now();
             assertThat(stopAnswer(accessToken, notebookId, sessionId)).isEqualTo(HttpStatus.NO_CONTENT);
+            assertThat(Duration.between(asked, Instant.now()))
+                    .describedAs("stopping must not wait for the provider to finish the answer")
+                    .isLessThan(STOP_TIMEOUT);
+
+            assertThat(awaitCutOff(cutOff))
+                    .describedAs("the request to the provider has to be abandoned, not merely ignored")
+                    .isTrue();
 
             final ResponseEntity<String> stopped = answering.get(1, TimeUnit.MINUTES);
             assertThat(eventNames(stopped)).endsWith("done");
@@ -521,6 +543,21 @@ class ChatApiIntegrationTest {
     }
 
     /**
+     * Waits for a provider to notice that nobody is reading what it writes.
+     *
+     * @param cutOff flag the provider raises when writing fails
+     * @return {@code true} if the provider noticed within the time a stop is given
+     * @throws InterruptedException if the waiting is interrupted
+     */
+    private static boolean awaitCutOff(final AtomicBoolean cutOff) throws InterruptedException {
+        final Instant deadline = Instant.now().plus(CUT_OFF_TIMEOUT);
+        while (!cutOff.get() && Instant.now().isBefore(deadline)) {
+            Thread.sleep(Duration.ofMillis(50));
+        }
+        return cutOff.get();
+    }
+
+    /**
      * Asks for the answer of a conversation to stop.
      *
      * @param accessToken access token to present
@@ -544,10 +581,13 @@ class ChatApiIntegrationTest {
      *
      * @param arrived counter raised as each request reaches the provider
      * @param release latch the provider stops writing at
+     * @param cutOff  flag raised when writing fails because the client abandoned the request
      * @return the started provider
      * @throws java.io.IOException if the provider cannot be started
      */
-    private static HttpServer writingProvider(final AtomicInteger arrived, final CountDownLatch release)
+    private static HttpServer writingProvider(final AtomicInteger arrived,
+                                              final CountDownLatch release,
+                                              final AtomicBoolean cutOff)
             throws java.io.IOException {
         final HttpServer provider =
                 HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -567,8 +607,9 @@ class ChatApiIntegrationTest {
             } catch (final InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (final java.io.IOException e) {
-                // The client stopped reading, which is what the case asserts. Writing the rest of an
-                // answer nobody is waiting for is not part of it.
+                // The client abandoned the request, which is what the case asserts. Writing the rest
+                // of an answer nobody is waiting for is not part of it.
+                cutOff.set(true);
             }
             exchange.close();
         });

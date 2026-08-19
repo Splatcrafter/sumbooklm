@@ -47,10 +47,13 @@ import org.springframework.stereotype.Service;
  * A stopped answer ends as complete rather than as failed, carrying what was generated: the reader
  * has already read it, and it was already paid for.
  *
- * <h2>How Many at Once</h2>
- * A permit is taken before the question is stored and returned when the answer ends, so an account
- * that already has as many answers in flight as it may have is refused before anything is written.
- * Taking it first is what keeps a refused question out of the transcript.
+ * <h2>How Many at Once, and How Often</h2>
+ * Two bounds are checked before a question is stored, and they answer different questions. A permit
+ * says whether this account has room for another answer right now, and it is held in this instance
+ * because what it protects is the pool of this instance. A recorded question says whether the account
+ * has asked as often as it may within the hour, and it is counted in the database because what it
+ * protects belongs to the installation rather than to one process. Both are checked before anything is
+ * written, which is what keeps a refused question out of the transcript.
  *
  * <h2>Asking Anyway</h2>
  * A question that retrieves nothing still reaches the model. The refusal then arrives in the language
@@ -105,6 +108,11 @@ public class NotebookChatService {
     private final ConcurrentAnswerLimit concurrentAnswerLimit;
 
     /**
+     * Bound on how often one account may ask.
+     */
+    private final QuestionRateLimit questionRateLimit;
+
+    /**
      * Registry of the answers being generated, so that one of them can be stopped.
      */
     private final RunningAnswers runningAnswers;
@@ -118,6 +126,7 @@ public class NotebookChatService {
      * @param groundedChatEngine     engine that generates an answer from the retrieved passages
      * @param chatTranscriptRecorder writer of the finished answer
      * @param concurrentAnswerLimit  bound on how many answers one account may have in flight
+     * @param questionRateLimit      bound on how often one account may ask
      * @param runningAnswers         registry of the answers being generated
      */
     public NotebookChatService(final ChatSessionService chatSessionService,
@@ -126,6 +135,7 @@ public class NotebookChatService {
                                final GroundedChatEngine groundedChatEngine,
                                final ChatTranscriptRecorder chatTranscriptRecorder,
                                final ConcurrentAnswerLimit concurrentAnswerLimit,
+                               final QuestionRateLimit questionRateLimit,
                                final RunningAnswers runningAnswers) {
         this.chatSessionService = chatSessionService;
         this.sourceDocumentService = sourceDocumentService;
@@ -133,6 +143,7 @@ public class NotebookChatService {
         this.groundedChatEngine = groundedChatEngine;
         this.chatTranscriptRecorder = chatTranscriptRecorder;
         this.concurrentAnswerLimit = concurrentAnswerLimit;
+        this.questionRateLimit = questionRateLimit;
         this.runningAnswers = runningAnswers;
     }
 
@@ -211,6 +222,8 @@ public class NotebookChatService {
      * @throws ChatSessionNotFoundException if that notebook holds no such conversation
      * @throws TooManyQuestionsException    if the account already has as many answers in flight as it
      *                                      may have
+     * @throws QuestionsTooOftenException   if the account has asked as many questions within the hour
+     *                                      as it may ask
      */
     public ChatTurnContext beginTurn(final UUID userId,
                                      final UUID notebookId,
@@ -220,6 +233,7 @@ public class NotebookChatService {
             throw new TooManyQuestionsException(userId);
         }
         try {
+            this.questionRateLimit.record(userId);
             return this.chatSessionService.beginTurn(userId, notebookId, sessionId, question);
         } catch (final RuntimeException e) {
             this.concurrentAnswerLimit.release(userId);

@@ -1121,3 +1121,66 @@ cannot find an orphan; they accumulate while the application runs.
 **Cost.** Indexing waits for one query per pass, and the pass reads every source identifier there is into
 memory. Both are bounded by the size of the library rather than by a page, which is the same shape as the
 rebuild and is recorded with it.
+
+## ADR-058: Two bounds on asking, one per instance and one in the database
+
+**Decision.** The bound on answers in flight stays where it was, in the heap of the instance that took
+the request. A second bound counts the questions of an account over the last hour in a table of its own,
+which every instance writes to. It is configured as `sumbooklm.chat.questions-per-hour`, it is checked
+before anything is stored, and the refusal carries `Retry-After`.
+
+**Reason.** The two protect different things and therefore belong in different places. What an answer
+occupies while it is generated is a thread of one pool, and a pool is protected by a count in the
+process that owns it. What an account asks for over a day is not about any one process: it is what the
+installation serves, and two instances that each permit their own share of it permit twice as much of
+something there is only one of.
+
+A concurrency says nothing about a rate. An account that asks one question, waits for it and asks the
+next is inside the first bound for as long as it likes, which is exactly the shape of a client that was
+left running. The second bound is the one that ends that, and it has to be a rate for the same reason.
+
+The database is the shared count because it is already shared. A store of its own would be a second
+thing to operate and to fail, and what it would buy is a counter faster than the transcript write that
+happens in the same request.
+
+A question is recorded before it is stored, so a turn that fails after that point has still been
+counted. That is the safe direction: a bound that only counted what was stored successfully could be
+avoided by asking in a way that fails late.
+
+`Retry-After` is on this refusal and not on the other one. Being busy with one's own answers passes
+sooner than any number this application could name; having asked too often passes at a moment it knows
+exactly, and a client that cannot tell the two apart would retry immediately against a bound that will
+refuse it for the next hour.
+
+**Cost.** Two questions of one account can read the same count and both be admitted, so the limit can be
+exceeded by as many questions as that account may have in flight. Serialising it would mean locking the
+account for every question, which is a cost everybody pays to make a bound exact that is approximate by
+nature. And it counts questions rather than what they cost, which is the bound an operator who pays for
+the tokens actually wants.
+
+## ADR-059: The chat client is chosen so that a stop can abandon the request
+
+**Decision.** Both providers are addressed through the JDK HTTP client rather than through the one the
+framework finds on the class path. The handle that belongs to the response is handed to the cancellation
+with the first part of the answer, and stopping closes the body through it.
+
+**Reason.** This reverses the cost recorded in ADR-052, and it reverses it by removing its cause rather
+than by accepting more of it. Stopping closes the body of the response. What that costs depends on the
+client underneath: the one the framework detects here wraps Apache HttpClient, whose close first reads
+the remainder of the message, so cancelling from the thread that asked for the stop held that request
+open for as long as the answer took. That is why the earlier design recorded the stop as a flag and let
+the reader discard what kept arriving.
+
+Choosing the client makes the same handle safe. The JDK client abandons the exchange when its body is
+closed, so the close returns at once, the socket is closed, and the provider is writing to nobody. The
+detected client is only detected because reading web sources put Apache HttpClient on this class path,
+which is a good reason for that module and no reason at all for this one.
+
+The flag stays as well. It is what the reading thread notices, so that nothing more reaches the reader
+and the run ends with what arrived, and it is what makes a stop that arrives before the first part still
+apply once the response exists.
+
+**Cost.** Closing the connection is how far this application can reach. Whether the provider then stops
+generating, and what it charges for what it generated, is the provider's business and differs between
+them. What is certain is only that nothing is being read and nothing more is being paid for on this
+side.

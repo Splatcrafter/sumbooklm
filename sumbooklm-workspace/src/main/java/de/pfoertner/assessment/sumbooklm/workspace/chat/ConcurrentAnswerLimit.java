@@ -25,7 +25,12 @@ import org.springframework.stereotype.Component;
  * <h2>In This Process Only</h2>
  * The count lives in the heap of one instance. Two instances behind a load balancer therefore permit
  * twice the limit, which is the correct shape for a bound on threads: what is being protected is the
- * pool of the instance that took the request.
+ * pool of the instance that took the request, and each pool is protected by its own count.
+ *
+ * <h2>Not the Bound on Spending</h2>
+ * This one says nothing about how often an account asks. An account that asks one question, waits for
+ * it and asks the next is inside this limit for as long as it likes, which is why there is a second
+ * bound that is a rate and is counted where every instance sees it; see {@link QuestionRateLimit}.
  *
  * @author Erik Pförtner
  * @since 0.1.0

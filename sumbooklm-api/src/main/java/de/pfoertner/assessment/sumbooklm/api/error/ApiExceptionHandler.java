@@ -5,13 +5,16 @@ import de.pfoertner.assessment.sumbooklm.security.authentication.InvalidCredenti
 import de.pfoertner.assessment.sumbooklm.security.authentication.UsernameAlreadyTakenException;
 import de.pfoertner.assessment.sumbooklm.security.token.InvalidRefreshTokenException;
 import de.pfoertner.assessment.sumbooklm.workspace.chat.ChatSessionNotFoundException;
+import de.pfoertner.assessment.sumbooklm.workspace.chat.QuestionsTooOftenException;
 import de.pfoertner.assessment.sumbooklm.workspace.chat.TooManyQuestionsException;
 import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.DuplicateSourceException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.EmptyUploadException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.SourceNotFoundException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -29,6 +32,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * A notebook or a source that belongs to another account is reported as missing rather than as
  * forbidden. The distinction would tell a caller that a row with that identifier exists, which is
  * information the caller is not entitled to.
+ *
+ * <h2>Two Kinds of Too Many</h2>
+ * An account can be refused because it is busy with its own answers and because it has asked often
+ * enough for a while. Both are {@code 429}, and only the second carries {@code Retry-After}: the first
+ * passes as soon as one of the answers arrives, which is sooner than any number this application could
+ * name, and the second passes at a moment it knows exactly.
  *
  * <h2>Wording of Authentication Failures</h2>
  * Both rejected credentials and rejected refresh tokens answer with the same generic detail. A more
@@ -175,6 +184,23 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 "This account already has as many answers being generated as it may have");
         problem.setTitle("Too many questions at once");
         return problem;
+    }
+
+    /**
+     * Reports an account that has asked as many questions within the hour as it may ask.
+     *
+     * @param exception failure raised by the workspace module
+     * @return a problem detail with status {@code 429} and the time until the account may ask again
+     */
+    @ExceptionHandler(QuestionsTooOftenException.class)
+    public ResponseEntity<ProblemDetail> handleQuestionsTooOften(final QuestionsTooOftenException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
+                "This account has asked as many questions as it may ask within an hour");
+        problem.setTitle("Too many questions in an hour");
+        final long seconds = Math.max(1, exception.retryAfter().toSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(seconds))
+                .body(problem);
     }
 
     /**

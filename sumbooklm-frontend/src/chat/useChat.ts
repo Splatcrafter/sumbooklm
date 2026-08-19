@@ -210,10 +210,13 @@ export function useChat(notebookId: string): ChatValue {
       } catch (error) {
         if (!controller.signal.aborted) {
           const limited = error instanceof ChatRequestError && error.status === 429;
+          const retryAfterSeconds = error instanceof ChatRequestError ? error.retryAfterSeconds : undefined;
           update(answerKey, (message) => ({
             ...message,
             streaming: false,
             limited,
+            limitedForMinutes:
+              limited && retryAfterSeconds !== undefined ? Math.ceil(retryAfterSeconds / 60) : undefined,
             failure: limited ? undefined : error instanceof ChatRequestError ? error.message : '',
           }));
         }

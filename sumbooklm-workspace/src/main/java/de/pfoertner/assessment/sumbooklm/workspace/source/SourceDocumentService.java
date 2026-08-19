@@ -16,6 +16,7 @@ import de.pfoertner.assessment.sumbooklm.persistence.document.DocumentPayload;
 import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentEntity;
 import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentMapper;
 import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentRepository;
+import de.pfoertner.assessment.sumbooklm.persistence.document.SourceReference;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookEntity;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
@@ -36,6 +37,12 @@ import org.springframework.transaction.annotation.Transactional;
  * Adding a source stores it, marks it as uploaded and answers. The work that makes it searchable is
  * announced as an event and performed once the storing transaction has committed, because a listener
  * that started earlier would look for a row that is not visible yet.
+ *
+ * <h2>Indexing Again</h2>
+ * A source can be sent through the pipeline more than once, and the request looks exactly like the
+ * one that follows adding it: the stage goes back to uploaded and the same event is published. That
+ * is what lets a failed source be retried and what lets the whole index be rebuilt, and it is also
+ * what makes the interface show the source moving again rather than appearing to do nothing.
  *
  * <h2>Stage Transitions</h2>
  * The three methods that move a source between stages are short transactions of their own rather
@@ -207,6 +214,42 @@ public class SourceDocumentService {
     }
 
     /**
+     * Sends a source through the indexing pipeline again.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook the source belongs to
+     * @param sourceId   identifier of the source to index again
+     * @return the source as it now is, waiting to be indexed
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     * @throws SourceNotFoundException   if that notebook holds no source with that identifier
+     */
+    @Transactional
+    public SourceDocument requestIndexing(final UUID userId, final UUID notebookId, final UUID sourceId) {
+        requireNotebook(userId, notebookId);
+        final SourceDocumentEntity entity = requireSource(userId, notebookId, sourceId);
+        final DocumentPayload payload =
+                this.sourceDocumentMapper.readPayload(entity).withStatus(DocumentStatus.UPLOADED);
+        store(entity, payload);
+
+        this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, sourceId));
+        return this.sourceDocumentMapper.toDomain(entity, payload);
+    }
+
+    /**
+     * Reads the identity of every source there is, across all accounts.
+     *
+     * <p>The result is not scoped to an account, unlike everything else this service offers. It
+     * serves the rebuild of the retrieval index, which belongs to the process rather than to a user,
+     * and which therefore has to see every source there is.
+     *
+     * @return one entry per stored source, in the order the sources were added
+     */
+    @Transactional(readOnly = true)
+    public List<SourceReference> references() {
+        return this.sourceDocumentRepository.findAllReferences();
+    }
+
+    /**
      * Marks a source as being indexed and reads what the run needs.
      *
      * @param userId   identifier of the account the source belongs to
@@ -220,25 +263,29 @@ public class SourceDocumentService {
         final DocumentPayload payload = this.sourceDocumentMapper.readPayload(entity);
         store(entity, payload.withStatus(DocumentStatus.INDEXING));
         return new IngestionInput(entity.getNotebookId(), payload.kind(), payload.origin(),
-                payload.displayName(), entity.getContent());
+                payload.displayName(), entity.getContent(), entity.getExtractedText());
     }
 
     /**
      * Marks a source as indexed and records what the run produced.
      *
-     * @param userId      identifier of the account the source belongs to
-     * @param sourceId    identifier of the indexed source
-     * @param displayName name the source is listed under from now on
-     * @param tokenCount  number of tokens the indexed text was counted as
+     * @param userId        identifier of the account the source belongs to
+     * @param sourceId      identifier of the indexed source
+     * @param displayName   name the source is listed under from now on
+     * @param tokenCount    number of tokens the indexed text was counted as
+     * @param extractedText text the run read out of the source, kept so that a later run can index it
+     *                      again without reading the source a second time
      * @throws SourceNotFoundException if the account holds no source with that identifier
      */
     @Transactional
     public void completeIndexing(final UUID userId,
                                  final UUID sourceId,
                                  final String displayName,
-                                 final int tokenCount) {
+                                 final int tokenCount,
+                                 final String extractedText) {
         final SourceDocumentEntity entity = requireSource(userId, sourceId);
         final DocumentPayload payload = this.sourceDocumentMapper.readPayload(entity);
+        entity.setExtractedText(extractedText);
         store(entity, payload.withIndexingResult(displayName, tokenCount));
     }
 
@@ -285,7 +332,7 @@ public class SourceDocumentService {
         final SourceDocumentEntity stored = this.sourceDocumentRepository.save(entity);
         notebook.setLastActivityAt(now);
 
-        this.eventPublisher.publishEvent(new SourceAddedEvent(userId, stored.getId()));
+        this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, stored.getId()));
         return this.sourceDocumentMapper.toDomain(stored, payload);
     }
 

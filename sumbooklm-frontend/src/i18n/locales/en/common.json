@@ -100,6 +100,7 @@
       "loading": "Loading sources...",
       "empty": "No sources yet. Add a document or a web page to ground this Sumbook in.",
       "remove": "Remove {{name}}",
+      "reindex": "Read {{name}} again",
       "kind": {
         "file": "Uploaded file",
         "web": "Web page"

@@ -14,7 +14,7 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 
-State as of 2026-08-19: build green across ten modules, 45 tests, and the JavaDoc gate active
+State as of 2026-08-19: build green across ten modules, 49 tests, and the JavaDoc gate active
 everywhere. The scaffold is complete and four feature areas are implemented.
 
 Authentication: registration, login, token rotation, logout, the weekly cleanup of invalidated
@@ -28,8 +28,11 @@ dashboard that lists, creates, renames, pins and removes them.
 Ingestion: uploads and web addresses added below `/api/v1/notebooks/{id}/sources`, stored and
 answered immediately, then parsed with Apache Tika or jsoup, cut into overlapping segments and
 embedded in process into a shared vector store where every segment carries its notebook and its
-source. The Sumbook view shows the sources with the stage each has reached, the conversation held
-about them, and the studio that will be generated from them.
+source. The text a source was read as is stored with it, so indexing it again needs neither the parser
+nor the network, and every source is indexed again once the application starts, because the vector
+store does not survive the process while the sources do. The Sumbook view shows the sources with the
+stage each has reached, a retry on the ones that could not be read, the conversation held about them,
+and the studio that will be generated from them.
 
 Chat: `POST /api/v1/notebooks/{id}/chat` answers as a stream of server sent events, from passages
 retrieved under a metadata filter on that notebook alone, under instructions that permit no other

@@ -22,9 +22,16 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Turns a stored source into segments the retrieval index can answer from.
  *
  * <h2>When It Runs</h2>
- * The run starts after the transaction that stored the source has committed, and it runs on its own
+ * A run starts after the transaction that requested it has committed, and it runs on its own
  * executor. Both matter: before the commit the row would not be visible, and on the request thread
  * the user would wait for a neural network to finish before learning that their upload arrived.
+ *
+ * <h2>Reading Once</h2>
+ * A source that was read successfully before is not read again. The text of that reading is stored
+ * with the source, and a run that finds it there goes straight to splitting and embedding, which is
+ * what lets the whole index be rebuilt without a parser and without reaching a single foreign host.
+ * Only a source that has never been read successfully is read, which is also what makes a repeated
+ * run of a failed source a retry rather than a repetition.
  *
  * <h2>Order of Work</h2>
  * The source is marked as being indexed, its text is extracted, the text is cut into segments, the
@@ -101,13 +108,13 @@ public class SourceIngestionPipeline {
     }
 
     /**
-     * Indexes a source that was just added.
+     * Indexes a source whose indexing was requested.
      *
-     * @param event announcement of the stored source
+     * @param event announcement of the source waiting to be indexed
      */
     @Async(INGESTION_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onSourceAdded(final SourceAddedEvent event) {
+    public void onIndexRequested(final SourceIndexRequestedEvent event) {
         index(event.userId(), event.sourceId());
     }
 
@@ -116,29 +123,49 @@ public class SourceIngestionPipeline {
      *
      * @param userId   identifier of the account the source belongs to
      * @param sourceId identifier of the source to index
+     * @return {@code true} if the source is now part of the retrieval index, {@code false} if it was
+     *         removed in the meantime or could not be read
      */
-    private void index(final UUID userId, final UUID sourceId) {
+    public boolean index(final UUID userId, final UUID sourceId) {
         final IngestionInput input;
         try {
             input = this.sourceDocumentService.beginIndexing(userId, sourceId);
         } catch (final SourceNotFoundException e) {
             LOG.debug("Source {} was removed before it could be indexed", sourceId);
-            return;
+            return false;
         }
 
         try {
-            final ExtractedContent content = extract(input);
+            final ExtractedContent content = read(input);
             final List<TextSegment> segments = this.textChunker.chunk(content.text());
             final int tokenCount = this.notebookIndex.index(input.notebookId(), sourceId, segments);
             this.sourceDocumentService.completeIndexing(
-                    userId, sourceId, displayName(input, content), tokenCount);
+                    userId, sourceId, displayName(input, content), tokenCount, content.text());
             LOG.debug("Indexed source {} as {} segments and {} tokens", sourceId, segments.size(), tokenCount);
+            return true;
         } catch (final SourceNotFoundException e) {
             LOG.debug("Source {} was removed while it was being indexed", sourceId);
+            return false;
         } catch (final RuntimeException e) {
             LOG.warn("Indexing source {} failed", sourceId, e);
             recordFailure(userId, sourceId);
+            return false;
         }
+    }
+
+    /**
+     * Returns the text of a source, reading it only if no earlier run already did.
+     *
+     * @param input values the run works with
+     * @return the text and, for a source that had to be read, the title its content carries
+     * @throws TextExtractionException if the source has to be read and cannot be
+     */
+    private ExtractedContent read(final IngestionInput input) {
+        final String stored = input.extractedText();
+        if (stored != null && !stored.isBlank()) {
+            return new ExtractedContent("", stored);
+        }
+        return extract(input);
     }
 
     /**

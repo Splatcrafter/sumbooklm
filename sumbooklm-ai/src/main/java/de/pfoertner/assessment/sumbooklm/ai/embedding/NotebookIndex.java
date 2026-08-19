@@ -29,6 +29,11 @@ import org.springframework.stereotype.Component;
  * that notebook, so a question asked in one notebook cannot reach a segment of another even though
  * both live in the same store.
  *
+ * <h2>Writing Replaces</h2>
+ * Indexing a source removes whatever was stored for it before. A source is indexed more than once,
+ * on request and whenever the store has to be rebuilt, and appending instead would leave every
+ * paragraph in the index as many times as the source was read.
+ *
  * <h2>Token Count</h2>
  * The count returned by indexing is what the model itself reported for the text it embedded, not an
  * estimate made next to it. It therefore describes the text that actually entered the index,
@@ -79,7 +84,8 @@ public class NotebookIndex {
     }
 
     /**
-     * Embeds the segments of one source and stores them under that source and its notebook.
+     * Embeds the segments of one source and stores them under that source and its notebook,
+     * replacing whatever was stored for that source before.
      *
      * @param notebookId       identifier of the notebook the segments belong to
      * @param sourceDocumentId identifier of the source the segments were extracted from
@@ -87,6 +93,7 @@ public class NotebookIndex {
      * @return number of tokens the model counted for the embedded text, zero for no segments
      */
     public int index(final UUID notebookId, final UUID sourceDocumentId, final List<TextSegment> segments) {
+        removeSource(sourceDocumentId);
         if (segments.isEmpty()) {
             return 0;
         }

@@ -89,7 +89,8 @@ de.pfoertner.assessment.sumbooklm
 │   ├── payload                                 PayloadTypes, PayloadCodec, PayloadDataFixerBootstrap
 │   ├── user                                    entity, repository, payload record and codec, mapper
 │   ├── notebook                                entity, repository, payload record and codec, mapper
-│   ├── document                                entity, repository, payload record and codec, count projection
+│   ├── document                                entity, repository, payload record and codec, the count
+│   │                                            and reference projections
 │   ├── chat                                    entity, repository, session and message payloads, mapper
 │   └── token                                   refresh token entity and repository
 ├── security
@@ -100,8 +101,8 @@ de.pfoertner.assessment.sumbooklm
 │   └── access                                  SensitiveOperation and its aspect
 ├── workspace
 │   ├── notebook                                NotebookService, update command, failure
-│   ├── source                                  SourceDocumentService, the pipeline, its event,
-│   │                                            fingerprints and failures
+│   ├── source                                  SourceDocumentService, the pipeline, its event, the
+│   │                                            startup rebuild, fingerprints and failures
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
 │                                                the turn context, the stream handler, failures
 ├── ingestion
@@ -120,7 +121,8 @@ de.pfoertner.assessment.sumbooklm
     └── v1
         ├── auth                                controller and payloads of the token lifecycle
         ├── notebook                            controller and payloads of notebook management
-        ├── source                              controller and payloads of source management
+        ├── source                              controller and payloads of source management,
+        │                                        including indexing a stored source again
         ├── chat                                controller, BYOK headers, stream events, SSE writer
         └── security                            cookie parameter endpoint and its payload
 ```
@@ -255,6 +257,26 @@ The relation that makes step 7 possible: an access token carries the identifier 
 it was issued with in its `sid` claim, so any operation can ask whether its session is still open
 even though the access token itself is verified by signature alone.
 
+## Indexing a source
+
+1. Adding a source stores it as `UPLOADED` and publishes an event that is delivered after the storing
+   transaction commits, on the indexing executor. `POST .../sources/{id}/reindex` puts an existing
+   source back in the same state and publishes the same event.
+2. The run marks the source `INDEXING` and reads what it needs in one short transaction, including
+   the text an earlier run extracted.
+3. If that text is there it is used as it is. If it is not, the source is read: Apache Tika for the
+   stored bytes of an upload, jsoup for the address of a page. A source is therefore read exactly once
+   for as long as reading it succeeded (ADR-041).
+4. The text is cut into overlapping segments, and `NotebookIndex` embeds them under the notebook and
+   the source, replacing whatever was stored for that source before (ADR-043).
+5. The run stores the token count the model reported, the extracted text, and the stage `READY`, or
+   `ERROR` if anything above threw.
+
+Once the application is ready, `IndexRestoreJob` puts every source of every account through that
+sequence again, because the store it writes to did not survive the process while the sources did
+(ADR-042). Steps 3 and 5 are what make that affordable and what turn it into a retry for the sources
+that never succeeded.
+
 ## Answering a question
 
 1. `POST /api/v1/notebooks/{id}/chat` carries the question in its body and the model in its headers.
@@ -292,7 +314,8 @@ token is usable), `issued_to_ip`.
 `record_version`. Title, pin state and topic icon live in `payload`.
 
 `source_document` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
-`content` (the uploaded bytes, null for a web source, see ADR-032), `payload`, `payload_version`,
+`content` (the uploaded bytes, null for a web source, see ADR-032), `extracted_text` (the text the last
+successful run read, null while there was none, see ADR-041), `payload`, `payload_version`,
 `record_version`. Name, kind, origin, stage, token count and content hash live in `payload`.
 
 `chat_session` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,

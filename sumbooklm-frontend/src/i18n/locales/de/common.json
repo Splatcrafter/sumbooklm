@@ -100,6 +100,7 @@
       "loading": "Quellen werden geladen ...",
       "empty": "Noch keine Quellen. Füge ein Dokument oder eine Webseite hinzu, auf die sich dieses Sumbook stützt.",
       "remove": "{{name}} entfernen",
+      "reindex": "{{name}} erneut einlesen",
       "kind": {
         "file": "Hochgeladene Datei",
         "web": "Webseite"

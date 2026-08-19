@@ -10,6 +10,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.hibernate.Length;
 
 /**
  * Relational row of a source document.
@@ -25,6 +26,11 @@ import jakarta.persistence.Version;
  * without asking the user to upload it a second time. A source that names a web page leaves the
  * column empty: its content lives at its address, and a copy taken at upload time would silently
  * become a different document than the one the address resolves to.
+ *
+ * <h2>Extracted Text</h2>
+ * {@code extracted_text} holds the text the last successful run read out of the source, whatever the
+ * source was. It is what the stored segments were produced from, so rebuilding them needs neither the
+ * parser nor the network, and it stays empty for a source that has never been read successfully.
  *
  * <h2>Two Identifier Columns</h2>
  * The owner is carried next to the notebook instead of being reached through it. A source is always
@@ -73,6 +79,16 @@ public class SourceDocumentEntity {
     @Lob
     @Column(name = "content")
     private byte[] content;
+
+    /**
+     * Text the last successful run extracted from the source, or {@code null} while there was none.
+     *
+     * <p>The column is declared with the greatest length the provider offers, which is what makes it
+     * choose an unbounded text type rather than the large object type a length free declaration would
+     * select.
+     */
+    @Column(name = "extracted_text", length = Length.LONG32)
+    private String extractedText;
 
     /**
      * CBOR encoded payload of the source.
@@ -169,6 +185,24 @@ public class SourceDocumentEntity {
      */
     public byte[] getContent() {
         return this.content;
+    }
+
+    /**
+     * Returns the text the last successful run extracted from the source.
+     *
+     * @return the extracted text, or {@code null} if the source has never been read successfully
+     */
+    public String getExtractedText() {
+        return this.extractedText;
+    }
+
+    /**
+     * Replaces the text the last successful run extracted from the source.
+     *
+     * @param extractedText text that was extracted
+     */
+    public void setExtractedText(final String extractedText) {
+        this.extractedText = extractedText;
     }
 
     /**

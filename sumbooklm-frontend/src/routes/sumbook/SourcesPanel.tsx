@@ -17,12 +17,14 @@ export function SourcesPanel({
   status,
   sources,
   onAdd,
+  onReindex,
   onRemove,
   onRetry,
 }: {
   status: SourcesStatus;
   sources: Source[];
   onAdd: () => void;
+  onReindex: (sourceId: string) => void;
   onRemove: (sourceId: string) => void;
   onRetry: () => void;
 }) {
@@ -76,7 +78,12 @@ export function SourcesPanel({
       {status === 'ready' && sources.length > 0 ? (
         <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
           {sources.map((source) => (
-            <SourceListItem key={source.id} source={source} onRemove={() => onRemove(source.id)} />
+            <SourceListItem
+              key={source.id}
+              source={source}
+              onReindex={() => onReindex(source.id)}
+              onRemove={() => onRemove(source.id)}
+            />
           ))}
         </ul>
       ) : null}

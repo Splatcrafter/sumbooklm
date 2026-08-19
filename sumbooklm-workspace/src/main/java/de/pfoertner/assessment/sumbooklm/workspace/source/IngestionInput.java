@@ -14,11 +14,17 @@ import org.jspecify.annotations.Nullable;
  * that long would serve nobody. The values it works on are therefore read in one short transaction
  * and carried out of it, rather than a detached row being kept and read from later.
  *
- * @param notebookId  identifier of the notebook the source belongs to
- * @param kind        way the source entered the notebook
- * @param origin      name of the uploaded file or address of the page
- * @param displayName name the source is currently listed under
- * @param content     bytes of the uploaded file, or {@code null} for a source that names a page
+ * <h2>Text That Is Already Known</h2>
+ * A source that has been read successfully before carries the text that reading produced. A run that
+ * finds it there does not read the source again, which is what makes rebuilding the index of an
+ * uploaded file free of the parser and that of a web page free of the network.
+ *
+ * @param notebookId    identifier of the notebook the source belongs to
+ * @param kind          way the source entered the notebook
+ * @param origin        name of the uploaded file or address of the page
+ * @param displayName   name the source is currently listed under
+ * @param content       bytes of the uploaded file, or {@code null} for a source that names a page
+ * @param extractedText text a previous run read out of the source, or {@code null} if there was none
  * @author Erik Pförtner
  * @since 0.1.0
  */
@@ -26,17 +32,20 @@ public record IngestionInput(UUID notebookId,
                              SourceKind kind,
                              String origin,
                              String displayName,
-                             byte @Nullable [] content) {
+                             byte @Nullable [] content,
+                             @Nullable String extractedText) {
 
     /**
      * Creates the input.
      *
-     * @param notebookId  identifier of the notebook the source belongs to
-     * @param kind        way the source entered the notebook
-     * @param origin      name of the uploaded file or address of the page
-     * @param displayName name the source is currently listed under
-     * @param content     bytes of the uploaded file, or {@code null} for a source that names a page
-     * @throws NullPointerException if any argument other than {@code content} is {@code null}
+     * @param notebookId    identifier of the notebook the source belongs to
+     * @param kind          way the source entered the notebook
+     * @param origin        name of the uploaded file or address of the page
+     * @param displayName   name the source is currently listed under
+     * @param content       bytes of the uploaded file, or {@code null} for a source that names a page
+     * @param extractedText text a previous run read out of the source, or {@code null} if there was none
+     * @throws NullPointerException if any argument other than {@code content} and
+     *                              {@code extractedText} is {@code null}
      */
     public IngestionInput {
         Objects.requireNonNull(notebookId, "notebookId must not be null");

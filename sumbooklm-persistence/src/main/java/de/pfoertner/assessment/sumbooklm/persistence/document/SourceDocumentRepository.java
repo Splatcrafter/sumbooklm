@@ -36,6 +36,22 @@ public interface SourceDocumentRepository extends JpaRepository<SourceDocumentEn
     List<NotebookSourceCount> countPerNotebook(@Param("userId") UUID userId);
 
     /**
+     * Finds every source there is, oldest first, reduced to the identifiers that address it.
+     *
+     * <p>The query deliberately spans all accounts. It serves the rebuild of the retrieval index,
+     * which is a property of the process rather than of one account, and which therefore has to see
+     * every source the database holds.
+     *
+     * @return one entry per stored source, in the order the sources were added
+     */
+    @Query("""
+            select document.id as id, document.userId as userId
+            from SourceDocumentEntity document
+            order by document.createdAt asc
+            """)
+    List<SourceReference> findAllReferences();
+
+    /**
      * Finds the sources of one notebook, oldest first.
      *
      * @param notebookId identifier of the notebook the sources belong to

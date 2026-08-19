@@ -567,3 +567,15 @@ of the stream.
 record codec hold a repeated nested record. `Codecs.LONG` plus `xmap` is enough for a timestamp; there
 is no codec for `java.time` types, and encoding an instant as microseconds since the epoch keeps it a
 single integer in the tree.
+
+### 43. `@Lob String` is a large object on PostgreSQL
+
+Hibernate maps a `@Lob String` to `oid` on PostgreSQL, which is a pointer into the large object table
+rather than a value in the column, and reading one outside a transaction fails. The byte variant is
+harmless because it becomes `bytea`, which is why the existing `content` column is fine and a text
+column next to it would not have been.
+
+`@Column(length = Length.LONG32)` avoids the question: the provider picks the widest text type it has,
+which is `text` on PostgreSQL and `clob` on H2, and neither is a large object handle. `org.hibernate.
+Length` is the only Hibernate specific import in the entity, and it contributes an integer rather than
+a behaviour.

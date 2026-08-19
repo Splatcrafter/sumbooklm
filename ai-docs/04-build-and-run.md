@@ -386,3 +386,48 @@ keys, none missing in any language, and the three keys built at runtime are the 
 reasons and the provider names.
 
 All harnesses live outside the repository; see open question 17.
+
+## Verification of the index rebuild on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 49 tests.
+
+`IndexRestoreIntegrationTest` runs against a database of its own, because the rebuild deliberately
+spans every account there is and would otherwise rebuild the sources the other suites use to provoke
+failures. A restart cannot be performed from inside the application it would restart, so what a
+restart does is reproduced instead: the store is emptied through the bean while the database keeps
+every source.
+
+| Case | Asserted |
+| --- | --- |
+| Emptying the store | the source still reports `READY` while its segments are gone, which is the failure this job exists for |
+| Running the rebuild | the same number of segments is back, the stage, the token count and the name are unchanged |
+| Indexing an indexed source again | `202` with `UPLOADED`, then `READY`, and the segment count is the same rather than doubled |
+| Indexing a failed source again | it is read again and fails again while the address stays unreachable, and it stores no segments |
+| A source of another account, of another notebook, or one that does not exist | `404` each time |
+
+The assertions count the segments the store holds for one source rather than asking a question about
+it. That is the state the rebuild is responsible for, and whether an answer can be produced from it is
+what the chat suite already covers.
+
+A real restart was then verified outside the test suite, because that is the thing the whole change is
+about and no test in a running application can perform it. The packaged jar was started against a file
+based H2 database, an account was registered, a text file uploaded and indexed, and a question asked:
+the stream named `thermodynamics.txt` among its sources. The process was stopped, started again
+against the same database file, and the same question asked: the source was named again, the log
+carried `Rebuilding the retrieval index for 1 sources` followed by `Rebuilt the retrieval index for 1
+of 1 sources`, and the whole rebuild took eighty-four milliseconds because the text was already
+stored.
+
+The claim that a rebuild needs no network could not be verified for a web source, because the guard
+against internal addresses refuses a page served from this machine and no other host is reachable from
+the container. What is verified is the branch itself: an uploaded file is rebuilt from stored text,
+and a source that has none is read again, which is what the failed source case shows. The branch is
+taken on the presence of the text rather than on the kind of the source, so the two cases share it.
+
+The retry control was rendered in all three languages: a failed source offers it, an indexed and a
+running one do not, every source can still be removed, and the label is translated rather than a key.
+
+Every translated key used in the interface was checked against all three locale files again: one
+hundred keys, none missing in any language.
+
+All harnesses live outside the repository; see open question 17.

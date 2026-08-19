@@ -80,6 +80,11 @@ public final class ApiPaths {
     public static final String V1_NOTEBOOK_SOURCE = V1_NOTEBOOK_SOURCES + "/{sourceId}";
 
     /**
+     * Endpoint that puts one source through the indexing pipeline again.
+     */
+    public static final String V1_NOTEBOOK_SOURCE_REINDEX = V1_NOTEBOOK_SOURCE + "/reindex";
+
+    /**
      * Endpoint that answers a question about the sources of one notebook.
      */
     public static final String V1_NOTEBOOK_CHAT = V1_NOTEBOOK + "/chat";

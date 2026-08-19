@@ -68,6 +68,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notebooks/{notebookId}/sources/{sourceId}/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Index a source again
+         * @description Puts a source that is already stored back at the start of the indexing pipeline. A source that was read successfully before is indexed from the text that reading produced; one that was not is read again, which is what makes this the way to retry a source that failed.
+         */
+        post: operations["reindex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notebooks/{notebookId}/sources/links": {
         parameters: {
             query?: never;
@@ -407,14 +427,6 @@ export interface components {
              */
             sourceCount?: number;
         };
-        /** @description Address of a web page to add as a source. */
-        WebSourceRequest: {
-            /**
-             * @description Address of the page to add.
-             * @example https://example.org/article
-             */
-            url: string;
-        };
         /** @description A source of one notebook of the authenticated account. */
         SourceResponse: {
             /**
@@ -454,6 +466,14 @@ export interface components {
              * @description Point in time the source was added to its notebook.
              */
             createdAt?: string;
+        };
+        /** @description Address of a web page to add as a source. */
+        WebSourceRequest: {
+            /**
+             * @description Address of the page to add.
+             * @example https://example.org/article
+             */
+            url: string;
         };
         /** @description A question about the sources of one notebook. */
         ChatQuestionRequest: {
@@ -676,6 +696,43 @@ export interface operations {
             };
             /** @description No valid access token was presented. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reindex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The source is waiting to be indexed. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SourceResponse"];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The notebook holds no such source. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

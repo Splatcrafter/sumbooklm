@@ -730,3 +730,63 @@ expired then, which is the behaviour a credential handed in by a user should hav
 **Cost.** The settings cannot be read before the session has been restored, so the interface starts
 with none and fills them in. Signing out discards them for good rather than keeping them for the next
 sign-in.
+
+## ADR-041: The text a source was read as is stored with the source
+
+**Decision.** A finished indexing run writes the extracted text into `extracted_text` next to the row.
+A run that finds it there does not read the source again, whatever kind of source it is. For an
+upload the original bytes are kept as well.
+
+**Reason.** Indexing happens more than once. It happens when a source is added, when a user asks for
+it again, and for every source whenever the process starts, so reading the source became the expensive
+part of an operation that is otherwise arithmetic.
+
+Reading again is also not equivalent to reading once. A parser is deterministic, but a web page is
+not: a rebuild that re-fetched would produce segments from whatever the address serves now, silently
+replacing what the stored answers cited. The stored text is exactly what the index was built from,
+which makes rebuilding a repetition rather than a new reading.
+
+The bytes of an upload stay because they are the source of truth for a file, which has no other home
+(ADR-032). The text is derived from them and may be derived differently by a later parser.
+
+**Cost.** An uploaded file is stored twice, once as bytes and once as text. And a web page is now read
+exactly once ever, so a page that changes is never noticed; see open question 29.
+
+## ADR-042: The whole index is rebuilt at startup, including what succeeded
+
+**Decision.** Once the application is ready, every source in the database is put through the pipeline
+again, on the indexing executor, one after another. No status is exempt.
+
+**Reason.** The vector store lives in the heap and the sources live in the database, so after a
+restart every source reports the stage it reached while the segments behind it are gone. That is the
+worst shape a failure can have: nothing reports an error, questions are answered from an empty index,
+and the answers are refusals that look like the notebook simply says nothing about it.
+
+Exempting the sources that succeeded would be exempting exactly the ones that lost something. After a
+restart a finished source and an interrupted one are in the same position, and what distinguishes them
+is only what the rebuild costs: one is rebuilt from its stored text, the other is read for the first
+time. That is also why failures are not exempt either, which makes a restart a retry for them at the
+price of one attempt each.
+
+The alternative, marking sources as unindexed at shutdown, does not survive the shutdown that matters,
+which is the one that was not orderly.
+
+**Cost.** Every embedding is recomputed on every start, and a source is not answerable until the run
+reaches it. Both are the price of a store that does not survive the process; see open questions 4
+and 30.
+
+## ADR-043: Indexing replaces the segments of a source
+
+**Decision.** `NotebookIndex.index` removes everything stored for that source before it writes.
+
+**Reason.** A source is indexed more than once now, and appending would leave every paragraph in the
+index as many times as the source was read. That is not merely wasteful: the retriever returns the
+nearest segments, so duplicates crowd out other sources and the answer narrows to whatever was indexed
+most often.
+
+Putting the removal inside the write rather than in front of its callers means there is no call site
+that can forget it, which is the same reason the notebook identifier is a parameter there (ADR-030).
+
+**Cost.** A rebuild that fails after the removal leaves the source with no segments at all, where
+before it had stale ones. Stale segments are worse: they answer questions from a version of a document
+the application no longer believes in.

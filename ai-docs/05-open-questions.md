@@ -34,9 +34,13 @@ first entity is written.
 
 ## 4. Vector store persistence
 
-`InMemoryEmbeddingStore` loses everything on restart. If re-embedding on startup is unacceptable
-even for the MVP, the successor is pgvector via `langchain4j-pgvector`, which keeps the
-`EmbeddingStore` abstraction intact.
+`InMemoryEmbeddingStore` loses everything on restart. Re-embedding on startup is now what happens
+(question 19), which makes the loss survivable rather than absent: the vectors are still recomputed
+every time the process starts, and the cost of that grows with the library.
+
+The successor is pgvector via `langchain4j-pgvector`, which keeps the `EmbeddingStore` abstraction
+intact. What the rebuild changed about that move is that it is no longer urgent, and that the code it
+would replace already knows how to reconcile a store against the database.
 
 ## 5. TypeScript 7
 
@@ -146,17 +150,26 @@ The fix is an explicit endpoint that records the visit, called by the detail vie
 That is worth doing once there is something to open that is worth returning to; today the two orders
 differ only for a Sumbook that is read and never touched.
 
-## 19. The vector index does not survive a restart, and nothing rebuilds it
+## 19. Resolved: the index is rebuilt when the application starts
 
-`InMemoryEmbeddingStore` keeps its vectors in the heap. After a restart every source still reports
-`READY`, because that is stored in the database, while the segments behind it are gone. The same
-happens to a source whose run was interrupted, which stays in `INDEXING` for ever because nothing
-picks it up again.
+A source can now be indexed again, and every source is, once the application is ready. What was
+missing was not persistence of the vectors but the ability to produce them a second time, which is
+what both halves of the original question asked for.
 
-Both need the same thing: a way to index a source that already exists. That is one endpoint and one
-call at startup for everything not in `READY`, and it becomes unavoidable the moment the vector store
-is not in memory any more, since a real one would then hold data that the application has to be able
-to reconcile against.
+Two things made it cheap enough to do unconditionally. The text a successful run extracted is stored
+with the source, so rebuilding needs neither the parser nor the network and only pays for the
+embeddings. And indexing replaces rather than appends, so running it again is safe whatever state the
+store was in.
+
+The consequence is that a restart retries exactly the sources that never succeeded, because those are
+the only ones without stored text. A source that stayed in `INDEXING` because its run was interrupted
+is picked up the same way.
+
+What stays open is the cost. Every restart recomputes every embedding, which is seconds for a small
+library and minutes for a large one, and a source is not answerable until the rebuild has reached it.
+That is question 4's problem now rather than this one's: a store that survives the process removes the
+rebuild instead of speeding it up, and the code that reconciles a store against the database is now
+in place for it.
 
 ## 20. The guard against internal addresses is not airtight
 
@@ -248,3 +261,24 @@ they fit.
 Counting tokens instead needs a tokenizer per provider, which is the thing this application deliberately
 does not have. Counting characters is the approximation to make, once there is a reason to believe the
 count is what breaks first.
+
+## 29. A web page is never fetched again
+
+Storing the extracted text made rebuilding free of the network, and it also means a page is read
+exactly once, when it is added. A page that changes afterwards keeps answering with what it said that
+day, and nothing tells the user how old that is.
+
+Refreshing it is the same call as indexing it again, minus the stored text, so the mechanism is
+already there. What is missing is the decision: whether a refresh is something the user asks for, or
+something that happens on an interval, and what should happen to an answer that cited the version that
+is being replaced.
+
+## 30. The rebuild has no bound and no back pressure
+
+The job walks every source in the database, one after another, and nothing stops it. With a large
+library that is a long run on the indexing pool, during which every upload queues behind it, and there
+is no way to see how far it has come other than the two lines it logs.
+
+Chunking it by notebook and rebuilding the ones being opened first would fix the part the user
+notices, which is that their own Sumbook is not answerable yet. That needs a priority the current
+executor does not have.

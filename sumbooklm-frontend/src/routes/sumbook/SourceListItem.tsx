@@ -1,4 +1,4 @@
-import { AlertCircle, Check, FileText, Globe, Loader2, Trash2 } from 'lucide-react';
+import { AlertCircle, Check, FileText, Globe, Loader2, RotateCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,20 @@ import type { Source } from '@/sources/source';
  * The stage a source has reached is shown as an icon rather than as a word, because the list is
  * narrow and the four stages are distinguishable by shape alone. Each icon still carries its label
  * for anyone who is not reading the shape.
+ *
+ * A source that could not be read is the only one offered a retry. Every other stage either has
+ * nothing to retry or is still running, and a control that is always there would suggest that reading
+ * a source again is something a user normally has to do.
  */
-export function SourceListItem({ source, onRemove }: { source: Source; onRemove: () => void }) {
+export function SourceListItem({
+  source,
+  onReindex,
+  onRemove,
+}: {
+  source: Source;
+  onReindex: () => void;
+  onRemove: () => void;
+}) {
   const { t } = useTranslation();
   const kindLabel = t(source.kind === 'WEB' ? 'sumbook.sources.kind.web' : 'sumbook.sources.kind.file');
 
@@ -31,6 +43,17 @@ export function SourceListItem({ source, onRemove }: { source: Source; onRemove:
         <span className="truncate text-xs leading-4 text-jb-grey-50">{statusLabel(source, t)}</span>
       </span>
       <StatusIcon status={source.status} label={statusLabel(source, t)} />
+      {source.status === 'ERROR' ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('sumbook.sources.reindex', { name: source.displayName })}
+          className="shrink-0 text-jb-grey-60 hover:bg-jb-grey-80/60 hover:text-jb-grey-5"
+          onClick={onReindex}
+        >
+          <RotateCw />
+        </Button>
+      ) : null}
       <Button
         variant="ghost"
         size="icon-sm"

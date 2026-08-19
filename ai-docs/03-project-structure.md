@@ -217,7 +217,7 @@ sumbooklm-frontend
         ├── settings      ModelSettingsDialog
         └── sumbook       SumbookPage, SourcesPanel, SourceListItem, AddSourceDialog,
                           ChatPanel, ConversationBar, ChatComposer, ChatMessageView,
-                          SummaryView, StudioPanel, SumbookMeta
+                          SummaryView, SumbookMeta
 ```
 
 The account routes are a second top level branch of the router rather than children of `AppLayout`.

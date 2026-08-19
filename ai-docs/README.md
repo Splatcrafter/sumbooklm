@@ -33,8 +33,7 @@ source. The text a source was read as is stored with it, so indexing it again ne
 nor the network, and every source is indexed again once the application starts, because the vector
 store does not survive the process while the sources do. The Sumbook view shows the sources with the
 stage each has reached, which of seven reasons stopped the ones that could not be read, when each page
-was last read and a way to read it again, the conversation held about them, and the studio that will
-be generated from them.
+was last read and a way to read it again, and the conversation held about them.
 
 Chat: `POST /api/v1/notebooks/{id}/chat` answers as a stream of server sent events, from passages
 retrieved under a metadata filter on that notebook alone, under instructions that permit no other

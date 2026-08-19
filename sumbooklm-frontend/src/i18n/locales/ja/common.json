@@ -173,10 +173,6 @@
       "empty": "質問すると、その回答と出典となった資料がここに表示されます。",
       "asked": "質問"
     },
-    "studio": {
-      "heading": "スタジオ",
-      "placeholder": "資料を選ぶか、会話を始めてください。この Sumbook から生成されたものがここに表示されます。"
-    },
     "actions": {
       "backToOverview": "すべての Sumbook",
       "cancel": "キャンセル",

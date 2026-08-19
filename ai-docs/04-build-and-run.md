@@ -772,3 +772,16 @@ container has no browser and no harness to drive one. What that leaves unverifie
 the summary block and of the language menu, not their wiring, which the types and the generated client
 cover. The three translation files were checked to hold the same keys, allowing for Japanese having no
 plural category and therefore none of the `_one` forms.
+
+## Verification of the removed studio panel on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 115 tests, the frontend built as part of it. Nothing
+in the build asserted the panel, and nothing asserted its absence: it held one translated sentence and
+no behaviour, so the type checker and the production build are the whole of what there is to verify.
+The three translation files no longer carry a `sumbook.studio` key, and no source file mentions the
+studio any more.
+
+What is not verified here, for the same reason as the summary before it, is how the two remaining
+panels look at each width: this container has no browser. The layout change is one grid template, from
+three columns above the extra large breakpoint to two above the large one, and the conversation already
+holds its content to a reading measure of its own, so the panel growing does not stretch the text.

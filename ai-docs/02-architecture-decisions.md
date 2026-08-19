@@ -1309,3 +1309,24 @@ leaves the rule out entirely rather than inventing one.
 **Cost.** A stored summary stays in the language it was written in. Switching the interface does not
 rewrite it, because that would spend a request on every switch; the reader can, with the button that is
 there anyway.
+
+## ADR-065: The studio panel is removed until there is something to put in it
+
+**Decision.** The third panel of an opened Sumbook is deleted, along with its component and its two
+translated strings. The screen is now the sources and the conversation, and the conversation takes
+everything the sources do not need at every width. This reverses the part of ADR-033 that kept a panel
+in the layout for a feature that does not exist.
+
+**Reason.** The panel held one sentence saying what it would hold one day. That is a promise on a
+screen a user works on, and it is the kind of promise an interface should not make: it takes a fifth of
+a large screen, it is the first thing a reader's eye finds free space in, and it answers every visit
+with the same sentence. ADR-033 kept it so that the layout would not rearrange itself when the first
+studio feature lands. Weighed against a panel that says nothing on every visit until then, an
+arrangement that changes once is the cheaper of the two.
+
+The conversation gains the width instead, which is the panel whose readability actually depends on it,
+and the reading measure inside it keeps the text from stretching with the panel.
+
+**Cost.** The layout will move when a studio arrives, which is exactly what ADR-033 paid this panel to
+avoid. The strings are gone from all three translations and would have to be written again, which is
+minutes of work in a file rather than a decision.

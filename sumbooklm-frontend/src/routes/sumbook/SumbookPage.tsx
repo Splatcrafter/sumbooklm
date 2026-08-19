@@ -8,23 +8,20 @@ import { useNotebook } from '@/notebooks/useNotebook';
 import { AddSourceDialog } from '@/routes/sumbook/AddSourceDialog';
 import { ChatPanel } from '@/routes/sumbook/ChatPanel';
 import { SourceTable } from '@/routes/sumbook/SourceTable';
-import { StudioPanel } from '@/routes/sumbook/StudioPanel';
 import { useSources } from '@/sources/useSources';
 
 /**
  * One opened Sumbook.
  *
- * The screen is three panels floating on the page with a gap between them: the sources on the left,
- * the conversation in the middle, the studio on the right. Only the middle one grows, because it is
- * the one a visitor is here for and the one whose content has no natural width, while the two beside
- * it are lists.
+ * The screen is two panels floating on the page with a gap between them: the sources on the left, the
+ * conversation beside them. Only the conversation grows, because it is the one a visitor is here for
+ * and the one whose content has no natural width, while the sources are a list.
  *
  * The title of the Sumbook stands in a slim bar above the panels rather than inside one of them, so
  * that it names the whole screen and not the panel it happens to sit in.
  *
  * The narrow layout stacks the panels instead of shrinking them, and the conversation comes first.
- * On a screen showing one panel at a time the order has to be the order of the work, and the studio
- * has nothing in it yet, so it goes last.
+ * On a screen showing one panel at a time the order has to be the order of the work.
  */
 export function SumbookPage() {
   const { t } = useTranslation();
@@ -83,7 +80,7 @@ export function SumbookPage() {
         </h1>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)_21rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[19rem_minmax(0,1fr)]">
         <div className="order-2 flex min-h-0 flex-col lg:order-none">
           <SourceTable
             status={sourcesStatus}
@@ -101,10 +98,6 @@ export function SumbookPage() {
             sourceCount={sources.length}
             summarisable={!indexing && sources.some((source) => source.status === 'READY')}
           />
-        </div>
-
-        <div className="order-3 flex min-h-0 flex-col lg:order-none">
-          <StudioPanel />
         </div>
       </div>
 

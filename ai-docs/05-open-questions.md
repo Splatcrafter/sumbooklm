@@ -117,8 +117,7 @@ in their logs rather than a routing mistake.
 
 ## 15. Resolved: a notebook card opens its Sumbook
 
-The card now navigates to `/dashboard/sumbook/{id}`, which shows the sources, the conversation and
-the studio. What remains open from the original question is smaller: the card is a `div` with
+The card now navigates to `/dashboard/sumbook/{id}`, which shows the sources and the conversation. What remains open from the original question is smaller: the card is a `div` with
 `role="link"` rather than an anchor, so it cannot be opened in a new tab. Wrapping the card in an
 anchor would nest the menu button inside a link, which is invalid; the alternative is an invisible
 anchor covering the card with the menu raised above it.

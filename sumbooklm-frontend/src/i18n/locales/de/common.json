@@ -178,10 +178,6 @@
       "empty": "Stelle eine Frage, und die Antwort erscheint hier, zusammen mit den Quellen, aus denen sie stammt.",
       "asked": "Gefragt"
     },
-    "studio": {
-      "heading": "Studio",
-      "placeholder": "Wähle eine Quelle oder beginne ein Gespräch. Was aus diesem Sumbook entsteht, erscheint hier."
-    },
     "actions": {
       "backToOverview": "Alle Sumbooks",
       "cancel": "Abbrechen",

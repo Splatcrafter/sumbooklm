@@ -132,7 +132,11 @@
       "placeholder": "資料について質問してください",
       "sources_other": "{{count}} 件の資料",
       "send": "質問を送信",
-      "notAvailable": "回答機能はまだ利用できません。質問はどこにも送信されていません。"
+      "thinking": "資料を読んでいます...",
+      "failed": "回答を生成できませんでした。",
+      "noModel": "モデルがまだ設定されていないため、質問に回答できません。",
+      "chooseModel": "モデルを選択",
+      "historyFailed": "会話を読み込めませんでした。"
     },
     "studio": {
       "heading": "スタジオ",
@@ -148,6 +152,30 @@
       "missing": "この Sumbook は存在しません。",
       "add": "資料を追加できませんでした。もう一度お試しください。",
       "duplicate": "この資料はすでに Sumbook に含まれています。"
+    }
+  },
+  "settings": {
+    "model": {
+      "heading": "回答モデル",
+      "description": "質問はここで選んだモデルが回答します。キーはこのブラウザーに保存され、あなた自身の質問とともにのみ送信されます。",
+      "unset": "モデルを選択",
+      "providers": {
+        "OPENAI": "OpenAI",
+        "GROQ": "Groq",
+        "OLLAMA": "Ollama"
+      },
+      "fields": {
+        "provider": "プロバイダー",
+        "model": "モデル",
+        "apiKey": "APIキー",
+        "baseUrl": "アドレス（任意）"
+      },
+      "hints": {
+        "apiKey": "このブラウザーに暗号化して保存され、サインアウト時に削除されます。"
+      },
+      "forget": "破棄",
+      "cancel": "キャンセル",
+      "confirm": "モデルを保存"
     }
   },
   "errors": {

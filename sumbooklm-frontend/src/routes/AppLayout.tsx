@@ -1,9 +1,13 @@
+import { useState } from 'react';
+import { Cpu } from 'lucide-react';
 import { Outlet, Navigate, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '@/auth/useAuth';
+import { useModelSettings } from '@/byok/useModelSettings';
 import { Button } from '@/components/ui/button';
 import { BrandMark } from '@/routes/account/BrandMark';
+import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
 
 /**
  * Frame of every route that requires a signed-in user.
@@ -16,10 +20,16 @@ import { BrandMark } from '@/routes/account/BrandMark';
  * Restoring a stored session takes a request, so the shell waits for that to finish before it
  * decides between the application and the sign-in screen. Rendering the application first and
  * redirecting afterwards would show the dashboard to a visitor who turns out not to be signed in.
+ *
+ * The model a visitor answers with is reached from here rather than from inside a Sumbook. It is one
+ * setting for the whole browser, and putting it next to the account it is stored with is what says
+ * so.
  */
 export function AppLayout() {
   const { t } = useTranslation();
   const { status, user, logout } = useAuth();
+  const { settings, configured } = useModelSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (status === 'restoring') {
     return (
@@ -54,6 +64,17 @@ export function AppLayout() {
                 variant="outline"
                 size="sm"
                 className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-90 hover:text-jb-grey-5"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Cpu aria-hidden />
+                <span className="max-w-40 truncate">
+                  {configured ? settings.model : t('settings.model.unset')}
+                </span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-90 hover:text-jb-grey-5"
                 onClick={() => void logout()}
               >
                 {t('account.signOut')}
@@ -65,6 +86,7 @@ export function AppLayout() {
       <main className="flex flex-1 flex-col">
         <Outlet />
       </main>
+      <ModelSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }

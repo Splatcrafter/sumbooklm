@@ -1,5 +1,6 @@
 package de.pfoertner.assessment.sumbooklm.api.error;
 
+import de.pfoertner.assessment.sumbooklm.ai.chat.UnusableModelSelectionException;
 import de.pfoertner.assessment.sumbooklm.security.authentication.InvalidCredentialsException;
 import de.pfoertner.assessment.sumbooklm.security.authentication.UsernameAlreadyTakenException;
 import de.pfoertner.assessment.sumbooklm.security.token.InvalidRefreshTokenException;
@@ -125,6 +126,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         final ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "The uploaded file carries no content");
         problem.setTitle("Empty upload");
+        return problem;
+    }
+
+    /**
+     * Reports a request that named a model which cannot be addressed with what it presented.
+     *
+     * <p>The detail of this one is the message of the failure rather than a fixed sentence. The
+     * settings are the property of the caller, and only they can correct them, so being told which
+     * part is missing is what makes the answer actionable.
+     *
+     * @param exception failure raised by the AI module
+     * @return a problem detail with status {@code 400}
+     */
+    @ExceptionHandler(UnusableModelSelectionException.class)
+    public ProblemDetail handleUnusableModelSelection(final UnusableModelSelectionException exception) {
+        final ProblemDetail problem =
+                ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Model not usable");
         return problem;
     }
 

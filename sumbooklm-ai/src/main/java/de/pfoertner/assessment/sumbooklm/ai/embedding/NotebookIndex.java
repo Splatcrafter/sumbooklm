@@ -8,6 +8,8 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.model.output.TokenUsage;
+import dev.langchain4j.rag.content.retriever.ContentRetriever;
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import org.springframework.context.annotation.Lazy;
@@ -22,6 +24,11 @@ import org.springframework.stereotype.Component;
  * instead would have made an untagged segment possible, and an untagged segment is one that every
  * notebook of every account can retrieve.
  *
+ * <h2>Reading Is Separated the Same Way</h2>
+ * A retriever is never handed out without a notebook either. It is built with a metadata filter on
+ * that notebook, so a question asked in one notebook cannot reach a segment of another even though
+ * both live in the same store.
+ *
  * <h2>Token Count</h2>
  * The count returned by indexing is what the model itself reported for the text it embedded, not an
  * estimate made next to it. It therefore describes the text that actually entered the index,
@@ -32,6 +39,21 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class NotebookIndex {
+
+    /**
+     * Number of segments one question is answered from. The value bounds how much of a notebook
+     * reaches the model, and with segments of about a thousand characters it is a context of a few
+     * thousand tokens, which every model the application can be pointed at accepts.
+     */
+    private static final int MAX_RESULTS = 8;
+
+    /**
+     * Similarity a segment has to reach in order to be shown to the model at all. Retrieval always
+     * returns the nearest segments, however far away they are, and without a floor a question the
+     * notebook says nothing about would be answered from its least unrelated paragraph. The scale is
+     * the cosine similarity mapped onto zero to one, so the value below is a cosine of about a third.
+     */
+    private static final double MIN_SCORE = 0.65;
 
     /**
      * Model that turns a segment into a vector.
@@ -81,6 +103,22 @@ public class NotebookIndex {
             return 0;
         }
         return usage.inputTokenCount();
+    }
+
+    /**
+     * Builds a retriever that reads the segments of one notebook and of no other.
+     *
+     * @param notebookId identifier of the notebook the retriever may read from
+     * @return a retriever answering a query from the segments of that notebook
+     */
+    public ContentRetriever retrieverFor(final UUID notebookId) {
+        return EmbeddingStoreContentRetriever.builder()
+                .embeddingStore(this.embeddingStore)
+                .embeddingModel(this.embeddingModel)
+                .maxResults(MAX_RESULTS)
+                .minScore(MIN_SCORE)
+                .filter(MetadataFilterBuilder.metadataKey(SegmentMetadata.NOTEBOOK_ID).isEqualTo(notebookId))
+                .build();
     }
 
     /**

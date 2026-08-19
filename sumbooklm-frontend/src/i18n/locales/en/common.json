@@ -137,7 +137,11 @@
       "sources_one": "{{count}} Source",
       "sources_other": "{{count}} Sources",
       "send": "Send question",
-      "notAvailable": "Answering is not available yet. Your question was not sent anywhere."
+      "thinking": "Reading your sources...",
+      "failed": "The answer could not be generated.",
+      "noModel": "No model is set up yet, so questions cannot be answered.",
+      "chooseModel": "Choose model",
+      "historyFailed": "The conversation could not be loaded."
     },
     "studio": {
       "heading": "Studio",
@@ -153,6 +157,30 @@
       "missing": "This Sumbook does not exist.",
       "add": "The source could not be added. Please try again.",
       "duplicate": "This source is already part of the Sumbook."
+    }
+  },
+  "settings": {
+    "model": {
+      "heading": "Answering model",
+      "description": "Questions are answered by the model you choose here. The key stays in this browser and is sent only with your own questions.",
+      "unset": "Choose model",
+      "providers": {
+        "OPENAI": "OpenAI",
+        "GROQ": "Groq",
+        "OLLAMA": "Ollama"
+      },
+      "fields": {
+        "provider": "Provider",
+        "model": "Model",
+        "apiKey": "API key",
+        "baseUrl": "Address (optional)"
+      },
+      "hints": {
+        "apiKey": "Kept encrypted in this browser and removed when you sign out."
+      },
+      "forget": "Forget",
+      "cancel": "Cancel",
+      "confirm": "Save model"
     }
   },
   "errors": {

@@ -3,7 +3,9 @@ package de.pfoertner.assessment.sumbooklm.workspace.source;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import de.pfoertner.assessment.sumbooklm.ai.embedding.NotebookIndex;
@@ -121,6 +123,25 @@ public class SourceDocumentService {
                 .stream()
                 .map(this.sourceDocumentMapper::toDomain)
                 .toList();
+    }
+
+    /**
+     * Reads the names the sources of one notebook are listed under.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to read the names of
+     * @return the name of every source of the notebook, by identifier
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, String> displayNames(final UUID userId, final UUID notebookId) {
+        requireNotebook(userId, notebookId);
+        final Map<UUID, String> names = new LinkedHashMap<>();
+        for (final SourceDocumentEntity entity
+                : this.sourceDocumentRepository.findAllByNotebookIdAndUserIdOrderByCreatedAtAsc(notebookId, userId)) {
+            names.put(entity.getId(), this.sourceDocumentMapper.readPayload(entity).displayName());
+        }
+        return names;
     }
 
     /**

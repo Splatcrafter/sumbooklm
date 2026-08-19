@@ -137,7 +137,11 @@
       "sources_one": "{{count}} Quelle",
       "sources_other": "{{count}} Quellen",
       "send": "Frage absenden",
-      "notAvailable": "Antworten gibt es noch nicht. Deine Frage wurde nirgendwohin gesendet."
+      "thinking": "Deine Quellen werden gelesen ...",
+      "failed": "Die Antwort konnte nicht erzeugt werden.",
+      "noModel": "Es ist noch kein Modell eingerichtet, daher können Fragen nicht beantwortet werden.",
+      "chooseModel": "Modell wählen",
+      "historyFailed": "Das Gespräch konnte nicht geladen werden."
     },
     "studio": {
       "heading": "Studio",
@@ -153,6 +157,30 @@
       "missing": "Dieses Sumbook existiert nicht.",
       "add": "Die Quelle konnte nicht hinzugefügt werden. Bitte versuche es erneut.",
       "duplicate": "Diese Quelle ist bereits Teil des Sumbooks."
+    }
+  },
+  "settings": {
+    "model": {
+      "heading": "Antwortmodell",
+      "description": "Fragen werden von dem Modell beantwortet, das du hier auswählst. Der Schlüssel bleibt in diesem Browser und wird nur mit deinen eigenen Fragen gesendet.",
+      "unset": "Modell wählen",
+      "providers": {
+        "OPENAI": "OpenAI",
+        "GROQ": "Groq",
+        "OLLAMA": "Ollama"
+      },
+      "fields": {
+        "provider": "Anbieter",
+        "model": "Modell",
+        "apiKey": "API-Schlüssel",
+        "baseUrl": "Adresse (optional)"
+      },
+      "hints": {
+        "apiKey": "Verschlüsselt in diesem Browser gespeichert und beim Abmelden entfernt."
+      },
+      "forget": "Verwerfen",
+      "cancel": "Abbrechen",
+      "confirm": "Modell speichern"
     }
   },
   "errors": {

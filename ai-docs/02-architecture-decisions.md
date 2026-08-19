@@ -615,3 +615,118 @@ moment the first studio feature lands.
 **Cost.** On a laptop at the large breakpoint the studio is not visible at all, which will be wrong
 once it holds something the user needs. That is a breakpoint to revisit rather than a structure to
 change.
+
+## ADR-034: The chat model is presented per request and never stored
+
+**Decision.** The provider, the model name, the key and the address travel in `X-AI-Provider`,
+`X-AI-Model`, `X-AI-Api-Key` and `X-AI-Base-Url`. A client is built from them for one answer and
+discarded. The application publishes no chat model bean and holds no key.
+
+**Reason.** The deployment has no key of its own, and giving it one would make every question the
+running cost of whoever hosts it. Presenting the key per request is also what makes revoking it real:
+the user changes their settings, and the next question uses the new value with nothing cached in
+between.
+
+Headers rather than the body, because one of the values is a credential and the body of this request
+is a question that is stored. A key in the body would end up in every log line that records one.
+
+**Cost.** A client is constructed per answer, which for the OpenAI compatible path means an HTTP
+client per answer. That is measurable next to a model that takes seconds to reply, and caching it
+would mean holding keys in memory and deciding when a changed setting takes effect.
+
+## ADR-035: Retrieval is filtered by the retriever, not after it
+
+**Decision.** `NotebookIndex.retrieverFor(notebookId)` builds an `EmbeddingStoreContentRetriever`
+whose metadata filter is the notebook. Nothing else reads the store.
+
+**Reason.** The store is shared by every notebook of every account, so a read without a filter returns
+other people's paragraphs. Filtering afterwards would mean the wrong segments were retrieved and then
+dropped, which is one forgotten line away from being retrieved and used.
+
+Making the notebook a parameter of the only method that hands out a retriever mirrors what indexing
+already does, so both directions of the store are impossible to use without naming the notebook.
+
+**Cost.** The floor on relevance is a constant in that method rather than a setting. It is the value
+that decides whether a question the notebook says nothing about is answered from its least unrelated
+paragraph, and it will need tuning against real documents.
+
+## ADR-036: The answer is streamed as typed events, not as raw text
+
+**Decision.** The endpoint answers with server sent events: one `sources` event, then `token` events,
+then either `done` or `error`. Every payload is a JSON object.
+
+**Reason.** A part of an answer can contain a newline, and a newline is what separates the fields of
+an event. Sending bare text would mean encoding it anyway, and encoding it as an object costs the same
+and leaves room for a field.
+
+The `sources` event exists because an answer cites its sources by number while it is being written. A
+client that only learned the sources at the end would have to hold the text back or render citations
+it cannot name yet.
+
+The `done` event repeats the whole answer rather than announcing the end. It is the text the provider
+closed the stream with and the text that is stored, so a client that missed a part ends up with the
+same answer as the transcript instead of a slightly different one.
+
+**Cost.** The answer is transferred twice. For an answer of a few kilobytes that is cheaper than the
+reconciliation the alternative needs.
+
+## ADR-037: The question is stored before the model is asked
+
+**Decision.** Opening a turn resolves the notebook, appends the question and returns the conversation
+so far, in one transaction, on the request thread. Only then does the answer start being generated,
+on an executor.
+
+**Reason.** The two failures that matter happen at different times. A notebook that does not belong to
+the caller and a model selection that cannot be used are both known before anything is generated, and
+both belong in the status of the response rather than inside a stream that has already started with
+status 200.
+
+Everything after that can fail without losing the question. A user whose provider was unreachable sees
+what they asked and can ask it again once they have fixed their settings.
+
+**Cost.** A conversation can hold a question with no answer after it. That is a state the interface has
+to render, which it does by marking the answer that never arrived rather than by hiding the question.
+
+## ADR-038: The answer is written to the transcript by a third component
+
+**Decision.** The finished answer is handed to an `@Async` recorder, which calls the transactional
+service. The client is told that the answer is complete without waiting for the write.
+
+**Reason.** The last part of an answer arrives on a thread belonging to the provider's HTTP client, and
+that thread is what closes the response. Running a transaction there would make the user wait for a
+database write after they have already read the answer.
+
+**Cost.** A client that reloads the transcript immediately after the last word can be ahead of the
+write and see the answer missing. The window is a few milliseconds, and the interface already holds
+the answer it just received.
+
+## ADR-039: Grounding is instructions plus numbered passages, and citations are Markdown links
+
+**Decision.** The system message carries the rules and the retrieved passages, numbered and named. A
+citation is written as `[n](#source-n)`.
+
+**Reason.** Retrieval on its own is a hint. Without the rule that only the passages may be used and
+that a missing answer has to be admitted, the model answers from its training and the retrieval merely
+biases it.
+
+The citation is a Markdown link because the answer is Markdown: a client that renders Markdown already
+parses it, and no second convention has to be extracted from the text. The target is an anchor rather
+than a URL, so the client decides what following a citation means. Numbers are per source rather than
+per passage, because a citation should name a document the reader can open.
+
+**Cost.** The model can cite a number that was never offered. That is rendered as a plain number
+rather than as a name, which leaves the mistake visible instead of inventing a document for it.
+
+## ADR-040: The settings are encrypted into a second cookie under the same key
+
+**Decision.** The model settings live in a cookie whose name is the one the backend chose plus a
+suffix, encrypted with the same derived key as the session.
+
+**Reason.** The key is already derived per browser and already unreadable to script that cannot repeat
+the request, and the settings contain a credential that deserves the same treatment as the token pair.
+Reusing the scheme also means the API key becomes unreadable at sign-out, because the key handle is
+expired then, which is the behaviour a credential handed in by a user should have.
+
+**Cost.** The settings cannot be read before the session has been restored, so the interface starts
+with none and fills them in. Signing out discards them for good rather than keeping them for the next
+sign-in.

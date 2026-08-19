@@ -4,8 +4,8 @@
  * <h2>One Store, Many Notebooks</h2>
  * All notebooks of all accounts share a single store. What keeps them apart is metadata: every
  * segment carries the notebook and the source it came from, and every read is filtered on it. The
- * separation is therefore a property of the queries rather than of the storage, which is why the
- * only way into the store is a call that names both identifiers.
+ * separation is therefore a property of the queries rather than of the storage, which is why neither
+ * a write nor a read is offered without the notebook it belongs to.
  *
  * <h2>Local Model</h2>
  * Embeddings are computed in process, so indexing needs neither a remote endpoint nor an API key and

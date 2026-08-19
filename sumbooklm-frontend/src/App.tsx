@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider } from 'react-router';
 
 import { AuthProvider } from '@/auth/AuthProvider';
+import { ModelSettingsProvider } from '@/byok/ModelSettingsProvider';
 import { AppLayout } from '@/routes/AppLayout';
 import { NotFoundPage } from '@/routes/NotFoundPage';
 import { AccountLayout } from '@/routes/account/AccountLayout';
@@ -32,7 +33,9 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <AuthProvider>
-      <RouterProvider router={router} />
+      <ModelSettingsProvider>
+        <RouterProvider router={router} />
+      </ModelSettingsProvider>
     </AuthProvider>
   );
 }

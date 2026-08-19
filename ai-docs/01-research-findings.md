@@ -512,3 +512,58 @@ Selecting the block elements that carry prose and joining them with a blank line
 structure. Two details matter: the noise elements have to be removed first, or navigation ends up as
 paragraphs, and a list item nested in another item is matched twice by the selector, which is why a
 paragraph identical to the one before it is dropped.
+
+### 37. The streaming interface is called `StreamingChatModel`
+
+LangChain4j renamed `StreamingChatLanguageModel` to `StreamingChatModel` in 1.0.0, together with the
+handler, which is now `StreamingChatResponseHandler` in `dev.langchain4j.model.chat.response`. Code
+and articles written against 0.3x therefore do not compile against 1.19.0, and the old names are gone
+rather than deprecated.
+
+The handler has one method per kind of part (`onPartialResponse`, `onPartialThinking`,
+`onPartialToolCall`) and exactly two endings, `onCompleteResponse` and `onError`. The complete
+response carries the assembled `AiMessage`, so a caller does not have to concatenate the parts itself
+in order to know what was said.
+
+### 38. The retrieval pieces live in `langchain4j-core`, not in a RAG module
+
+`ContentRetriever`, `EmbeddingStoreContentRetriever`, `Query` and `Content` are all in
+`dev.langchain4j.rag` inside `langchain4j-core`. There is no separate `langchain4j-rag` artifact to
+add, which is easy to miss because the documentation talks about a RAG module.
+
+The builder of `EmbeddingStoreContentRetriever` takes either a fixed `filter(Filter)` or a
+`dynamicFilter(Function<Query, Filter>)`. A retriever built per notebook only needs the fixed one, and
+`InMemoryEmbeddingStore.search` applies it against the metadata of the segment.
+
+### 39. `minScore` is a mapped cosine similarity, not a cosine
+
+`RelevanceScore.fromCosineSimilarity` is `(cosine + 1) / 2`, so the zero to one scale the retriever
+compares against is not the cosine it came from. A threshold that looks strict is permissive: `0.5`
+accepts everything with a non-negative cosine, and a value around `0.65` is what actually rejects
+unrelated text.
+
+### 40. Ollama streams newline delimited JSON, not server sent events
+
+`OllamaServerSentEventParser` reads the response body line by line and hands each line on as the data
+of an event. The endpoint is `POST {baseUrl}/api/chat`, each line is an object with a `message` and a
+`done` flag, and the final line carries `done: true` with the token counts. That is enough to stand a
+fake provider up in a test harness: a plain HTTP server writing those lines is indistinguishable from
+Ollama as far as the client is concerned.
+
+### 41. `SseEmitter` accepts events before the container has initialised it
+
+An `SseEmitter` returned from a controller method is only wired to the response after the method has
+returned, and background work can start before that. `ResponseBodyEmitter` keeps early sends and
+replays them once it is initialised, so a handler that starts writing immediately does not have to
+synchronise with the request thread.
+
+What it does not tolerate is being completed twice, or being written to after the reader has gone,
+which is why the writer in this application closes exactly once and treats a failed write as the end
+of the stream.
+
+### 42. Aether Datafixers has a list codec
+
+`Codecs.list(elementCodec)` and `Codec#listOf()` produce a codec for `List<A>`, which is what lets a
+record codec hold a repeated nested record. `Codecs.LONG` plus `xmap` is enough for a timestamp; there
+is no codec for `java.time` types, and encoding an instant as microseconds since the epoch keeps it a
+single integer in the tree.

@@ -198,3 +198,53 @@ point would leave rows whose vectors are gone.
 Nothing follows the removal, so the window is theoretical today. It stops being theoretical as soon as
 the store is a real database, at which point the removal belongs in an after-commit listener like the
 one indexing already uses.
+
+## 24. The key is handed to the server on every question
+
+Bring your own key means the browser sends the key to this application, which forwards it to the
+provider. The application stores it nowhere and logs it nowhere, but it does see it, and a request
+made over plain HTTP carries it in the clear.
+
+The honest alternative is for the browser to call the provider directly, which removes the server from
+the path entirely, and with it the retrieval that made the question worth asking. The middle ground is
+to require HTTPS for the chat endpoint outside development, which is a deployment decision this
+scaffold does not make yet.
+
+## 25. Nothing bounds how many questions one account may ask
+
+A question occupies a thread of the chat pool for as long as the provider takes. Eight of them can be
+in flight, another thirty-two wait, and after that the caller answers its own question on a request
+thread. Nothing distinguishes one account asking forty questions from forty accounts asking one.
+
+The cost is the user's rather than the operator's, which is what makes this less urgent than it looks,
+but the threads are not. A limit per account is the shape to add, and the pool is where it would be
+enforced.
+
+## 26. A cancelled answer is generated to the end
+
+Leaving a Sumbook aborts the request, and the server keeps generating. That is deliberate: the answer
+is already paid for and is worth storing for the next visit. It also means a user cannot stop an
+answer they no longer want, and that every abandoned question still costs them tokens.
+
+Stopping it needs the cancellation handle LangChain4j exposes on the streaming callbacks, plus a
+decision about what a half generated answer is worth storing as. Both are cheap; deciding which of the
+two behaviours a user expects is not.
+
+## 27. The transcript is one conversation per notebook
+
+A notebook holds one conversation, created by its first question. The table already carries an
+identifier and its own timestamps, and the payload already carries a title, so several conversations
+about one set of sources are a change to the service rather than to the schema.
+
+What is missing is the interface for it. A list of conversations is a fourth thing competing for the
+width of a Sumbook, and until there is a reason to have two, one is the honest model.
+
+## 28. History is trimmed by count, not by size
+
+A question is asked with the last ten messages. Ten short exchanges and ten long ones are not the same
+request, and the long ones can exceed the context of a small local model while the count still says
+they fit.
+
+Counting tokens instead needs a tokenizer per provider, which is the thing this application deliberately
+does not have. Counting characters is the approximation to make, once there is a reason to believe the
+count is what breaks first.

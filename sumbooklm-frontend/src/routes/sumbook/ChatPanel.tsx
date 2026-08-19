@@ -1,28 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { useModelSettings } from '@/byok/useModelSettings';
+import { useChat } from '@/chat/useChat';
 import { Button } from '@/components/ui/button';
 import type { Notebook } from '@/notebooks/notebook';
 import { TopicIcon } from '@/notebooks/TopicIcon';
 import { ChatComposer } from '@/routes/sumbook/ChatComposer';
+import { ChatMessageView } from '@/routes/sumbook/ChatMessageView';
 import { useSumbookMeta } from '@/routes/sumbook/SumbookMeta';
+import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
 
 /**
- * The middle panel, where the Sumbook is summarised and asked questions.
+ * The middle panel, where the Sumbook is asked about its sources.
  *
- * The summary is not written yet, so the panel says that instead of showing an empty block, and the
- * button that would copy it is offered as disabled rather than left out: a control that appears only
- * once the feature lands moves everything around it at that moment.
+ * An empty conversation shows what the Sumbook is instead of an empty box, and the summary that will
+ * stand there is announced rather than left out. As soon as something has been asked, that space
+ * belongs to the conversation: it is what the reader came back for, and it is the part that grows.
  *
- * Asking is already wired up as far as it can be. The field behaves the way it will behave, and a
- * submitted question is answered with the one honest answer available, which is that answering does
- * not exist yet.
+ * Asking needs a model, and this browser is the only place one is configured. A Sumbook that has none
+ * therefore says so where the question would be typed, with the way to fix it right there, rather
+ * than letting the question be sent and rejected.
  */
 export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourceCount: number }) {
   const { t } = useTranslation();
   const meta = useSumbookMeta();
-  const [asked, setAsked] = useState(false);
+  const { settings, configured } = useModelSettings();
+  const { status, messages, answering, ask } = useChat(notebook.id);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const transcript = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const element = transcript.current;
+    if (element) {
+      element.scrollTop = element.scrollHeight;
+    }
+  }, [messages]);
 
   return (
     <section
@@ -41,31 +55,55 @@ export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourc
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-4 overflow-y-auto">
-        <p className="max-w-2xl text-sm leading-6 text-jb-grey-40">
-          {sourceCount === 0 ? t('sumbook.summary.noSources') : t('sumbook.summary.pending')}
-        </p>
-        <div className="flex">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled
-            className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-30 disabled:opacity-45"
-          >
-            <Copy />
-            {t('sumbook.summary.copy')}
-          </Button>
-        </div>
+      <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        {messages.length === 0 ? (
+          <div className="flex flex-1 flex-col justify-center gap-4">
+            <p className="max-w-2xl text-sm leading-6 text-jb-grey-40">
+              {status === 'failed'
+                ? t('sumbook.chat.historyFailed')
+                : sourceCount === 0
+                  ? t('sumbook.summary.noSources')
+                  : t('sumbook.summary.pending')}
+            </p>
+            <div className="flex">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-30 disabled:opacity-45"
+              >
+                <Copy />
+                {t('sumbook.summary.copy')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          messages.map((message) => <ChatMessageView key={message.key} message={message} />)
+        )}
       </div>
 
       <div className="flex flex-col gap-2">
-        <ChatComposer sourceCount={sourceCount} onSubmit={() => setAsked(true)} />
-        {asked ? (
-          <p className="text-xs text-jb-grey-50" role="status">
-            {t('sumbook.chat.notAvailable')}
-          </p>
-        ) : null}
+        {configured ? null : (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-jb-card bg-jb-grey-90/50 px-3 py-2 ring-1 ring-jb-grey-70/30">
+            <p className="text-xs text-jb-grey-40">{t('sumbook.chat.noModel')}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-jb-card border-jb-grey-70 bg-transparent text-jb-grey-20 hover:bg-jb-grey-80/40 hover:text-jb-grey-5"
+              onClick={() => setSettingsOpen(true)}
+            >
+              {t('sumbook.chat.chooseModel')}
+            </Button>
+          </div>
+        )}
+        <ChatComposer
+          sourceCount={sourceCount}
+          disabled={!configured || answering}
+          onSubmit={(question) => void ask(question, settings)}
+        />
       </div>
+
+      <ModelSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </section>
   );
 }

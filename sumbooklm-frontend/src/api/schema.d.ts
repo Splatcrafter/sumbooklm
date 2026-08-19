@@ -108,6 +108,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notebooks/{notebookId}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask a question about the sources of a notebook
+         * @description Stores the question and answers it as a stream of server sent events: the sources the answer may cite, then the answer part by part, then either the finished answer or the reason none arrived. The model is the one named by the headers of the request and is addressed with the key they carry.
+         */
+        post: operations["ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/logout": {
         parameters: {
             query?: never;
@@ -208,6 +228,26 @@ export interface paths {
          * @description Returns every source of the notebook, oldest first, each with the stage it has reached on its way into the retrieval index.
          */
         get: operations["list_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebookId}/chat/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the conversation of a notebook
+         * @description Returns every message of the conversation, oldest first. A notebook that has not been asked anything answers with an empty conversation.
+         */
+        get: operations["conversation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -415,6 +455,14 @@ export interface components {
              */
             createdAt?: string;
         };
+        /** @description A question about the sources of one notebook. */
+        ChatQuestionRequest: {
+            /**
+             * @description Question to answer from the sources of the notebook.
+             * @example What does the second chapter say about entropy?
+             */
+            question: string;
+        };
         /** @description Credentials of an existing account. */
         LoginRequest: {
             /**
@@ -469,6 +517,28 @@ export interface components {
             key?: string;
             /** @description Base64 encoded vector to use for the next encryption. */
             initializationVector?: string;
+        };
+        /** @description The conversation held inside one notebook. */
+        ChatConversationResponse: {
+            /** @description Name the conversation is listed under, empty while unused. */
+            title?: string;
+            /** @description Messages of the conversation, oldest first. */
+            messages?: components["schemas"]["ChatMessageResponse"][];
+        };
+        /** @description One message of the conversation held inside a notebook. */
+        ChatMessageResponse: {
+            /**
+             * @description Author of the message.
+             * @enum {string}
+             */
+            role?: "USER" | "ASSISTANT";
+            /** @description Content of the message, in Markdown for a generated answer. */
+            text?: string;
+            /**
+             * Format: date-time
+             * @description Point in time the message was appended to the conversation.
+             */
+            createdAt?: string;
         };
     };
     responses: never;
@@ -731,6 +801,58 @@ export interface operations {
             };
         };
     };
+    ask: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-AI-Provider"?: string;
+                "X-AI-Model"?: string;
+                "X-AI-Api-Key"?: string;
+                "X-AI-Base-Url"?: string;
+            };
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatQuestionRequest"];
+            };
+        };
+        responses: {
+            /** @description The answer is being streamed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description The question or the named model is not usable. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -970,6 +1092,42 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SourceResponse"][];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    conversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation was returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ChatConversationResponse"];
                 };
             };
             /** @description No valid access token was presented. */

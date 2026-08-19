@@ -80,6 +80,16 @@ public final class ApiPaths {
     public static final String V1_NOTEBOOK_SOURCE = V1_NOTEBOOK_SOURCES + "/{sourceId}";
 
     /**
+     * Endpoint that answers a question about the sources of one notebook.
+     */
+    public static final String V1_NOTEBOOK_CHAT = V1_NOTEBOOK + "/chat";
+
+    /**
+     * Transcript of the conversation held inside one notebook.
+     */
+    public static final String V1_NOTEBOOK_CHAT_MESSAGES = V1_NOTEBOOK_CHAT + "/messages";
+
+    /**
      * Endpoint that hands a client the parameters its stored token pair is encrypted with. The
      * trailing slash is part of the published path.
      */

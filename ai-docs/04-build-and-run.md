@@ -327,3 +327,62 @@ arrow; shift with enter neither sends nor clears; enter sends the trimmed questi
 as well. Those are the requirements that no amount of static markup can demonstrate.
 
 All harnesses live outside the repository; see open question 17.
+
+## Verification of the chat pipeline on 2026-08-19
+
+Full `mvn clean install` on JDK 25 / Maven 3.9.15: all ten modules green, 45 tests, JavaDoc gate
+unchanged.
+
+`ChatApiIntegrationTest` drives the assembled application over HTTP on a random port, seven cases. No
+language model is reachable from a build, so every question is asked against `http://127.0.0.1:9`,
+which refuses the connection immediately. What that leaves observable is everything this application
+is responsible for; only the generated words are out of reach, and they are the part it does not
+write.
+
+| Case | Asserted |
+| --- | --- |
+| Reading a fresh conversation | `200` with an empty title and no messages, not `404` |
+| Asking without provider, without model, without a key, with an unknown provider | `400` each time, and nothing added to the transcript |
+| Asking with an unreachable provider | `200`, the stream carries `sources` then `error`, and the question is in the transcript with the title derived from it |
+| Two notebooks with one document each | the `sources` event of a question names only the document of the notebook it was asked in |
+| A notebook without sources | an empty `sources` event and the same stream shape as any other question |
+| A notebook of another account | reading and asking both answer `404` |
+| No access token | `401` |
+
+The fourth case is the one the retrieval filter exists for. It uploads a text about thermodynamics
+into one notebook and a text about sourdough into another, waits for both to be indexed, and asks the
+same question in both. It fails the moment the metadata filter stops being applied.
+
+`npm run api:generate` against the packaged jar regenerated `src/api/schema.d.ts` with the two chat
+paths, and `npm run typecheck` and `npm run build` are green against it, with only the pre-existing
+chunk size warning.
+
+The browser client was then driven against the running jar from Node, through Vite's SSR loader as
+before. Eight checks: a real `File` uploaded and indexed, an empty transcript, the event stream parsed
+into `sources` then `error`, the retrieved source reported with its name and number, a reason carried
+by the failure, the question in the transcript afterwards, and a selection without a key rejected with
+`400` before any stream starts.
+
+A second harness put a fake Ollama server in front of the same client: a plain HTTP server answering
+`POST /api/chat` with newline delimited JSON, which is exactly what the LangChain4j Ollama client
+parses. That closes the last gap, because it is the only way to observe a successful answer without a
+real model. Fourteen checks, and the interesting ones are what the fake server received: the first
+message is a system message that carries the citation format `[n](#source-n)`, the heading `[1]
+thermodynamics.txt`, and the text of the retrieved passage itself. The question is the last message.
+Then the answer arrives in three parts through `onToken`, assembles into the text the fake model sent,
+is announced once through `onDone`, ends up in the transcript as an `ASSISTANT` message, and a second
+question is sent with the earlier exchange in front of it.
+
+The message rendering needed a DOM, so `jsdom` was installed outside the manifest and removed
+afterwards: Markdown emphasis and lists are rendered, `[1](#source-1)` becomes a chip carrying the
+number and the name of its source rather than a link, the cited sources are listed under the answer, a
+question is shown exactly as typed and is not rendered as markup, questions sit right and answers
+left, a failed answer names its reason, the composer stays disabled and grey while the field holds
+only whitespace and turns blue with text, shift with enter does not send, enter sends and clears, and
+a composer disabled while an answer is being written sends nothing at all.
+
+Every translated key used in the interface was checked against all three locale files: ninety-nine
+keys, none missing in any language, and the three keys built at runtime are the account failure
+reasons and the provider names.
+
+All harnesses live outside the repository; see open question 17.

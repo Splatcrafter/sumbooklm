@@ -17,8 +17,8 @@ sumbooklm-parent                 (pom, aggregator + dependency and plugin manage
 
 The graph is acyclic and one directional. `domain` is a leaf and must stay framework free.
 `persistence`, `ingestion` and `ai` are capability modules that must not reference each other:
-`ingestion` knows how to read a source, `ai` knows how to embed one, and neither knows that notebooks
-exist. `security` and `workspace` are the two modules that combine capabilities and own tables; see
+`ingestion` knows how to read a source, `ai` knows how to embed one and how to ask a model, and
+neither knows that notebooks exist. `security` and `workspace` are the two modules that combine capabilities and own tables; see
 ADR-012 and ADR-024. `workspace` is therefore the only module that depends on `ingestion` and `ai`,
 because the pipeline that runs one after the other is the lifecycle of a source and not a capability
 of its own.
@@ -26,8 +26,8 @@ of its own.
 ## Module responsibilities
 
 **`sumbooklm-domain`** — Notebooks, sources, chunks, chat interactions as plain Java. No JPA, no
-Jackson, no Spring, no LangChain4j. Holds the user account model and the workspace model; the source
-and chunk side of the model joins it with the ingestion pipeline.
+Jackson, no Spring, no LangChain4j. Holds the user account model and the workspace model, including
+the transcript of a conversation and the two roles a message can have.
 
 **`sumbooklm-persistence`** — Spring Data JPA, the CBOR payload codec, and the Aether Datafixers
 integration. Holds `PayloadSchemaVersion`. Carries the H2 and PostgreSQL drivers at runtime scope.
@@ -49,9 +49,11 @@ document parser for extracting text from PDF, Markdown, HTML and plain text uplo
 that cuts the extracted text into segments. Produces text and segments, and knows nothing about where
 either came from or goes.
 
-**`sumbooklm-ai`** — Chat model access (OpenAI compatible endpoint or Ollama), in process embeddings
-via `all-MiniLM-L6-v2`, vector storage via `InMemoryEmbeddingStore`. `NotebookIndex` is the only way
-into the store and takes the notebook and the source as parameters; see ADR-030.
+**`sumbooklm-ai`** — Chat model access built per request from what the caller presented (ADR-034),
+the instructions an answer is grounded by, in process embeddings via `all-MiniLM-L6-v2`, and vector
+storage via `InMemoryEmbeddingStore`. `NotebookIndex` is the only way into the store in either
+direction: writing takes the notebook and the source, and reading hands out a retriever filtered to
+one notebook; see ADR-030 and ADR-035.
 
 **`sumbooklm-api`** — Controllers, transport models, `ApiPaths`, `OpenApiConfiguration`, the
 `SecurityFilterChain` and the exception handler that maps failures onto problem details. Owns the
@@ -76,18 +78,19 @@ de.pfoertner.assessment.sumbooklm
 ├── config
 │   ├── SinglePageApplicationConfiguration
 │   ├── TimeConfiguration                       the shared Clock, see ADR-024
-│   ├── AsyncConfiguration                      @EnableAsync and the ingestion pool, see ADR-028
+│   ├── AsyncConfiguration                      @EnableAsync, the ingestion and chat pools, ADR-028
 │   └── H2ConsoleSecurityConfiguration          (dev profile only)
 ├── domain
 │   ├── user                                    UserAccount, UserProfile, AccountActivity
-│   └── workspace                               Notebook, SourceDocument, DocumentStatus, SourceKind
+│   └── workspace                               Notebook, SourceDocument, DocumentStatus, SourceKind,
+│                                                ChatSession, ChatMessage, ChatRole
 ├── persistence
 │   ├── schema.PayloadSchemaVersion
 │   ├── payload                                 PayloadTypes, PayloadCodec, PayloadDataFixerBootstrap
 │   ├── user                                    entity, repository, payload record and codec, mapper
 │   ├── notebook                                entity, repository, payload record and codec, mapper
 │   ├── document                                entity, repository, payload record and codec, count projection
-│   ├── chat                                    entity, repository, payload record and codec
+│   ├── chat                                    entity, repository, session and message payloads, mapper
 │   └── token                                   refresh token entity and repository
 ├── security
 │   ├── config                                  SecurityProperties, bean and scheduling configuration
@@ -97,13 +100,17 @@ de.pfoertner.assessment.sumbooklm
 │   └── access                                  SensitiveOperation and its aspect
 ├── workspace
 │   ├── notebook                                NotebookService, update command, failure
-│   └── source                                  SourceDocumentService, the pipeline, its event,
-│                                                fingerprints and failures
+│   ├── source                                  SourceDocumentService, the pipeline, its event,
+│   │                                            fingerprints and failures
+│   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
+│                                                the turn context, the stream handler, failures
 ├── ingestion
 │   ├── extraction                              file and web extractors, their result and failure
 │   └── chunking                                TextChunker
 ├── ai
-│   └── embedding                               model and store beans, NotebookIndex, metadata keys
+│   ├── embedding                               model and store beans, NotebookIndex, metadata keys
+│   └── chat                                    ChatProvider, ModelSelection, ChatModelFactory,
+│                                                GroundedPrompt, GroundedChatEngine, its handler
 └── api
     ├── ApiPaths
     ├── config                                  OpenApiConfiguration, SecurityConfiguration
@@ -113,6 +120,8 @@ de.pfoertner.assessment.sumbooklm
     └── v1
         ├── auth                                controller and payloads of the token lifecycle
         ├── notebook                            controller and payloads of notebook management
+        ├── source                              controller and payloads of source management
+        ├── chat                                controller, BYOK headers, stream events, SSE writer
         └── security                            cookie parameter endpoint and its payload
 ```
 
@@ -155,11 +164,23 @@ sumbooklm-frontend
     │   ├── source.ts         client side type, its narrowing and the pending predicate
     │   ├── sourcesApi.ts     the four calls below /api/v1/notebooks/{id}/sources
     │   └── useSources.ts     the list, its actions, and the polling while indexing runs
+    ├── chat
+    │   ├── chatMessage.ts    client side message and source types with their narrowing
+    │   ├── chatApi.ts        the transcript call and the fetch that reads the event stream
+    │   └── useChat.ts        the transcript, the answer being written, and asking
+    ├── byok
+    │   ├── modelSettings.ts           the settings, their rules and the headers they become
+    │   ├── modelSettingsStore.ts      the encrypted cookie they live in
+    │   ├── modelSettingsContext.ts    context and its value
+    │   ├── ModelSettingsProvider.tsx  restore on sign-in, save, forget
+    │   └── useModelSettings.ts        hook over the context
+    ├── security
+    │   └── encryptedCookies.ts  AES-GCM read, write and delete under the derived key
     ├── auth
     │   ├── authContext.ts    context, failure type, status
     │   ├── AuthProvider.tsx  session restore, login, register, refresh, logout
     │   ├── session.ts        client side types and narrowing of the generated ones
-    │   ├── sessionStore.ts   AES-GCM encryption of the session into a cookie
+    │   ├── sessionStore.ts   the session as one of the encrypted cookies
     │   └── useAuth.ts        hook over the context
     ├── i18n
     │   ├── index.ts      i18next + language detector, de / en / ja
@@ -170,8 +191,9 @@ sumbooklm-frontend
         │                 LoginPage, RegisterPage
         ├── dashboard     DashboardPage, NotebookCard, NotebookCreateCard,
         │                 NotebookTitleDialog, NotebookDeleteDialog, NotebookMeta
+        ├── settings      ModelSettingsDialog
         └── sumbook       SumbookPage, SourcesPanel, SourceListItem, AddSourceDialog,
-                          ChatPanel, ChatComposer, StudioPanel, SumbookMeta
+                          ChatPanel, ChatComposer, ChatMessageView, StudioPanel, SumbookMeta
 ```
 
 The account routes are a second top level branch of the router rather than children of `AppLayout`.
@@ -233,9 +255,28 @@ The relation that makes step 7 possible: an access token carries the identifier 
 it was issued with in its `sid` claim, so any operation can ask whether its session is still open
 even though the access token itself is verified by signature alone.
 
+## Answering a question
+
+1. `POST /api/v1/notebooks/{id}/chat` carries the question in its body and the model in its headers.
+   The selection is validated first, then the notebook is resolved for the account of the access
+   token, the question is appended to the conversation of that notebook, and the transaction commits.
+   Both failures that can still be a status code have happened by now (ADR-037).
+2. The request returns an `SseEmitter`. Everything after this point runs on the chat executor.
+3. The retriever of that notebook embeds the question and reads the segments whose `notebookId`
+   metadata matches, above the relevance floor (ADR-035). Their sources are named from the source
+   table, numbered per document, and sent as the `sources` event.
+4. A client is built for the presented provider, and the model is asked with the rules, the numbered
+   passages, the last messages of the conversation and the question. Each part it generates is
+   written to the stream as a `token` event.
+5. The finished answer is handed to the asynchronous recorder and sent as the `done` event, after
+   which the stream is closed. A failure at any point after step 2 becomes an `error` event instead,
+   and the question stays in the transcript without an answer.
+
 ## Database tables
 
-Both tables are created by Hibernate from the entities; there are no migration scripts (ADR-005).
+All tables are created by Hibernate from the entities; there are no migration scripts (ADR-005).
+Every one of them carries a `payload` of CBOR bytes and the `payload_version` those bytes were written
+at, so a field that is not part of a query lives there rather than in a column (ADR-016).
 
 `user_account` — `id` (UUID, primary key), `username` (unique), `password_hash`, `registered_at`,
 `last_login_at`, `payload` (CBOR bytes), `payload_version`, `record_version` (optimistic locking).
@@ -245,3 +286,20 @@ First name, last name and the two recorded addresses live in `payload`; see ADR-
 (foreign key to `user_account`), `token_hash` (unique, hexadecimal SHA-256 of the issued token),
 `issued_at`, `expires_at` (indexed, the cleanup job filters on it), `revoked_at` (null while the
 token is usable), `issued_to_ip`.
+
+`notebook` — `id` (UUID, primary key), `user_id` (indexed, every query is scoped to it),
+`created_at`, `last_activity_at` (the overview orders by it), `payload`, `payload_version`,
+`record_version`. Title, pin state and topic icon live in `payload`.
+
+`source_document` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
+`content` (the uploaded bytes, null for a web source, see ADR-032), `payload`, `payload_version`,
+`record_version`. Name, kind, origin, stage, token count and content hash live in `payload`.
+
+`chat_session` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
+`last_message_at`, `payload`, `payload_version`, `record_version`. The title and the whole transcript
+live in `payload`: a message is never read without its conversation and never changes once appended,
+so a row per message would add a join without ever being addressed on its own.
+
+The rows below a notebook carry its identifier rather than a foreign key with a cascade. Removing a
+notebook therefore removes its sources and its conversations explicitly, in the same transaction,
+where that cascade is visible.

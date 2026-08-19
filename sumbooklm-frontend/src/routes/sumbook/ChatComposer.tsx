@@ -10,23 +10,29 @@ import { Textarea } from '@/components/ui/textarea';
  * Enter sends and shift with enter adds a line, which is what a chat is expected to do and the
  * opposite of what a textarea does on its own. Sending is only offered once the field holds
  * something other than whitespace, so the button never promises to send an empty question.
+ *
+ * The field is cleared as the question leaves it. What was asked is already visible in the
+ * conversation above, so leaving it behind would only mean deleting it before asking the next one.
  */
 export function ChatComposer({
   sourceCount,
+  disabled = false,
   onSubmit,
 }: {
   sourceCount: number;
+  disabled?: boolean;
   onSubmit: (question: string) => void;
 }) {
   const { t } = useTranslation();
   const [question, setQuestion] = useState('');
-  const ready = question.trim() !== '';
+  const ready = !disabled && question.trim() !== '';
 
   function send() {
     if (!ready) {
       return;
     }
     onSubmit(question.trim());
+    setQuestion('');
   }
 
   function keyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -40,6 +46,7 @@ export function ChatComposer({
     <div className="flex flex-col gap-2 rounded-jb-block bg-jb-grey-90/60 p-3 ring-1 ring-jb-grey-70/30 focus-within:ring-jb-grey-50/50">
       <Textarea
         rows={1}
+        disabled={disabled}
         value={question}
         onChange={(event) => setQuestion(event.target.value)}
         onKeyDown={keyDown}

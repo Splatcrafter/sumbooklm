@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import de.pfoertner.assessment.sumbooklm.ai.embedding.NotebookIndex;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentFailure;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentStatus;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.SourceDocument;
@@ -22,6 +21,7 @@ import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookEntity;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
 import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +38,12 @@ import org.springframework.transaction.annotation.Transactional;
  * Adding a source stores it, marks it as uploaded and answers. The work that makes it searchable is
  * announced as an event and performed once the storing transaction has committed, because a listener
  * that started earlier would look for a row that is not visible yet.
+ *
+ * <h2>Duplicates Are a Constraint, Not a Check</h2>
+ * A source is refused when its notebook already holds the same content, which the database answers
+ * from an index over the hash. The check exists so that the caller is told what happened, and the
+ * unique constraint behind it is what makes the rule hold even when two uploads of the same file
+ * arrive at once and both find nothing.
  *
  * <h2>Indexing Again</h2>
  * A source can be sent through the pipeline more than once, and the request looks exactly like the
@@ -77,12 +83,7 @@ public class SourceDocumentService {
     private final SourceDocumentMapper sourceDocumentMapper;
 
     /**
-     * Retrieval index the segments of a removed source are taken out of.
-     */
-    private final NotebookIndex notebookIndex;
-
-    /**
-     * Publisher of the event that starts an indexing run.
+     * Publisher of the events this service announces its work with.
      */
     private final ApplicationEventPublisher eventPublisher;
 
@@ -97,20 +98,17 @@ public class SourceDocumentService {
      * @param notebookRepository       storage of the notebooks
      * @param sourceDocumentRepository storage of the sources
      * @param sourceDocumentMapper     translator between rows, payload and the domain model
-     * @param notebookIndex            retrieval index the segments of a source live in
-     * @param eventPublisher           publisher of the event that starts an indexing run
+     * @param eventPublisher           publisher of the events this service announces its work with
      * @param clock                    source of the current time
      */
     public SourceDocumentService(final NotebookRepository notebookRepository,
                                  final SourceDocumentRepository sourceDocumentRepository,
                                  final SourceDocumentMapper sourceDocumentMapper,
-                                 final NotebookIndex notebookIndex,
                                  final ApplicationEventPublisher eventPublisher,
                                  final Clock clock) {
         this.notebookRepository = notebookRepository;
         this.sourceDocumentRepository = sourceDocumentRepository;
         this.sourceDocumentMapper = sourceDocumentMapper;
-        this.notebookIndex = notebookIndex;
         this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
@@ -173,9 +171,9 @@ public class SourceDocumentService {
         if (content.length == 0) {
             throw new EmptyUploadException(name);
         }
-        return add(userId, notebookId, content,
+        return add(userId, notebookId, SourceFingerprint.ofContent(content), content,
                 new DocumentPayload(name, SourceKind.FILE, name, DocumentStatus.UPLOADED, 0,
-                        DocumentFailure.NONE, SourceFingerprint.ofContent(content)));
+                        DocumentFailure.NONE));
     }
 
     /**
@@ -191,9 +189,9 @@ public class SourceDocumentService {
     @Transactional
     public SourceDocument addWebPage(final UUID userId, final UUID notebookId, final String address) {
         final String trimmed = address.strip();
-        return add(userId, notebookId, null,
+        return add(userId, notebookId, SourceFingerprint.ofAddress(trimmed), null,
                 new DocumentPayload(trimmed, SourceKind.WEB, trimmed, DocumentStatus.UPLOADED, 0,
-                        DocumentFailure.NONE, SourceFingerprint.ofAddress(trimmed)));
+                        DocumentFailure.NONE));
     }
 
     /**
@@ -211,7 +209,8 @@ public class SourceDocumentService {
         final SourceDocumentEntity entity = requireSource(userId, notebookId, sourceId);
         this.sourceDocumentRepository.delete(entity);
         notebook.setLastActivityAt(now());
-        this.notebookIndex.removeSource(sourceId);
+
+        this.eventPublisher.publishEvent(new SourceRemovedEvent(sourceId));
     }
 
     /**
@@ -307,20 +306,25 @@ public class SourceDocumentService {
     /**
      * Stores a source and announces that it is waiting to be indexed.
      *
-     * @param userId     identifier of the account the notebook belongs to
-     * @param notebookId identifier of the notebook the source is added to
-     * @param content    bytes of the uploaded file, or {@code null} for a page
-     * @param payload    payload the source starts its life with
+     * @param userId       identifier of the account the notebook belongs to
+     * @param notebookId   identifier of the notebook the source is added to
+     * @param documentHash hash identifying the content that is being added
+     * @param content      bytes of the uploaded file, or {@code null} for a page
+     * @param payload      payload the source starts its life with
      * @return the stored source
      * @throws NotebookNotFoundException if the account holds no notebook with that identifier
      * @throws DuplicateSourceException  if the notebook already holds the same content
      */
     private SourceDocument add(final UUID userId,
                                final UUID notebookId,
+                               final String documentHash,
                                final byte[] content,
                                final DocumentPayload payload) {
         final NotebookEntity notebook = requireNotebook(userId, notebookId);
-        requireNotAlreadyPresent(userId, notebookId, payload.documentHash());
+        if (this.sourceDocumentRepository
+                .existsByNotebookIdAndUserIdAndDocumentHash(notebookId, userId, documentHash)) {
+            throw new DuplicateSourceException(notebookId);
+        }
 
         final Instant now = now();
         final SourceDocumentEntity entity = new SourceDocumentEntity(
@@ -328,10 +332,20 @@ public class SourceDocumentService {
                 userId,
                 notebookId,
                 now,
+                documentHash,
                 content,
                 this.sourceDocumentMapper.writePayload(payload),
                 PayloadSchemaVersion.CURRENT);
-        final SourceDocumentEntity stored = this.sourceDocumentRepository.save(entity);
+
+        final SourceDocumentEntity stored;
+        try {
+            stored = this.sourceDocumentRepository.saveAndFlush(entity);
+        } catch (final DataIntegrityViolationException e) {
+            // The row is written eagerly rather than at commit, so that a second upload of the same
+            // content, which passed the check above because the first had not been written yet, is
+            // still refused here instead of failing the request after the response was decided.
+            throw new DuplicateSourceException(notebookId);
+        }
         notebook.setLastActivityAt(now);
 
         this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, stored.getId()));
@@ -347,25 +361,6 @@ public class SourceDocumentService {
     private void store(final SourceDocumentEntity entity, final DocumentPayload payload) {
         entity.setPayload(this.sourceDocumentMapper.writePayload(payload));
         entity.setPayloadVersion(PayloadSchemaVersion.CURRENT);
-    }
-
-    /**
-     * Rejects content a notebook already holds.
-     *
-     * @param userId       identifier of the account the notebook belongs to
-     * @param notebookId   identifier of the notebook to search
-     * @param documentHash fingerprint of the content that is about to be added
-     * @throws DuplicateSourceException if a source of the notebook carries the same fingerprint
-     */
-    private void requireNotAlreadyPresent(final UUID userId, final UUID notebookId, final String documentHash) {
-        final boolean present = this.sourceDocumentRepository
-                .findAllByNotebookIdAndUserIdOrderByCreatedAtAsc(notebookId, userId)
-                .stream()
-                .map(this.sourceDocumentMapper::readPayload)
-                .anyMatch(existing -> existing.documentHash().equals(documentHash));
-        if (present) {
-            throw new DuplicateSourceException(notebookId);
-        }
     }
 
     /**

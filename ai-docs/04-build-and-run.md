@@ -478,3 +478,26 @@ as a sentence rather than as a key, an indexed source shows its token count inst
 the retry control is offered on a failed source and on no other.
 
 All harnesses live outside the repository; see open question 17.
+
+## Verification of the hash column and the deferred index removal on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 68 tests.
+
+Duplicate detection reaches the database now, so the suite states both halves of it. The existing case
+covers the check: the same content twice in one notebook is `409`, and the same content in a second
+notebook is `201`. A new case covers the constraint, directly against the repository, because two
+requests never arrive at the same instant in a test and a check without a constraint behind it is
+exactly what a race defeats. A second row carrying the hash of an existing source is refused by the
+table in the same notebook and accepted in another one.
+
+Removing segments after the commit is invisible in a response, so it is asserted by counting what the
+store holds: deleting a source takes its segments out, and deleting a notebook takes out the segments
+of the sources it held. Both would have passed before the change as well, which is the point: they are
+what keeps the move from quietly dropping the removal altogether.
+
+The schema changed, so the restart harness was run again from an empty file backed database: the table
+is created with the column and the constraint, a file is uploaded and indexed, the process is stopped
+and started against the same file, and the source is retrievable again in ninety-one milliseconds.
+
+The frontend is untouched by this change. The hash was never part of a response, so the generated
+client and the interface are the same as before.

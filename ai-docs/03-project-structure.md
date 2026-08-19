@@ -102,9 +102,11 @@ de.pfoertner.assessment.sumbooklm
 │   ├── cookie                                  cookie key derivation and its parameters
 │   └── access                                  SensitiveOperation and its aspect
 ├── workspace
-│   ├── notebook                                NotebookService, update command, failure
-│   ├── source                                  SourceDocumentService, the pipeline, its event, the
-│   │                                            startup rebuild, fingerprints and failures
+│   ├── notebook                                NotebookService, update command, removal event,
+│   │                                            failure
+│   ├── source                                  SourceDocumentService, the pipeline, its events, the
+│   │                                            startup rebuild, the index cleanup listener,
+│   │                                            fingerprints and failures
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
 │                                                the turn context, the stream handler, failures
 ├── ingestion
@@ -262,9 +264,10 @@ even though the access token itself is verified by signature alone.
 
 ## Indexing a source
 
-1. Adding a source stores it as `UPLOADED` and publishes an event that is delivered after the storing
-   transaction commits, on the indexing executor. `POST .../sources/{id}/reindex` puts an existing
-   source back in the same state and publishes the same event.
+1. Adding a source hashes its content, refuses it if the notebook already holds that hash, stores it
+   as `UPLOADED` and publishes an event that is delivered after the storing transaction commits, on
+   the indexing executor. `POST .../sources/{id}/reindex` puts an existing source back in the same
+   state and publishes the same event.
 2. The run marks the source `INDEXING` and reads what it needs in one short transaction, including
    the text an earlier run extracted.
 3. If that text is there it is used as it is. If it is not, the source is read: Apache Tika for the
@@ -319,10 +322,11 @@ token is usable), `issued_to_ip`.
 `record_version`. Title, pin state and topic icon live in `payload`.
 
 `source_document` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
-`content` (the uploaded bytes, null for a web source, see ADR-032), `extracted_text` (the text the last
-successful run read, null while there was none, see ADR-041), `payload`, `payload_version`,
-`record_version`. Name, kind, origin, stage, failure cause, token count and content hash live in
-`payload`.
+`document_hash` (unique together with `notebook_id`, see ADR-046), `content` (the uploaded bytes, null
+for a web source, see ADR-032), `extracted_text` (the text the last successful run read, null while
+there was none, see ADR-041), `payload`, `payload_version`, `record_version`. Name, kind, origin,
+stage, failure cause and token count live in `payload`; the hash does not, because it is the one field
+that is queried rather than displayed.
 
 `chat_session` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
 `last_message_at`, `payload`, `payload_version`, `record_version`. The title and the whole transcript
@@ -331,4 +335,5 @@ so a row per message would add a join without ever being addressed on its own.
 
 The rows below a notebook carry its identifier rather than a foreign key with a cascade. Removing a
 notebook therefore removes its sources and its conversations explicitly, in the same transaction,
-where that cascade is visible.
+where that cascade is visible. The segments of those sources are removed after that transaction has
+committed rather than inside it, because the vector store cannot be rolled back with it (ADR-047).

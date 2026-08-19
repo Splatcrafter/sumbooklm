@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import org.hibernate.Length;
 
@@ -17,9 +18,15 @@ import org.hibernate.Length;
  *
  * <h2>Column Contract</h2>
  * The columns hold the identifier of the source, the notebook it belongs to, the account that owns
- * both, and the point in time it was added. Its name, its processing state, its token count and its
- * content hash live in {@code payload} as CBOR bytes written at the schema version recorded in
- * {@code payload_version}.
+ * both, the point in time it was added and the hash of its content. Its name, its processing state,
+ * its token count and the reason it failed live in {@code payload} as CBOR bytes written at the
+ * schema version recorded in {@code payload_version}.
+ *
+ * <h2>The Hash Is a Column</h2>
+ * The hash is asked about rather than displayed: every added source is compared against the ones the
+ * notebook already holds. A field that is queried belongs in a column, and the unique constraint over
+ * the notebook and the hash makes the rule an invariant of the table rather than the outcome of a
+ * check that two concurrent uploads could both pass.
  *
  * <h2>Stored Content</h2>
  * {@code content} holds the bytes of an uploaded file, so that the source can be parsed again
@@ -45,7 +52,10 @@ import org.hibernate.Length;
         indexes = {
                 @Index(name = "ix_source_document_notebook_id", columnList = "notebook_id"),
                 @Index(name = "ix_source_document_user_id", columnList = "user_id")
-        })
+        },
+        uniqueConstraints = @UniqueConstraint(
+                name = "ux_source_document_notebook_hash",
+                columnNames = {"notebook_id", "document_hash"}))
 public class SourceDocumentEntity {
 
     /**
@@ -72,6 +82,12 @@ public class SourceDocumentEntity {
      */
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /**
+     * Hash identifying the content of the source, as a hexadecimal digest of fixed length.
+     */
+    @Column(name = "document_hash", nullable = false, updatable = false, length = 64)
+    private String documentHash;
 
     /**
      * Bytes of the uploaded file, or {@code null} for a source that names a web page.
@@ -122,6 +138,7 @@ public class SourceDocumentEntity {
      * @param userId         identifier of the account the source belongs to
      * @param notebookId     identifier of the notebook the source belongs to
      * @param createdAt      point in time the source was added
+     * @param documentHash   hash identifying the content of the source
      * @param content        bytes of the uploaded file, or {@code null} for a web page
      * @param payload        CBOR encoded payload of the source
      * @param payloadVersion payload schema version the payload was written with
@@ -130,6 +147,7 @@ public class SourceDocumentEntity {
                                 final UUID userId,
                                 final UUID notebookId,
                                 final Instant createdAt,
+                                final String documentHash,
                                 final byte[] content,
                                 final byte[] payload,
                                 final int payloadVersion) {
@@ -137,6 +155,7 @@ public class SourceDocumentEntity {
         this.userId = userId;
         this.notebookId = notebookId;
         this.createdAt = createdAt;
+        this.documentHash = documentHash;
         this.content = content;
         this.payload = payload;
         this.payloadVersion = payloadVersion;
@@ -176,6 +195,15 @@ public class SourceDocumentEntity {
      */
     public Instant getCreatedAt() {
         return this.createdAt;
+    }
+
+    /**
+     * Returns the hash identifying the content of the source.
+     *
+     * @return hexadecimal digest of the content
+     */
+    public String getDocumentHash() {
+        return this.documentHash;
     }
 
     /**

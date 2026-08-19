@@ -19,13 +19,6 @@ import de.splatgames.aether.datafixers.api.result.DataResult;
  * relational, so a change to the pipeline changes this record and is carried into stored data by a
  * data fixer instead of by a schema migration.
  *
- * <h2>Content Hash</h2>
- * The hash identifies the content of a source independently of the name it was uploaded under, which
- * is what lets the same document be recognised when it is added a second time. It is stored in the
- * payload rather than in a column, which means duplicate detection compares decoded payloads within
- * one notebook rather than asking the database for a match; promoting the hash to an indexed column
- * is the change to make once detection has to span notebooks.
- *
  * <h2>Failure Next to Status</h2>
  * The stage says that a source could not be indexed and the failure says why. The two are kept apart
  * rather than folded into one enumeration of stages, because the stage drives what the pipeline and
@@ -44,7 +37,6 @@ import de.splatgames.aether.datafixers.api.result.DataResult;
  * @param tokenCount   number of tokens the indexed text was counted as, zero while unknown
  * @param failure      reason the source could not be indexed, {@link DocumentFailure#NONE} unless it
  *                     failed
- * @param documentHash hash identifying the content of the source, empty while unknown
  * @author Erik Pförtner
  * @since 0.1.0
  */
@@ -53,8 +45,7 @@ public record DocumentPayload(String displayName,
                               String origin,
                               DocumentStatus status,
                               int tokenCount,
-                              DocumentFailure failure,
-                              String documentHash) {
+                              DocumentFailure failure) {
 
     /**
      * Codec of the processing stage. The stage is written by name, so that inserting a constant into
@@ -87,8 +78,7 @@ public record DocumentPayload(String displayName,
                     Codecs.STRING.fieldOf("origin").forGetter(DocumentPayload::origin),
                     STATUS_CODEC.fieldOf("status").forGetter(DocumentPayload::status),
                     Codecs.INT.fieldOf("tokenCount").forGetter(DocumentPayload::tokenCount),
-                    FAILURE_CODEC.fieldOf("failure").forGetter(DocumentPayload::failure),
-                    Codecs.STRING.fieldOf("documentHash").forGetter(DocumentPayload::documentHash)
+                    FAILURE_CODEC.fieldOf("failure").forGetter(DocumentPayload::failure)
             ).apply(instance, DocumentPayload::new));
 
     /**
@@ -100,7 +90,6 @@ public record DocumentPayload(String displayName,
      * @param status       stage the source has reached on its way into the retrieval index
      * @param tokenCount   number of tokens the indexed text was counted as, zero while unknown
      * @param failure      reason the source could not be indexed
-     * @param documentHash hash identifying the content of the source, empty while unknown
      * @throws NullPointerException     if any reference argument is {@code null}
      * @throws IllegalArgumentException if {@code tokenCount} is negative
      */
@@ -110,7 +99,6 @@ public record DocumentPayload(String displayName,
         Objects.requireNonNull(origin, "origin must not be null");
         Objects.requireNonNull(status, "status must not be null");
         Objects.requireNonNull(failure, "failure must not be null");
-        Objects.requireNonNull(documentHash, "documentHash must not be null");
         if (tokenCount < 0) {
             throw new IllegalArgumentException("tokenCount must not be negative");
         }
@@ -127,8 +115,8 @@ public record DocumentPayload(String displayName,
      * @return a payload equal to this one except for its stage and its failure
      */
     public DocumentPayload withStatus(final DocumentStatus newStatus) {
-        return new DocumentPayload(this.displayName, this.kind, this.origin, newStatus,
-                this.tokenCount, DocumentFailure.NONE, this.documentHash);
+        return new DocumentPayload(
+                this.displayName, this.kind, this.origin, newStatus, this.tokenCount, DocumentFailure.NONE);
     }
 
     /**
@@ -139,8 +127,8 @@ public record DocumentPayload(String displayName,
      *         {@link DocumentStatus#ERROR}, and its failure
      */
     public DocumentPayload withFailure(final DocumentFailure cause) {
-        return new DocumentPayload(this.displayName, this.kind, this.origin, DocumentStatus.ERROR,
-                this.tokenCount, cause, this.documentHash);
+        return new DocumentPayload(
+                this.displayName, this.kind, this.origin, DocumentStatus.ERROR, this.tokenCount, cause);
     }
 
     /**
@@ -153,7 +141,7 @@ public record DocumentPayload(String displayName,
      */
     public DocumentPayload withIndexingResult(final String newDisplayName, final int newTokenCount) {
         return new DocumentPayload(newDisplayName, this.kind, this.origin, DocumentStatus.READY,
-                newTokenCount, DocumentFailure.NONE, this.documentHash);
+                newTokenCount, DocumentFailure.NONE);
     }
 
     /**

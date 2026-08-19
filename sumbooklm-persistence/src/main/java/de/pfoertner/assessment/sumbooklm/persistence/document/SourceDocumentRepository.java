@@ -61,6 +61,20 @@ public interface SourceDocumentRepository extends JpaRepository<SourceDocumentEn
     List<SourceDocumentEntity> findAllByNotebookIdAndUserIdOrderByCreatedAtAsc(UUID notebookId, UUID userId);
 
     /**
+     * Reports whether a notebook already holds a source with the given content.
+     *
+     * <p>This is what duplicate detection asks, and it is a query rather than a scan because the hash
+     * is a column. The unique constraint over the same two values is what makes the answer binding
+     * even when two uploads race each other.
+     *
+     * @param notebookId   identifier of the notebook to search
+     * @param userId       identifier of the owning account
+     * @param documentHash hash of the content that is about to be added
+     * @return {@code true} if the notebook already holds a source with that hash
+     */
+    boolean existsByNotebookIdAndUserIdAndDocumentHash(UUID notebookId, UUID userId, String documentHash);
+
+    /**
      * Finds one source of an account.
      *
      * @param id     identifier of the source

@@ -612,3 +612,13 @@ Spring Boot 4.1.0 manages `httpclient5` 5.6.1, which depends on `httpcore5` 5.4.
 that already held `httpclient5` 5.6.1 and `httpcore5` 5.4 as transitive artifacts of something else
 therefore still fails an offline build, because the pair does not match. The two are released on
 their own cadence and a resolved client version does not imply a resolved core version.
+
+### 47. A unique constraint only becomes catchable with an explicit flush
+
+Spring Data's `save` leaves the insert to the persistence context, which flushes at commit. A unique
+violation therefore surfaces after the service method has returned, where it can no longer be turned
+into the status the caller should get, and the transaction is already being rolled back.
+
+`saveAndFlush` moves the write to the point of the call, so `DataIntegrityViolationException` is
+thrown inside the method that can translate it. The cost is one statement that cannot be batched with
+whatever else the transaction writes, which is nothing here.

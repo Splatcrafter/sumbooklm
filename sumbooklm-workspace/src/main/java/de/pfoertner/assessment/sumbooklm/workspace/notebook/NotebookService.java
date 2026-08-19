@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import de.pfoertner.assessment.sumbooklm.ai.embedding.NotebookIndex;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.Notebook;
 import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.document.NotebookSourceCount;
@@ -18,6 +17,7 @@ import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookMapper;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookPayload;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,9 +36,12 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>Removal</h2>
  * Deleting a notebook deletes the sources and the chat sessions that belong to it in the same
- * transaction, and takes its segments out of the retrieval index. The rows below a notebook carry
- * its identifier rather than a foreign key with a cascade, so the cascade is performed here, where
- * it is visible.
+ * transaction. The rows below a notebook carry its identifier rather than a foreign key with a
+ * cascade, so the cascade is performed here, where it is visible.
+ *
+ * The segments of those sources are not removed here. The retrieval index has no transaction of its
+ * own, so the deletion is announced and acted on once it has committed; see
+ * {@code RetrievalIndexCleanup}.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -67,9 +70,9 @@ public class NotebookService {
     private final NotebookMapper notebookMapper;
 
     /**
-     * Retrieval index the segments of a removed notebook are taken out of.
+     * Publisher of the event announcing a deleted notebook.
      */
-    private final NotebookIndex notebookIndex;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Source of the current time, so that the recorded timestamps are deterministic in tests.
@@ -83,20 +86,20 @@ public class NotebookService {
      * @param sourceDocumentRepository storage of the sources
      * @param chatSessionRepository    storage of the chat sessions
      * @param notebookMapper           translator between rows, payload and the domain model
-     * @param notebookIndex            retrieval index the segments of a notebook live in
+     * @param eventPublisher           publisher of the event announcing a deleted notebook
      * @param clock                    source of the current time
      */
     public NotebookService(final NotebookRepository notebookRepository,
                            final SourceDocumentRepository sourceDocumentRepository,
                            final ChatSessionRepository chatSessionRepository,
                            final NotebookMapper notebookMapper,
-                           final NotebookIndex notebookIndex,
+                           final ApplicationEventPublisher eventPublisher,
                            final Clock clock) {
         this.notebookRepository = notebookRepository;
         this.sourceDocumentRepository = sourceDocumentRepository;
         this.chatSessionRepository = chatSessionRepository;
         this.notebookMapper = notebookMapper;
-        this.notebookIndex = notebookIndex;
+        this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
 
@@ -196,7 +199,8 @@ public class NotebookService {
         this.sourceDocumentRepository.deleteByNotebookIdAndUserId(notebookId, userId);
         this.chatSessionRepository.deleteByNotebookIdAndUserId(notebookId, userId);
         this.notebookRepository.delete(entity);
-        this.notebookIndex.removeNotebook(notebookId);
+
+        this.eventPublisher.publishEvent(new NotebookRemovedEvent(notebookId));
     }
 
     /**

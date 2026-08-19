@@ -33,7 +33,7 @@ import org.springframework.web.client.RestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Exercises the rebuild of the retrieval index against a running server.
+ * Exercises what keeps the retrieval index and the database saying the same thing.
  *
  * <h2>Simulating a Restart</h2>
  * A restart cannot be performed inside a test that runs in the application it would restart. What a
@@ -48,8 +48,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <h2>Counting Segments</h2>
  * The assertions count the segments stored for one source rather than asking a question about it.
- * That is the state the rebuild is responsible for; whether an answer can be produced from it is what
- * the chat suite already covers.
+ * That is the state these mechanisms are responsible for; whether an answer can be produced from it
+ * is what the chat suite already covers.
+ *
+ * <h2>Deletions Belong Here Too</h2>
+ * Removing the segments of a deleted source happens after the transaction that deleted it has
+ * committed, through an event. Nothing about that is visible in a response, so the only way to state
+ * that it happens at all is to count what the store holds afterwards.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -236,6 +241,49 @@ class IndexRestoreIntegrationTest {
         assertThat(reindex(owner, otherNotebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(reindex(owner, notebookId, UUID.randomUUID().toString()).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Verifies that deleting a source takes its segments out of the store, which happens after the
+     * deleting transaction has committed rather than inside it.
+     */
+    @Test
+    void deletingASourceRemovesItsSegments() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+        final String sourceId = idOf(uploadFile(accessToken, notebookId, "removable.txt", DOCUMENT_TEXT));
+        awaitSettled(accessToken, notebookId, sourceId);
+        assertThat(segmentsOf(sourceId)).isPositive();
+
+        final ResponseEntity<Void> response = this.client.delete()
+                .uri("/api/v1/notebooks/" + notebookId + "/sources/" + sourceId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .toBodilessEntity();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(segmentsOf(sourceId)).isZero();
+    }
+
+    /**
+     * Verifies that deleting a notebook takes the segments of every source it held out of the store.
+     */
+    @Test
+    void deletingANotebookRemovesTheSegmentsOfItsSources() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+        final String sourceId = idOf(uploadFile(accessToken, notebookId, "doomed.txt", DOCUMENT_TEXT));
+        awaitSettled(accessToken, notebookId, sourceId);
+        assertThat(segmentsOf(sourceId)).isPositive();
+
+        final ResponseEntity<Void> response = this.client.delete()
+                .uri("/api/v1/notebooks/" + notebookId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .toBodilessEntity();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(segmentsOf(sourceId)).isZero();
     }
 
     /**

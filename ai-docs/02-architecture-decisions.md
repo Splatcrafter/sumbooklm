@@ -836,3 +836,46 @@ message or from the type of an underlying exception would be guesswork about a f
 narrows anything unfamiliar to `UNEXPECTED` rather than rendering a key. And the payload grew a field
 inside schema `V1_0_0` again, which is the last change that can be made that way once the application
 has been deployed anywhere.
+
+## ADR-046: The content hash is a column with a unique constraint over it
+
+**Decision.** `document_hash` moves out of the CBOR payload into a column, with a unique constraint
+over `(notebook_id, document_hash)`. Adding a source asks the database whether the notebook already
+holds that content, and the constraint is what answers if two requests ask at the same moment.
+
+**Reason.** The rule that decides where a field lives is whether it is queried or displayed
+(ADR-016), and the hash is the one field of the payload that is never shown and always asked about.
+Leaving it in the payload meant decoding every source of a notebook to compare one string, which is
+fine for a dozen sources and wrong for a thousand.
+
+The constraint is the part that makes the rule true rather than likely. A check followed by an insert
+is two statements, and two uploads of the same file can both pass the check before either has
+written. With the constraint the second insert fails, and the service turns that into the same
+conflict the check would have produced.
+
+**Cost.** The payload lost a field, which is the third change to schema `V1_0_0` and the last one
+that can be made that way once the application has been deployed anywhere. And detection is still
+scoped to one notebook: the constraint spans a notebook, not an account, which is what the product
+means by adding the same document to two notebooks.
+
+## ADR-047: The index forgets after the commit, not during it
+
+**Decision.** Deleting a source or a notebook publishes an event, and the segments are removed by a
+listener that runs after the transaction has committed.
+
+**Reason.** The vector store is not part of the transaction and cannot be rolled back with it.
+Removing during the transaction means a rollback leaves a source that exists and can no longer be
+retrieved from, which is the failure that reports success: nothing is marked, nothing is logged, and
+the source keeps saying it is ready.
+
+Removing afterwards inverts what can go wrong. The leftover is then a segment whose source is gone,
+and one of those is already ignored when an answer is assembled, because a passage whose source the
+notebook does not list is dropped. The failure that survives is the one that is already handled.
+
+The listener does not run on its own thread, unlike indexing. Removal is a filtered pass over the
+store rather than a neural network, and keeping it on the committing thread means a source that is
+deleted and added again cannot have the two overtake each other.
+
+**Cost.** A removal that fails now leaves segments nobody will collect, since the rebuild at startup
+indexes the sources that exist rather than reconciling the store against them. That is the trade
+above, taken deliberately.

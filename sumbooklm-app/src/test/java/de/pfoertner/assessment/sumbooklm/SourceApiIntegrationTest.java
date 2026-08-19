@@ -8,8 +8,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Predicate;
 
+import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentEntity;
+import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentRepository;
+import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.ParameterizedTypeReference;
@@ -25,6 +29,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * Exercises the source endpoints and the indexing pipeline against a running server.
@@ -40,6 +45,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Indexing runs on another thread, so the assertions that describe its outcome poll the source until
  * it has left the stages that mean the run is still going. A fixed pause would either make the test
  * slow or make it depend on how fast the machine happens to be.
+ *
+ * <h2>One Case Below the API</h2>
+ * Duplicate detection is a check the service performs and a constraint the table carries, and only
+ * the check is reachable over HTTP: two requests never arrive at the same instant in a test. The
+ * constraint is therefore asserted directly against the repository, because a check without the
+ * constraint behind it is exactly what a race defeats.
  *
  * <h2>Failures Without a Network</h2>
  * The failing path is provoked with an address inside the loopback range rather than with an
@@ -97,16 +108,24 @@ class SourceApiIntegrationTest {
     private final RestClient client;
 
     /**
+     * Storage of the sources, used for the one assertion that is about the table rather than the API.
+     */
+    private final SourceDocumentRepository sourceDocumentRepository;
+
+    /**
      * Creates the test class and binds the client to the port the server was started on.
      *
-     * @param port port the embedded server listens on
+     * @param port                     port the embedded server listens on
+     * @param sourceDocumentRepository storage of the sources
      */
-    SourceApiIntegrationTest(@Autowired @LocalServerPort final int port) {
+    SourceApiIntegrationTest(@Autowired @LocalServerPort final int port,
+                             @Autowired final SourceDocumentRepository sourceDocumentRepository) {
         this.client = RestClient.builder()
                 .baseUrl("http://localhost:" + port)
                 .defaultStatusHandler(status -> true, (request, response) -> {
                 })
                 .build();
+        this.sourceDocumentRepository = sourceDocumentRepository;
     }
 
     /**
@@ -183,6 +202,48 @@ class SourceApiIntegrationTest {
                 .isEqualTo(HttpStatus.CONFLICT);
         assertThat(uploadFile(accessToken, otherNotebookId, "first.txt", DOCUMENT_TEXT).getStatusCode())
                 .isEqualTo(HttpStatus.CREATED);
+    }
+
+    /**
+     * Verifies that the table refuses a second source with the same content in the same notebook,
+     * which is what holds when two uploads pass the check of the service at the same time.
+     */
+    @Test
+    void theTableRefusesTheSameContentTwiceInOneNotebook() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+        final String otherNotebookId = createNotebook(accessToken);
+        final Map<String, Object> stored = requireBody(
+                uploadFile(accessToken, notebookId, "constrained.txt", DOCUMENT_TEXT));
+
+        final SourceDocumentEntity existing = this.sourceDocumentRepository
+                .findById(UUID.fromString((String) stored.get("id")))
+                .orElseThrow(() -> new AssertionError("The uploaded source was not stored"));
+
+        assertThatExceptionOfType(DataIntegrityViolationException.class).isThrownBy(() ->
+                this.sourceDocumentRepository.saveAndFlush(copyInto(existing, existing.getNotebookId())));
+        this.sourceDocumentRepository.saveAndFlush(
+                copyInto(existing, UUID.fromString(otherNotebookId)));
+    }
+
+    /**
+     * Builds a second row carrying the content of an existing source, in a notebook of the same
+     * account.
+     *
+     * @param source     source to copy the content and the hash of
+     * @param notebookId identifier of the notebook the copy belongs to
+     * @return a new row, not yet stored
+     */
+    private static SourceDocumentEntity copyInto(final SourceDocumentEntity source, final UUID notebookId) {
+        return new SourceDocumentEntity(
+                UUID.randomUUID(),
+                source.getUserId(),
+                notebookId,
+                source.getCreatedAt(),
+                source.getDocumentHash(),
+                source.getContent(),
+                source.getPayload(),
+                PayloadSchemaVersion.CURRENT);
     }
 
     /**

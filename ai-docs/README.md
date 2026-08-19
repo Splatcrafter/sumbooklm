@@ -14,7 +14,7 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 
-State as of 2026-08-19: build green across ten modules, 65 tests, and the JavaDoc gate active
+State as of 2026-08-19: build green across ten modules, 68 tests, and the JavaDoc gate active
 everywhere. The scaffold is complete and four feature areas are implemented.
 
 Authentication: registration, login, token rotation, logout, the weekly cleanup of invalidated

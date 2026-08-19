@@ -123,13 +123,15 @@ the studio. What remains open from the original question is smaller: the card is
 anchor would nest the menu button inside a link, which is invalid; the alternative is an invisible
 anchor covering the card with the menu raised above it.
 
-## 16. The document hash cannot be queried
+## 16. Resolved: the document hash is a column
 
-`DocumentPayload.documentHash` is where the specification asked for it, in the payload. Duplicate
-detection inside one notebook can therefore decode the sources of that notebook and compare, which is
-cheap enough. Detection across all sources of an account cannot be expressed as a query at all and
-would need the hash as an indexed column next to the payload. The choice belongs to the ingestion
-step, which is the first code that will actually need it.
+The hash moved out of the payload into `document_hash`, with a unique constraint over the notebook and
+the hash. Duplicate detection is a query now, and detection across a wider scope is a different query
+rather than a different design.
+
+What the move also settled is the rule for the payload, which had only been stated: a field that is
+asked about belongs in a column, a field that is displayed belongs in the payload. The hash was the
+one field that was never displayed, and it is the one that left.
 
 ## 17. The frontend has no test runner
 
@@ -198,24 +200,31 @@ What is not covered is a failure that never reaches an extractor, which is recor
 and tells the user nothing beyond the fact that it happened. That is the correct answer for a defect
 in this application, and it is meant to stay rare rather than to become informative.
 
-## 22. Duplicate detection decodes every payload of the notebook
+## 22. Resolved: duplicate detection is one query
 
-Adding a source reads every source of the notebook and decodes its payload to compare one hash. That
-is cheap for a notebook with a dozen sources and wrong for one with a thousand.
+Adding a source asks the database whether the notebook already holds that hash, which is an index
+lookup rather than a scan that decodes every payload.
 
-It is the direct consequence of the hash living in the payload, which open question 16 already
-records. The change is the same one: promote `documentHash` to an indexed column and let the database
-answer the question.
+The change went one step further than the question asked for. A check followed by an insert is two
+statements, so two uploads of the same file can both pass the check before either has written; the
+unique constraint over the notebook and the hash is what makes the rule hold in that case, and the
+service turns the violation into the same conflict the check produces.
 
-## 23. Removing a notebook takes its vectors out outside any transaction
+Detection is still scoped to one notebook rather than to an account. That is what the product means:
+the same document in two notebooks is two sources.
 
-Deleting a notebook or a source removes the matching segments from the vector store inside the
-transaction that deletes the rows, but the store has no transaction of its own. A rollback after that
-point would leave rows whose vectors are gone.
+## 23. Resolved: the index forgets after the commit
 
-Nothing follows the removal, so the window is theoretical today. It stops being theoretical as soon as
-the store is a real database, at which point the removal belongs in an after-commit listener like the
-one indexing already uses.
+Deleting a source or a notebook now publishes an event, and the segments are removed once that
+transaction has committed, through the same mechanism indexing already used.
+
+That does not remove the mismatch, it chooses which side of it to be on. Before, a rollback could
+leave a source that exists and cannot be retrieved from, which reports success while answering
+nothing. Now what can be left behind is a segment whose source is gone, and one of those is already
+ignored when an answer is assembled, because a passage whose source the notebook does not list is
+dropped.
+
+The leftover is not collected by anything, which is recorded as question 33.
 
 ## 24. The key is handed to the server on every question
 
@@ -309,3 +318,15 @@ with that beyond trying again.
 That is deliberate, because the alternative is showing them an internal message. What would make it
 better is not another constant but fewer occurrences, so the value worth watching is how often it is
 recorded at all.
+
+## 33. Nothing collects segments whose source is gone
+
+Removing the segments of a deleted source happens after the commit, so a removal that fails leaves
+them in the store with nothing left to remove them. The answer path ignores them, because a passage is
+dropped when the notebook does not list its source, so they are invisible rather than wrong. They
+still occupy memory and still cost a comparison on every search.
+
+Collecting them means a pass that compares the store against the sources that exist, which is what the
+rebuild at startup would be if it cleared the store first instead of replacing one source at a time.
+It does not, because a rebuild asked for at runtime would then briefly empty an index that is being
+searched.

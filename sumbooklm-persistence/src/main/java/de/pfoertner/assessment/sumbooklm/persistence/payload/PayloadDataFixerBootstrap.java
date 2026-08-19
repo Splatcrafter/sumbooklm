@@ -4,6 +4,7 @@ import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion
 import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionPayload;
 import de.pfoertner.assessment.sumbooklm.persistence.document.DocumentPayload;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookPayload;
+import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookSummaryFix;
 import de.pfoertner.assessment.sumbooklm.persistence.user.UserAccountPayload;
 import de.splatgames.aether.datafixers.api.DataVersion;
 import de.splatgames.aether.datafixers.api.bootstrap.DataFixerBootstrap;
@@ -29,7 +30,9 @@ import org.springframework.stereotype.Component;
  * version in {@link #registerSchemas(SchemaRegistry)} with the codecs of that version, and registers
  * the fixes that carry data from the previous version to it in
  * {@link #registerFixes(FixRegistrar)}. Schemas of earlier versions are retained, because they are
- * what stored data is read with before it is migrated.
+ * what stored data is read with before it is migrated. A payload whose shape is unchanged between two
+ * versions is registered in both with the same codec; only the one that changed gets a codec of its
+ * own, and only that one gets a fix.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -58,21 +61,29 @@ public class PayloadDataFixerBootstrap implements DataFixerBootstrap {
     public void registerSchemas(final SchemaRegistry schemas) {
         final TypeRegistry initialTypes = new SimpleTypeRegistry();
         initialTypes.register(new SimpleType<>(PayloadTypes.USER_ACCOUNT, UserAccountPayload.CODEC));
-        initialTypes.register(new SimpleType<>(PayloadTypes.NOTEBOOK, NotebookPayload.CODEC));
+        initialTypes.register(new SimpleType<>(PayloadTypes.NOTEBOOK, NotebookPayload.CODEC_V1_0_0));
         initialTypes.register(new SimpleType<>(PayloadTypes.SOURCE_DOCUMENT, DocumentPayload.CODEC));
         initialTypes.register(new SimpleType<>(PayloadTypes.CHAT_SESSION, ChatSessionPayload.CODEC));
         schemas.register(new Schema(new DataVersion(PayloadSchemaVersion.V1_0_0), initialTypes));
+
+        final TypeRegistry summaryTypes = new SimpleTypeRegistry();
+        summaryTypes.register(new SimpleType<>(PayloadTypes.USER_ACCOUNT, UserAccountPayload.CODEC));
+        summaryTypes.register(new SimpleType<>(PayloadTypes.NOTEBOOK, NotebookPayload.CODEC));
+        summaryTypes.register(new SimpleType<>(PayloadTypes.SOURCE_DOCUMENT, DocumentPayload.CODEC));
+        summaryTypes.register(new SimpleType<>(PayloadTypes.CHAT_SESSION, ChatSessionPayload.CODEC));
+        schemas.register(new Schema(new DataVersion(PayloadSchemaVersion.V1_1_0), summaryTypes));
     }
 
     /**
      * Registers the data fixes applied when a stored payload is older than {@link #CURRENT_VERSION}.
      *
-     * <p>No fix is registered yet: {@code 1.0.0} is the initial payload schema version, so there is
-     * no earlier version any stored payload could carry.
+     * <p>Only the notebook has changed shape so far. Every other payload passes the pipeline
+     * unchanged, which is what a type without a registered fix does.
      *
      * @param fixes registrar the fixes are contributed to
      */
     @Override
     public void registerFixes(final FixRegistrar fixes) {
+        fixes.register(PayloadTypes.NOTEBOOK, new NotebookSummaryFix());
     }
 }

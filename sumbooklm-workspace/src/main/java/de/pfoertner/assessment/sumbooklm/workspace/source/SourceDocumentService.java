@@ -3,6 +3,7 @@ package de.pfoertner.assessment.sumbooklm.workspace.source;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -153,6 +154,48 @@ public class SourceDocumentService {
             names.put(entity.getId(), this.sourceDocumentMapper.readPayload(entity).displayName());
         }
         return names;
+    }
+
+    /**
+     * Reads the text of every source of one notebook that was read successfully, oldest first.
+     *
+     * <p>A source that is still being indexed and one that could not be read are both left out. What
+     * this returns is the material a notebook can have something derived from, and a document that
+     * was never read is not part of it, however it got into that state.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to read the sources of
+     * @return the readable sources of the notebook, in the order they were added
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    @Transactional(readOnly = true)
+    public List<SourceText> texts(final UUID userId, final UUID notebookId) {
+        requireNotebook(userId, notebookId);
+        final List<SourceText> texts = new ArrayList<>();
+        for (final SourceDocumentEntity entity
+                : this.sourceDocumentRepository.findAllByNotebookIdAndUserIdOrderByCreatedAtAsc(notebookId, userId)) {
+            final DocumentPayload payload = this.sourceDocumentMapper.readPayload(entity);
+            final String text = entity.getExtractedText();
+            if (payload.status() == DocumentStatus.READY && text != null && !text.isBlank()) {
+                texts.add(new SourceText(entity.getId(), payload.displayName(), text));
+            }
+        }
+        return List.copyOf(texts);
+    }
+
+    /**
+     * Returns the value the set of sources of one notebook is recognised by.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to fingerprint the sources of
+     * @return the fingerprint of the sources the notebook currently holds
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    @Transactional(readOnly = true)
+    public String fingerprintOfSources(final UUID userId, final UUID notebookId) {
+        requireNotebook(userId, notebookId);
+        return SourceFingerprint.ofSourceSet(
+                this.sourceDocumentRepository.findStampsOfNotebook(notebookId, userId));
     }
 
     /**

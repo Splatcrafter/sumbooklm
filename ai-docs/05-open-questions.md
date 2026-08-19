@@ -515,3 +515,45 @@ they differ between providers.
 Reporting that honestly to a reader would mean knowing what each provider does, which is a table this
 application would have to keep current. What it says instead is what it knows: the answer stopped, and
 what arrived is kept.
+
+## 46. A summary is written in one language and read in three
+
+A summary is written in the language the interface was in when it was requested and stored as that text.
+Switching the interface afterwards changes every sentence on the screen except the one the model wrote,
+which is then a German paragraph under Japanese headings.
+
+Rewriting it on a switch would spend a request on an action that is otherwise free, and doing it silently
+would spend it without being asked. Storing one summary per language would multiply the cost by the
+number of languages a reader tries. What is there instead is the button that already exists for a summary
+whose sources changed, which writes the text again in the language now being read.
+
+## 47. Every readable source is loaded into the heap to be summarised
+
+Writing a summary reads the stored text of every source of the notebook, and the shortening happens
+afterwards. A notebook holding two hundred large documents therefore builds a list of two hundred texts in
+order to send twenty thousand characters of them.
+
+Shortening in the query is possible: the length is already read for the fingerprint, and a substring per
+row would bound what is loaded. It is not done yet because the share each source gets depends on how much
+the others need, so a query would have to be told a budget it cannot compute. The honest fix is to read
+the lengths first and the texts second, which is two queries for a case nobody has hit.
+
+## 48. A summary holds a thread of the web server
+
+An answer is streamed and generated on the executor of the workspace module, so the request that started
+it returns immediately. A summary is one response, so the request that asked for it waits for the
+provider, up to the two minutes the client allows.
+
+That is the simpler protocol and the reason for it stands, but it means a handful of readers summarising
+large notebooks at once occupy threads that are otherwise never held for long. The bound on requests in
+flight per account caps it at three per account, which is a cap on the abuse rather than on the load.
+
+## 49. The fingerprint of the sources sees a length, not a text
+
+A summary is recognised as out of date when a source is added, removed or read again with a text of
+another length. A page whose new version has exactly the length of the old one is not noticed, and neither
+is one whose text changed in a way that keeps the count.
+
+Hashing the text would notice everything and would mean reading every text to answer a question that is
+asked whenever a notebook is opened. A hash stored with the source at the moment it is indexed would fix
+that, and it is the same column that question 39 would need in order to notice that a page changed at all.

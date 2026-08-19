@@ -32,7 +32,16 @@ export function SumbookPage() {
   const id = notebookId ?? '';
 
   const { status: notebookStatus, notebook, reload: reloadNotebook } = useNotebook(id);
-  const { status: sourcesStatus, sources, reload, addFile, addLink, refresh, remove } = useSources(id);
+  const {
+    status: sourcesStatus,
+    sources,
+    indexing,
+    reload,
+    addFile,
+    addLink,
+    refresh,
+    remove,
+  } = useSources(id);
   const [adding, setAdding] = useState(false);
 
   if (notebookStatus === 'loading') {
@@ -87,7 +96,11 @@ export function SumbookPage() {
         </div>
 
         <div className="order-1 flex min-h-0 min-w-0 flex-col lg:order-none">
-          <ChatPanel notebook={notebook} sourceCount={sources.length} />
+          <ChatPanel
+            notebook={notebook}
+            sourceCount={sources.length}
+            summarisable={!indexing && sources.some((source) => source.status === 'READY')}
+          />
         </div>
 
         <div className="order-3 flex min-h-0 flex-col lg:order-none">

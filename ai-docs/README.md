@@ -14,8 +14,8 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 
-State as of 2026-08-19: build green across ten modules, 86 tests, and the JavaDoc gate active
-everywhere. The scaffold is complete and four feature areas are implemented.
+State as of 2026-08-19: build green across ten modules, 115 tests, and the JavaDoc gate active
+everywhere. The scaffold is complete and five feature areas are implemented.
 
 Authentication: registration, login, token rotation, logout, the weekly cleanup of invalidated
 refresh tokens, the client cookie encryption parameters, and the login and registration views bound
@@ -46,3 +46,12 @@ and the answer once the stream has finished. A notebook holds as many conversati
 starts, and an answer being written can be stopped, which keeps what had arrived. An account may have three answers being generated at
 once, and a deployment that declares itself served over HTTPS refuses any API request that arrived
 without it.
+
+Summary: `GET /api/v1/notebooks/{id}/summary` returns the text a model wrote about the sources of a
+Sumbook, and `POST` has one written, from the stored text of every source that was read rather than from
+what a question retrieves. The material is shared out over a budget so that no source disappears, the
+text is stored in the notebook payload together with a fingerprint of the sources it describes, and a
+summary whose sources have changed says so instead of being rewritten behind the reader. The first
+summary of a Sumbook is written by itself once a model is configured; every one after that is asked for,
+because the key is the reader's. The language it is written in is the language the interface is being
+read in, which is switched from the frame of every screen, signed in or not.

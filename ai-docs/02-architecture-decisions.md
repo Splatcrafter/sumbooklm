@@ -1218,3 +1218,94 @@ so it is the same sentence every time and it does not address what was asked. Th
 sentence that says less and is never invented. And the floor no longer expresses relevance, so a notebook
 will hand over its nearest passages even for a question it says nothing about, which now depends entirely
 on the model following the instruction to say that they do not answer it.
+
+## ADR-061: A summary is written from every source, not from what a question retrieves
+
+**Decision.** The summary of a notebook is written from the stored text of every source that was read,
+shared out over a budget of characters, and requested as a single response rather than as a stream. Each
+source is given the smaller of what it needs and what is left divided by how many are still waiting, so a
+short source hands its unused share to a long one and no source is left out. The instructions forbid
+citations and ask for at most five sentences of flowing text.
+
+**Reason.** Retrieval selects passages by their similarity to a question, and a summary has no question.
+The measurement behind ADR-060 already showed what asking for one anyway produces: against the segments
+of a real document, the request to summarise it scores 0.62 while an unrelated question about baking
+scores 0.64. Selecting material that way would summarise whichever parts of a notebook happen to resemble
+the word summary. Every source is therefore the material, and the only decision left is how much of each
+of them fits, which is arithmetic rather than a guess.
+
+Citations are left out because a summary is read before anything has been asked, next to no list of
+sources, so the numbers of an answer would be links into something that is not on the screen. Streaming
+is left out because five sentences are worth reading once they exist, and a second protocol for that
+would be carried by every client for nothing.
+
+**Cost.** A notebook whose sources are far larger than the budget is summarised from their beginnings,
+marked as cut, and the model is told not to guess at what followed. The texts of every readable source
+are held in the heap of one request while it is assembled. And the request occupies a thread of the web
+server until the provider answers, which an answer does not, because an answer hands itself to the
+executor of the workspace module and returns.
+
+## ADR-062: The summary is stored with the notebook, behind the first payload version bump
+
+**Decision.** The notebook payload gains two fields: the text of the summary and the fingerprint of the
+sources it was written from. Payload schema version `1.1.0` is added, the schema of `1.0.0` keeps a codec
+of the shape it had, and a data fix adds both fields as empty to anything written before.
+
+**Reason.** The summary is a property of the notebook, nothing queries it, and by ADR-002 that is exactly
+what belongs in the payload rather than in a column. It is read on its own request rather than with the
+notebook, because the overview shows notebooks by the dozen and none of them shows a paragraph.
+
+The fingerprint is stored with the text because a summary that cannot be recognised as out of date can
+only ever be shown as current. It is formed over the identifier, the content hash and the length of the
+read text of every source. The length is what the hash cannot say: the hash of a page is the hash of its
+address, so it exists before the page has been read and does not change when the page does.
+
+This is also the first change to a stored payload since the initial version, which is what the data fixer
+was put in for. It is exercised end to end by a test that writes a row at `1.0.0` and reads it back
+through the endpoint.
+
+**Cost.** A row written by the earlier version is migrated on every read until something writes it back,
+which for a notebook nobody renames is every read there ever is. And a page whose new version happens to
+have exactly the length of the old one leaves the fingerprint unchanged, so the summary is not marked as
+out of date by it.
+
+## ADR-063: A summary is written once by itself, and afterwards only when asked
+
+**Decision.** The interface has a summary written automatically when a notebook has sources that were
+read, carries none, and a model is configured. That happens once per notebook and per browser session,
+whatever it ends in. Everything after that is a button: a summary whose sources have changed says so and
+offers to be written again.
+
+**Reason.** The summary is the one thing a notebook can say about itself before anything has been asked,
+and the space it belongs in is the first thing a reader looks at. Leaving it empty until somebody presses
+a button they have no reason to trust yet would leave it empty. Rewriting it whenever a source arrives is
+the opposite mistake: the key belongs to the reader, so every rewrite spends their money, and only they
+know whether the source that arrived was worth another request.
+
+The attempt is made once because a provider that refuses would otherwise be asked again by every render
+that follows it.
+
+**Cost.** Opening a notebook can spend a request the reader did not ask for. Both bounds on asking are
+taken for it, so it is at least an expense the installation can see and cap.
+
+## ADR-064: The language of the interface is switched in the frame, and the summary is written in it
+
+**Decision.** A menu in the frame of every screen, signed in or not, switches between the languages the
+interface is translated into. The languages are listed under their own names, the choice is kept by the
+browser rather than by the account, and the `lang` attribute of the document follows it. A request for a
+summary carries the tag of that language, and the instructions name the language in English rather than
+passing the tag on.
+
+**Reason.** The reader who needs the switch most is the one who cannot read the screen they are on, so it
+cannot live behind a word in a settings dialog, and it has to exist on the sign-in screen, where there is
+no account to keep a setting on. Listing the languages under their own names is the same argument one
+level down: somebody looking for Japanese is looking for 日本語.
+
+An answer is written in the language of its question. A summary has no question, and the language of the
+sources is not the language of the reader, so the client is the only one that knows which language to ask
+for. A model acts on the name of a language more reliably than on a tag, and a tag that names no language
+leaves the rule out entirely rather than inventing one.
+
+**Cost.** A stored summary stays in the language it was written in. Switching the interface does not
+rewrite it, because that would spend a request on every switch; the reader can, with the button that is
+there anyway.

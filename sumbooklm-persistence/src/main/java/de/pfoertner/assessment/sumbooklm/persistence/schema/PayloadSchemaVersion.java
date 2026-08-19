@@ -30,9 +30,15 @@ public final class PayloadSchemaVersion {
     public static final int V1_0_0 = 100;
 
     /**
+     * Payload schema version {@code 1.1.0}, which adds the written summary of a notebook and the
+     * fingerprint of the sources it was written from.
+     */
+    public static final int V1_1_0 = 110;
+
+    /**
      * Payload schema version written by the running application.
      */
-    public static final int CURRENT = V1_0_0;
+    public static final int CURRENT = V1_1_0;
 
     /**
      * Prevents instantiation of this constant holder.

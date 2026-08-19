@@ -1,5 +1,7 @@
 import { apiClient } from '@/api/client';
+import { modelHeaders, type ModelSettings } from '@/byok/modelSettings';
 import { toNotebook, type Notebook } from '@/notebooks/notebook';
+import { toNotebookSummary, type NotebookSummary } from '@/notebooks/notebookSummary';
 
 /**
  * Raised when the backend rejects a notebook request.
@@ -95,4 +97,47 @@ export async function deleteNotebook(accessToken: string, notebookId: string): P
   if (!response.ok) {
     throw new NotebookRequestError(response.status);
   }
+}
+
+/**
+ * Reads the summary one Sumbook carries, which is empty until one has been written.
+ *
+ * The call reaches no model and costs nothing, so it is made whenever a Sumbook is opened.
+ */
+export async function getNotebookSummary(
+  accessToken: string,
+  notebookId: string,
+): Promise<NotebookSummary> {
+  const { data, response } = await apiClient.GET('/api/v1/notebooks/{notebookId}/summary', {
+    headers: authorization(accessToken),
+    params: { path: { notebookId } },
+  });
+  if (!response.ok || !data) {
+    throw new NotebookRequestError(response.status);
+  }
+  return toNotebookSummary(data);
+}
+
+/**
+ * Has the summary of one Sumbook written and returns the text that was stored.
+ *
+ * This is a request to the provider of the reader, made with their own key, and it takes as long as
+ * the model does. The language is the one the interface is being read in, because a summary has no
+ * question whose language it could follow.
+ */
+export async function writeNotebookSummary(
+  accessToken: string,
+  notebookId: string,
+  language: string,
+  settings: ModelSettings,
+): Promise<NotebookSummary> {
+  const { data, response } = await apiClient.POST('/api/v1/notebooks/{notebookId}/summary', {
+    headers: { ...authorization(accessToken), ...modelHeaders(settings) },
+    params: { path: { notebookId } },
+    body: { language },
+  });
+  if (!response.ok || !data) {
+    throw new NotebookRequestError(response.status);
+  }
+  return toNotebookSummary(data);
 }

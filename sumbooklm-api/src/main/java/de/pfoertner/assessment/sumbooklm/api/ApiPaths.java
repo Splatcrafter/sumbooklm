@@ -85,6 +85,11 @@ public final class ApiPaths {
     public static final String V1_NOTEBOOK_SOURCE_REFRESH = V1_NOTEBOOK_SOURCE + "/refresh";
 
     /**
+     * The summary written about the sources of one notebook.
+     */
+    public static final String V1_NOTEBOOK_SUMMARY = V1_NOTEBOOK + "/summary";
+
+    /**
      * Collection of the conversations held inside one notebook.
      */
     public static final String V1_NOTEBOOK_CHATS = V1_NOTEBOOK + "/chats";

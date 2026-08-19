@@ -1,6 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.api.error;
 
 import de.pfoertner.assessment.sumbooklm.ai.chat.UnusableModelSelectionException;
+import de.pfoertner.assessment.sumbooklm.ai.summary.SummaryNotWrittenException;
 import de.pfoertner.assessment.sumbooklm.security.authentication.InvalidCredentialsException;
 import de.pfoertner.assessment.sumbooklm.security.authentication.UsernameAlreadyTakenException;
 import de.pfoertner.assessment.sumbooklm.security.token.InvalidRefreshTokenException;
@@ -8,6 +9,7 @@ import de.pfoertner.assessment.sumbooklm.workspace.chat.ChatSessionNotFoundExcep
 import de.pfoertner.assessment.sumbooklm.workspace.chat.QuestionsTooOftenException;
 import de.pfoertner.assessment.sumbooklm.workspace.chat.TooManyQuestionsException;
 import de.pfoertner.assessment.sumbooklm.workspace.notebook.NotebookNotFoundException;
+import de.pfoertner.assessment.sumbooklm.workspace.notebook.NothingToSummariseException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.DuplicateSourceException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.EmptyUploadException;
 import de.pfoertner.assessment.sumbooklm.workspace.source.SourceNotFoundException;
@@ -38,6 +40,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * enough for a while. Both are {@code 429}, and only the second carries {@code Retry-After}: the first
  * passes as soon as one of the answers arrives, which is sooner than any number this application could
  * name, and the second passes at a moment it knows exactly.
+ *
+ * <h2>A Provider That Did Not Answer</h2>
+ * A summary that the selected provider refused or answered with nothing is reported as {@code 502}.
+ * The request was correct and the account is entitled to it; what failed is a server this one asked
+ * on the caller's behalf, and that is the status for it.
  *
  * <h2>Wording of Authentication Failures</h2>
  * Both rejected credentials and rejected refresh tokens answer with the same generic detail. A more
@@ -201,6 +208,34 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, Long.toString(seconds))
                 .body(problem);
+    }
+
+    /**
+     * Reports a notebook whose sources cannot be summarised yet.
+     *
+     * @param exception failure raised by the workspace module
+     * @return a problem detail with status {@code 409}
+     */
+    @ExceptionHandler(NothingToSummariseException.class)
+    public ProblemDetail handleNothingToSummarise(final NothingToSummariseException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, "No source of this notebook has been read yet");
+        problem.setTitle("Nothing to summarise");
+        return problem;
+    }
+
+    /**
+     * Reports a summary the selected provider did not produce.
+     *
+     * @param exception failure raised by the AI module
+     * @return a problem detail with status {@code 502}
+     */
+    @ExceptionHandler(SummaryNotWrittenException.class)
+    public ProblemDetail handleSummaryNotWritten(final SummaryNotWrittenException exception) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_GATEWAY, "The selected model did not write a summary");
+        problem.setTitle("Summary not written");
+        return problem;
     }
 
     /**

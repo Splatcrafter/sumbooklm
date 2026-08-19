@@ -3,6 +3,9 @@
     "name": "SumbookLM",
     "restoring": "Deine Sitzung wird wiederhergestellt ..."
   },
+  "language": {
+    "change": "Sprache ändern"
+  },
   "account": {
     "login": {
       "title": "Anmelden",
@@ -138,9 +141,19 @@
     },
     "summary": {
       "heading": "Zusammenfassung",
-      "pending": "Die Zusammenfassung dieser Quellen gibt es noch nicht. Sie erscheint hier, sobald ein Sumbook sich selbst zusammenfassen kann.",
+      "pending": "Für diese Quellen wurde noch keine Zusammenfassung geschrieben.",
+      "unread": "Die Quellen werden noch gelesen. Die Zusammenfassung folgt, sobald das geschehen ist.",
+      "needsModel": "Es ist noch kein Modell eingerichtet, daher kann keine Zusammenfassung geschrieben werden.",
+      "writing": "Die Zusammenfassung dieser Quellen wird geschrieben ...",
       "noSources": "Dieses Sumbook hat noch nichts zusammenzufassen. Füge eine Quelle hinzu, sie wird für dich indexiert.",
-      "copy": "Zusammenfassung kopieren"
+      "stale": "Die Quellen haben sich geändert, seit diese Zusammenfassung geschrieben wurde.",
+      "failed": "Die Zusammenfassung konnte nicht geschrieben werden.",
+      "limited": "Du hast für den Moment so oft gefragt, wie diese Installation erlaubt. Die Zusammenfassung lässt sich in Kürze schreiben.",
+      "loadFailed": "Die Zusammenfassung konnte nicht geladen werden.",
+      "write": "Zusammenfassung schreiben",
+      "again": "Neu schreiben",
+      "copy": "Zusammenfassung kopieren",
+      "copied": "Kopiert"
     },
     "chat": {
       "heading": "Chat",

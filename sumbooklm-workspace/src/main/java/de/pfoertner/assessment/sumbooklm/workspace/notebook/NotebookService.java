@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import de.pfoertner.assessment.sumbooklm.domain.workspace.Notebook;
+import de.pfoertner.assessment.sumbooklm.domain.workspace.NotebookSummary;
 import de.pfoertner.assessment.sumbooklm.persistence.chat.ChatSessionRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.document.NotebookSourceCount;
 import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentRepository;
@@ -17,6 +18,7 @@ import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookMapper;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookPayload;
 import de.pfoertner.assessment.sumbooklm.persistence.notebook.NotebookRepository;
 import de.pfoertner.assessment.sumbooklm.persistence.schema.PayloadSchemaVersion;
+import de.pfoertner.assessment.sumbooklm.workspace.source.SourceFingerprint;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,11 @@ import org.springframework.transaction.annotation.Transactional;
  * The timestamp orders the overview and is refreshed when the content of a notebook changes, which
  * includes a rename. Pinning does not refresh it: pinning is how a user says where a notebook should
  * appear, and letting it also change the order of the list below would work against that.
+ *
+ * <h2>The Summary Is Read on Its Own</h2>
+ * The text a model wrote about a notebook is stored in its payload but is not part of the notebook
+ * every list returns. It is a paragraph that only one screen shows, and reading it with the overview
+ * would carry one per entry across the wire for nothing.
  *
  * <h2>Removal</h2>
  * Deleting a notebook deletes the sources and the chat sessions that belong to it in the same
@@ -145,7 +152,7 @@ public class NotebookService {
     @Transactional
     public Notebook create(final UUID userId, final String title) {
         final Instant now = now();
-        final NotebookPayload payload = new NotebookPayload(title.strip(), false, "");
+        final NotebookPayload payload = new NotebookPayload(title.strip(), false, "", "", "");
         final NotebookEntity entity = new NotebookEntity(
                 UUID.randomUUID(),
                 userId,
@@ -184,6 +191,49 @@ public class NotebookService {
         entity.setPayloadVersion(PayloadSchemaVersion.CURRENT);
         return this.notebookMapper.toDomain(entity, payload,
                 this.sourceDocumentRepository.countByNotebookIdAndUserId(notebookId, userId));
+    }
+
+    /**
+     * Reads the summary of one notebook of an account.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to read the summary of
+     * @return the summary, with an empty text while none has been written
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    @Transactional(readOnly = true)
+    public NotebookSummary readSummary(final UUID userId, final UUID notebookId) {
+        final NotebookPayload payload = this.notebookMapper.readPayload(require(userId, notebookId));
+        final boolean stale = !payload.summary().isEmpty()
+                && !payload.summaryFingerprint().equals(fingerprintOfSources(userId, notebookId));
+        return new NotebookSummary(notebookId, payload.summary(), stale);
+    }
+
+    /**
+     * Stores a written summary together with the fingerprint of the sources it was written from.
+     *
+     * <p>Storing it does not refresh the activity timestamp of the notebook. The order of the
+     * overview says when a user last did something with a notebook, and having a summary written is
+     * something the application did with the sources they already had.
+     *
+     * @param userId      identifier of the account the notebook belongs to
+     * @param notebookId  identifier of the notebook the summary belongs to
+     * @param text        text a model wrote about the sources
+     * @param fingerprint fingerprint of the sources that text was written from
+     * @return the summary as it is stored, which is stale already if the sources have changed since
+     * @throws NotebookNotFoundException if the account holds no notebook with that identifier
+     */
+    @Transactional
+    public NotebookSummary storeSummary(final UUID userId,
+                                        final UUID notebookId,
+                                        final String text,
+                                        final String fingerprint) {
+        final NotebookEntity entity = require(userId, notebookId);
+        final NotebookPayload payload = this.notebookMapper.readPayload(entity).withSummary(text, fingerprint);
+        entity.setPayload(this.notebookMapper.writePayload(payload));
+        entity.setPayloadVersion(PayloadSchemaVersion.CURRENT);
+        return new NotebookSummary(
+                notebookId, text, !fingerprint.equals(fingerprintOfSources(userId, notebookId)));
     }
 
     /**
@@ -227,6 +277,18 @@ public class NotebookService {
     private NotebookEntity require(final UUID userId, final UUID notebookId) {
         return this.notebookRepository.findByIdAndUserId(notebookId, userId)
                 .orElseThrow(() -> new NotebookNotFoundException(notebookId));
+    }
+
+    /**
+     * Returns the value the current set of sources of a notebook is recognised by.
+     *
+     * @param userId     identifier of the account the notebook belongs to
+     * @param notebookId identifier of the notebook to fingerprint the sources of
+     * @return the fingerprint of the sources the notebook holds right now
+     */
+    private String fingerprintOfSources(final UUID userId, final UUID notebookId) {
+        return SourceFingerprint.ofSourceSet(
+                this.sourceDocumentRepository.findStampsOfNotebook(notebookId, userId));
     }
 
     /**

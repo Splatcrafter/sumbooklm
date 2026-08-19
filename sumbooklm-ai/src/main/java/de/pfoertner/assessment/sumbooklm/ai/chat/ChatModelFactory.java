@@ -4,8 +4,11 @@ import java.time.Duration;
 
 import dev.langchain4j.http.client.HttpClientBuilder;
 import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.stereotype.Component;
 
@@ -30,6 +33,12 @@ import org.springframework.stereotype.Component;
  * Both cloud providers speak the OpenAI protocol and differ only in the address, so they share a
  * branch. Ollama has a protocol of its own and needs none of the key handling, which is what makes it
  * the second branch rather than a third address.
+ *
+ * <h2>Two Shapes of Client</h2>
+ * An answer is read while it is written and arrives as a stream. A summary is read once it exists and
+ * arrives as one response. The two are different clients of the same provider, built here from the
+ * same selection, so that a caller chooses the shape it needs rather than a second way of reaching a
+ * model.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -85,6 +94,32 @@ public class ChatModelFactory {
                     .timeout(TIMEOUT)
                     .build();
             case OLLAMA -> OllamaStreamingChatModel.builder()
+                    .httpClientBuilder(abortableClient())
+                    .baseUrl(selection.baseUrl())
+                    .modelName(selection.modelName())
+                    .temperature(TEMPERATURE)
+                    .timeout(TIMEOUT)
+                    .build();
+        };
+    }
+
+    /**
+     * Builds a client that returns the whole response of the model a caller selected.
+     *
+     * @param selection model to address, already validated
+     * @return a client that answers once, with everything the model produced
+     */
+    public ChatModel createComplete(final ModelSelection selection) {
+        return switch (selection.provider()) {
+            case OPENAI, GROQ -> OpenAiChatModel.builder()
+                    .httpClientBuilder(abortableClient())
+                    .baseUrl(selection.baseUrl())
+                    .apiKey(selection.apiKey())
+                    .modelName(selection.modelName())
+                    .temperature(TEMPERATURE)
+                    .timeout(TIMEOUT)
+                    .build();
+            case OLLAMA -> OllamaChatModel.builder()
                     .httpClientBuilder(abortableClient())
                     .baseUrl(selection.baseUrl())
                     .modelName(selection.modelName())

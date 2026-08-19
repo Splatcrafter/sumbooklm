@@ -6,7 +6,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
+
+import de.pfoertner.assessment.sumbooklm.persistence.document.SourceStamp;
 
 /**
  * Produces the value two sources are compared by.
@@ -21,6 +24,13 @@ import java.util.Locale;
  * first would make the caller wait for a foreign server before learning whether the source was even
  * accepted. Two addresses that serve the same page therefore count as two sources, which is the
  * price of answering immediately.
+ *
+ * <h2>A Set of Sources Is Compared by Its Members</h2>
+ * The same value is also formed over a whole notebook, out of the identifier and the fingerprint of
+ * every source it holds. It says which sources something was derived from, so that a text written
+ * about them can be recognised as one written about a set the notebook no longer has. It says nothing
+ * about a page that changed behind an address it is still reached at, because that is exactly what the
+ * fingerprint of a page does not cover.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -57,6 +67,27 @@ public final class SourceFingerprint {
      */
     public static String ofAddress(final String address) {
         return hexDigest(normalise(address).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Returns the fingerprint of the set of sources a notebook holds.
+     *
+     * <p>The members are sorted before they are hashed, so the value depends on what the notebook
+     * holds and not on the order a query returned it in.
+     *
+     * @param sources what every source of the notebook contributes to the value
+     * @return the hash of the whole set, in lower case hexadecimal, empty for a notebook without
+     *         sources
+     */
+    public static String ofSourceSet(final List<SourceStamp> sources) {
+        if (sources.isEmpty()) {
+            return "";
+        }
+        final List<String> members = sources.stream()
+                .map(source -> source.getId() + ":" + source.getDocumentHash() + ":" + source.getTextLength())
+                .sorted()
+                .toList();
+        return hexDigest(String.join("\n", members).getBytes(StandardCharsets.UTF_8));
     }
 
     /**

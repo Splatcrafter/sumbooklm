@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/auth/useAuth';
 import { useModelSettings } from '@/byok/useModelSettings';
 import { Button } from '@/components/ui/button';
+import { LanguageMenu } from '@/i18n/LanguageMenu';
 import { BrandMark } from '@/routes/account/BrandMark';
 import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
 
@@ -22,7 +23,8 @@ import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
  *
  * The model a visitor answers with is reached from here rather than from inside a Sumbook. It is one
  * setting for the whole browser, and putting it next to the account it is stored with is what says
- * so.
+ * so. The language of the interface sits beside it for the same reason, and because a reader who
+ * cannot read the screen has to be able to find it without reading it.
  */
 export function AppLayout() {
   const { t } = useTranslation();
@@ -55,6 +57,7 @@ export function AppLayout() {
               <span className="hidden text-[0.8125rem] text-nb-muted sm:inline">
                 {t('account.signedInAs', { username: user.username })}
               </span>
+              <LanguageMenu />
               <Button
                 variant="outline"
                 size="sm"

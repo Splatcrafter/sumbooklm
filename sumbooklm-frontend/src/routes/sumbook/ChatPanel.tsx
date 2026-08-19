@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useModelSettings } from '@/byok/useModelSettings';
@@ -10,6 +9,7 @@ import { TopicIcon } from '@/notebooks/TopicIcon';
 import { ChatComposer } from '@/routes/sumbook/ChatComposer';
 import { ChatMessageView } from '@/routes/sumbook/ChatMessageView';
 import { ConversationBar } from '@/routes/sumbook/ConversationBar';
+import { SummaryView } from '@/routes/sumbook/SummaryView';
 import { useSumbookMeta } from '@/routes/sumbook/SumbookMeta';
 import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
 
@@ -17,8 +17,8 @@ import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
  * The middle panel, where the Sumbook is asked about its sources.
  *
  * An empty conversation shows what the Sumbook is instead of an empty box: its symbol, its name, how
- * much it is grounded in, and the summary that will stand there once a Sumbook can write one. As soon
- * as something has been asked, that space belongs to the conversation.
+ * much it is grounded in, and the summary of what it holds. As soon as something has been asked, that
+ * space belongs to the conversation.
  *
  * The content is held to a reading measure and centred in whatever width the panel has, because a
  * line of text stretched across a desk monitor is hard to read at any size.
@@ -27,7 +27,16 @@ import { ModelSettingsDialog } from '@/routes/settings/ModelSettingsDialog';
  * therefore says so where the question would be typed, with the way to fix it right there, rather
  * than letting the question be sent and rejected.
  */
-export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourceCount: number }) {
+export function ChatPanel({
+  notebook,
+  sourceCount,
+  summarisable,
+}: {
+  notebook: Notebook;
+  sourceCount: number;
+  /** Whether every source has been read, which is when a summary can be written from all of them. */
+  summarisable: boolean;
+}) {
   const { t } = useTranslation();
   const meta = useSumbookMeta();
   const { settings, configured } = useModelSettings();
@@ -72,24 +81,17 @@ export function ChatPanel({ notebook, sourceCount }: { notebook: Notebook; sourc
                   {meta(sourceCount, notebook.lastActivityAt)}
                 </p>
               </div>
-              <p className="text-[0.9375rem] leading-7 text-nb-body">
-                {status === 'failed'
-                  ? t('sumbook.chat.historyFailed')
-                  : sourceCount === 0
-                    ? t('sumbook.summary.noSources')
-                    : t('sumbook.summary.pending')}
-              </p>
-              <div className="flex">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled
-                  className="rounded-full border-nb-line bg-transparent text-nb-body disabled:opacity-45"
-                >
-                  <Copy />
-                  {t('sumbook.summary.copy')}
-                </Button>
-              </div>
+              {status === 'failed' ? (
+                <p className="text-[0.9375rem] leading-7 text-nb-body" role="alert">
+                  {t('sumbook.chat.historyFailed')}
+                </p>
+              ) : (
+                <SummaryView
+                  notebookId={notebook.id}
+                  sourceCount={sourceCount}
+                  summarisable={summarisable}
+                />
+              )}
             </div>
           ) : (
             messages.map((message) => <ChatMessageView key={message.key} message={message} />)

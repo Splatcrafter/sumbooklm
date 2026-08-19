@@ -68,6 +68,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notebooks/{notebookId}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the summary of a notebook
+         * @description Returns the summary the notebook carries. The text is empty while none has been written, and the summary reports itself as stale when the sources have changed since it was written. Nothing is requested from a model here.
+         */
+        get: operations["summary"];
+        put?: never;
+        /**
+         * Write the summary of a notebook
+         * @description Sends every source of the notebook that has been read to the model named by the headers of the request, stores the summary it writes in place of the previous one and returns it. The request counts against the same bounds as an asked question.
+         */
+        post: operations["write"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notebooks/{notebookId}/sources/{sourceId}/refresh": {
         parameters: {
             query?: never;
@@ -475,6 +499,21 @@ export interface components {
              */
             sourceCount?: number;
         };
+        /** @description How the summary of a notebook is to be written. */
+        NotebookSummaryRequest: {
+            /**
+             * @description IETF language tag the summary is to be written in.
+             * @example de
+             */
+            language?: string;
+        };
+        /** @description The summary written about the sources of one notebook. */
+        NotebookSummaryResponse: {
+            /** @description Text a model wrote about the sources, empty while none was written. */
+            text?: string;
+            /** @description Whether the sources have changed since the text was written. */
+            stale?: boolean;
+        };
         /** @description A source of one notebook of the authenticated account. */
         SourceResponse: {
             /**
@@ -794,6 +833,115 @@ export interface operations {
             };
             /** @description No valid access token was presented. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary was returned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotebookSummaryResponse"];
+                };
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    write: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-AI-Provider"?: string;
+                "X-AI-Model"?: string;
+                "X-AI-Api-Key"?: string;
+                "X-AI-Base-Url"?: string;
+            };
+            path: {
+                notebookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NotebookSummaryRequest"];
+            };
+        };
+        responses: {
+            /** @description The summary was written. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotebookSummaryResponse"];
+                };
+            };
+            /** @description The named model or the named language is not usable. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token was presented. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account owns no such notebook. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No source of the notebook has been read. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The account has asked as often as it may. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The selected model wrote no summary. */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

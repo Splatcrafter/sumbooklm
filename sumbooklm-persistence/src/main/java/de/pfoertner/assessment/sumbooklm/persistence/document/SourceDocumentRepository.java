@@ -96,6 +96,29 @@ public interface SourceDocumentRepository extends JpaRepository<SourceDocumentEn
     Optional<SourceDocumentEntity> findByIdAndUserId(UUID id, UUID userId);
 
     /**
+     * Reads what every source of one notebook contributes to the fingerprint of that notebook.
+     *
+     * <p>The result says what the notebook holds without reading what the sources hold. It is what a
+     * summary of the notebook is compared against, so that a summary written from other material can
+     * be recognised as one.
+     *
+     * @param notebookId identifier of the notebook to read the sources of
+     * @param userId     identifier of the owning account
+     * @return the identifier, the content hash and the length of the read text of every source,
+     *         ordered by identifier
+     */
+    @Query("""
+            select document.id as id,
+                   document.documentHash as documentHash,
+                   coalesce(length(document.extractedText), 0) as textLength
+            from SourceDocumentEntity document
+            where document.notebookId = :notebookId and document.userId = :userId
+            order by document.id
+            """)
+    List<SourceStamp> findStampsOfNotebook(@Param("notebookId") UUID notebookId,
+                                           @Param("userId") UUID userId);
+
+    /**
      * Counts the sources of one notebook.
      *
      * @param notebookId identifier of the notebook to count the sources of

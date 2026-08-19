@@ -726,3 +726,49 @@ the sources of another.
 
 Three cases had to be given a source to keep testing what they test. They asked in empty notebooks and
 relied on the provider being contacted anyway, which is exactly the behaviour that was removed.
+
+## Verification of the summary and of the language switch on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 115 tests, the frontend built by the private Node
+toolchain as part of it.
+
+`SummaryApiIntegrationTest` is the one that matters, because a summary is one request with one response
+and can therefore be driven end to end against a provider the test starts. Eight cases: the endpoints
+refuse an anonymous caller, a notebook that was never summarised answers `200` with an empty text rather
+than `404`, a notebook of another account answers as missing, a request without model headers is refused
+before anything is read, a notebook whose sources have not been read is refused with `409`, and the case
+the feature exists for.
+
+That case uploads a document, waits until it has been read, and asserts three things about the request
+the provider actually received: it carries the text of the source, it carries the name the source is
+listed under, and it carries the sentence `Write the summary in German.` for a request that named `de`.
+The summary that comes back is then read again through `GET`, which is what states that it was stored
+rather than only returned.
+
+The two remaining cases are the ones that would otherwise be believed rather than known. A source added
+after a summary was written makes the stored summary report itself as stale, which is the whole point of
+storing a fingerprint next to the text. And a provider that answers with an empty message leaves the
+previous summary in place: the request ends `502`, and the following `GET` still returns the text that
+was there before. An empty summary that overwrote a real one would be the worst possible failure of this
+feature, so it is the one with a test.
+
+`PayloadMigrationIntegrationTest` covers the first payload version bump this repository has had. It
+creates a notebook through the endpoint, replaces its payload column with the CBOR an earlier version
+would have written and stamps it `100`, and then reads the notebook back through the API. The title, the
+pin state and the topic icon survive, and the summary endpoint answers with an empty text, which is what
+the fix puts there. The data fixer pipeline had never been exercised before, because there had never been
+two versions to migrate between.
+
+`SummaryBudgetTest` states the arithmetic that decides how much of each source is sent: a small set is
+sent whole, a set of ten documents of thirty thousand characters each is cut to twenty thousand
+characters in total with every one of them still present, a short source keeps its whole text while the
+long one beside it is given everything the short one did not need, and the order the notebook lists them
+in survives. `NotebookSummaryPromptTest` states what the rest of the application depends on: the names
+and texts reach the model, a tag becomes `Write the summary in Japanese.` rather than `ja`, and a tag
+that names no language leaves the rule out instead of inventing one.
+
+The interface was verified by the type checker and by the production build, not in a browser: this
+container has no browser and no harness to drive one. What that leaves unverified is the appearance of
+the summary block and of the language menu, not their wiring, which the types and the generated client
+cover. The three translation files were checked to hold the same keys, allowing for Japanese having no
+plural category and therefore none of the `_one` forms.

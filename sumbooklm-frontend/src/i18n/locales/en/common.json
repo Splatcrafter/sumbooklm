@@ -3,6 +3,9 @@
     "name": "SumbookLM",
     "restoring": "Restoring your session ..."
   },
+  "language": {
+    "change": "Change language"
+  },
   "account": {
     "login": {
       "title": "Sign in",
@@ -138,9 +141,19 @@
     },
     "summary": {
       "heading": "Summary",
-      "pending": "The summary of these sources is not written yet. It appears here once a Sumbook can summarise itself.",
+      "pending": "No summary of these sources has been written yet.",
+      "unread": "The sources are still being read. The summary follows once they have been.",
+      "needsModel": "No model is set up yet, so no summary can be written.",
+      "writing": "Writing a summary of these sources ...",
       "noSources": "This Sumbook has nothing to summarise yet. Add a source and it will be indexed for you.",
-      "copy": "Copy summary"
+      "stale": "The sources have changed since this summary was written.",
+      "failed": "The summary could not be written.",
+      "limited": "You have asked as often as this installation allows for now. The summary can be written again shortly.",
+      "loadFailed": "The summary could not be loaded.",
+      "write": "Write summary",
+      "again": "Write again",
+      "copy": "Copy summary",
+      "copied": "Copied"
     },
     "chat": {
       "heading": "Chat",

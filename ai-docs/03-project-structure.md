@@ -51,8 +51,9 @@ that cuts the extracted text into segments. Produces text and segments, and know
 either came from or goes.
 
 **`sumbooklm-ai`** — Chat model access built per request from what the caller presented (ADR-034),
-the instructions an answer is grounded by, in process embeddings via `all-MiniLM-L6-v2`, and vector
-storage via `InMemoryEmbeddingStore`. `NotebookIndex` is the only way into the store in either
+the instructions an answer is grounded by, the instructions a summary is written under and the way its
+material is shared out (ADR-061), in process embeddings via `all-MiniLM-L6-v2`, and vector storage via
+`InMemoryEmbeddingStore`. `NotebookIndex` is the only way into the store in either
 direction: writing takes the notebook and the source, and reading hands out a retriever filtered to
 one notebook; see ADR-030 and ADR-035.
 
@@ -83,17 +84,18 @@ de.pfoertner.assessment.sumbooklm
 │   └── H2ConsoleSecurityConfiguration          (dev profile only)
 ├── domain
 │   ├── user                                    UserAccount, UserProfile, AccountActivity
-│   └── workspace                               Notebook, SourceDocument, DocumentStatus,
-│                                                DocumentFailure, SourceKind, ChatSession,
-│                                                ChatMessage, ChatRole
+│   └── workspace                               Notebook, NotebookSummary, SourceDocument,
+│                                                DocumentStatus, DocumentFailure, SourceKind,
+│                                                ChatSession, ChatMessage, ChatRole
 ├── persistence
 │   ├── schema.PayloadSchemaVersion
 │   ├── payload                                 PayloadTypes, PayloadCodec, PayloadCodecs,
 │   │                                            PayloadDataFixerBootstrap
 │   ├── user                                    entity, repository, payload record and codec, mapper
-│   ├── notebook                                entity, repository, payload record and codec, mapper
-│   ├── document                                entity, repository, payload record and codec, the count
-│   │                                            and reference projections
+│   ├── notebook                                entity, repository, payload record and its two codecs,
+│   │                                            mapper, the fix that added the summary
+│   ├── document                                entity, repository, payload record and codec, the count,
+│   │                                            reference and stamp projections
 │   ├── chat                                    entity, repository, session and message payloads, mapper
 │   └── token                                   refresh token entity and repository
 ├── security
@@ -103,12 +105,12 @@ de.pfoertner.assessment.sumbooklm
 │   ├── cookie                                  cookie key derivation and its parameters
 │   └── access                                  SensitiveOperation and its aspect
 ├── workspace
-│   ├── notebook                                NotebookService, update command, removal event,
-│   │                                            failure
+│   ├── notebook                                NotebookService, NotebookSummaryService, update
+│   │                                            command, removal event, failures
 │   ├── source                                  SourceDocumentService, the pipeline, its events, the
 │   │                                            startup rebuild, the index cleanup listener, the
-│   │                                            collector of orphaned segments, fingerprints and
-│   │                                            failures
+│   │                                            collector of orphaned segments, fingerprints, the
+│   │                                            text of a read source and failures
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
 │                                                the turn context, the stream handler, the bound on
 │                                                answers in flight, the bound on how often an account
@@ -121,9 +123,11 @@ de.pfoertner.assessment.sumbooklm
 │   └── chunking                                TextChunker
 ├── ai
 │   ├── embedding                               model and store beans, NotebookIndex, metadata keys
-│   └── chat                                    ChatProvider, ModelSelection, ChatModelFactory,
-│                                                GroundedPrompt, PromptBudget, GroundedChatEngine,
-│                                                its handler and the cancellation it watches
+│   ├── chat                                    ChatProvider, ModelSelection, ChatModelFactory,
+│   │                                            GroundedPrompt, PromptBudget, GroundedChatEngine,
+│   │                                            its handler and the cancellation it watches
+│   └── summary                                 SourceExcerpt, SummaryBudget, NotebookSummaryPrompt,
+│                                                NotebookSummaryEngine and its failure
 └── api
     ├── ApiPaths
     ├── config                                  OpenApiConfiguration, SecurityConfiguration,
@@ -133,7 +137,8 @@ de.pfoertner.assessment.sumbooklm
     │                                            AuthenticatedUserResolver
     └── v1
         ├── auth                                controller and payloads of the token lifecycle
-        ├── notebook                            controller and payloads of notebook management
+        ├── notebook                            controllers and payloads of notebook management and
+        │                                        of the summary written about its sources
         ├── source                              controller and payloads of source management,
         │                                        including indexing a stored source again
         ├── chat                                controller, BYOK headers, stream events, SSE writer
@@ -170,7 +175,9 @@ sumbooklm-frontend
     │                    dropdown-menu, dialog, alert-dialog, tabs, textarea
     ├── notebooks
     │   ├── notebook.ts       client side type and its narrowing
-    │   ├── notebooksApi.ts   the five calls of /api/v1/notebooks
+    │   ├── notebookSummary.ts        client side summary type and its narrowing
+    │   ├── useNotebookSummary.ts     the summary, and having one written when there is none
+    │   ├── notebooksApi.ts   the five calls of /api/v1/notebooks and the two of its summary
     │   ├── notebookRoutes.ts the address one Sumbook lives under
     │   ├── TopicIcon.tsx     the topic square and its fallback icon
     │   ├── useNotebooks.ts   the list and the actions that change it
@@ -198,7 +205,8 @@ sumbooklm-frontend
     │   ├── sessionStore.ts   the session as one of the encrypted cookies
     │   └── useAuth.ts        hook over the context
     ├── i18n
-    │   ├── index.ts      i18next + language detector, de / en / ja
+    │   ├── index.ts          i18next + language detector, de / en / ja
+    │   ├── LanguageMenu.tsx  the switch in the frame of every screen
     │   └── locales/{de,en,ja}/common.json
     ├── lib/utils.ts      cn()
     └── routes            AppLayout (the signed-in shell), NotFoundPage
@@ -209,7 +217,7 @@ sumbooklm-frontend
         ├── settings      ModelSettingsDialog
         └── sumbook       SumbookPage, SourcesPanel, SourceListItem, AddSourceDialog,
                           ChatPanel, ConversationBar, ChatComposer, ChatMessageView,
-                          StudioPanel, SumbookMeta
+                          SummaryView, StudioPanel, SumbookMeta
 ```
 
 The account routes are a second top level branch of the router rather than children of `AppLayout`.

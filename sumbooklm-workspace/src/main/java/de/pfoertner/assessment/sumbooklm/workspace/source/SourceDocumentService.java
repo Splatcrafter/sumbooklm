@@ -49,11 +49,12 @@ import org.springframework.transaction.annotation.Transactional;
  * unique constraint behind it is what makes the rule hold even when two uploads of the same file
  * arrive at once and both find nothing.
  *
- * <h2>Indexing Again</h2>
+ * <h2>Reading a Source Again</h2>
  * A source can be sent through the pipeline more than once, and the request looks exactly like the
- * one that follows adding it: the stage goes back to uploaded and the same event is published. That
- * is what lets a failed source be retried and what lets the whole index be rebuilt, and it is also
- * what makes the interface show the source moving again rather than appearing to do nothing.
+ * one that follows adding it: the stage goes back to uploaded and the same event is published. What
+ * a user asks for is always a reading, whether the source failed the first time or has changed since,
+ * so the text an earlier run extracted is ignored for that run. It is not deleted, so a reading that
+ * fails leaves the source answering with what it said before.
  *
  * <h2>Stage Transitions</h2>
  * The three methods that move a source between stages are short transactions of their own rather
@@ -177,7 +178,7 @@ public class SourceDocumentService {
         }
         return add(userId, notebookId, SourceFingerprint.ofContent(content), content,
                 new DocumentPayload(name, SourceKind.FILE, name, DocumentStatus.UPLOADED, 0,
-                        DocumentFailure.NONE));
+                        DocumentFailure.NONE, Instant.EPOCH));
     }
 
     /**
@@ -195,7 +196,7 @@ public class SourceDocumentService {
         final String trimmed = address.strip();
         return add(userId, notebookId, SourceFingerprint.ofAddress(trimmed), null,
                 new DocumentPayload(trimmed, SourceKind.WEB, trimmed, DocumentStatus.UPLOADED, 0,
-                        DocumentFailure.NONE));
+                        DocumentFailure.NONE, Instant.EPOCH));
     }
 
     /**
@@ -217,24 +218,24 @@ public class SourceDocumentService {
     }
 
     /**
-     * Sends a source through the indexing pipeline again.
+     * Reads a source again from where it came from.
      *
      * @param userId     identifier of the account the notebook belongs to
      * @param notebookId identifier of the notebook the source belongs to
-     * @param sourceId   identifier of the source to index again
-     * @return the source as it now is, waiting to be indexed
+     * @param sourceId   identifier of the source to read again
+     * @return the source as it now is, waiting to be read
      * @throws NotebookNotFoundException if the account holds no notebook with that identifier
      * @throws SourceNotFoundException   if that notebook holds no source with that identifier
      */
     @Transactional
-    public SourceDocument requestIndexing(final UUID userId, final UUID notebookId, final UUID sourceId) {
+    public SourceDocument requestRefresh(final UUID userId, final UUID notebookId, final UUID sourceId) {
         requireNotebook(userId, notebookId);
         final SourceDocumentEntity entity = requireSource(userId, notebookId, sourceId);
         final DocumentPayload payload =
                 this.sourceDocumentMapper.readPayload(entity).withStatus(DocumentStatus.UPLOADED);
         store(entity, payload);
 
-        this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, sourceId));
+        this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, sourceId, true));
         return this.sourceDocumentMapper.toDomain(entity, payload);
     }
 
@@ -278,6 +279,8 @@ public class SourceDocumentService {
      * @param tokenCount    number of tokens the indexed text was counted as
      * @param extractedText text the run read out of the source, kept so that a later run can index it
      *                      again without reading the source a second time
+     * @param wasRead       whether the run read the source rather than taking the text it had stored,
+     *                      which is what decides whether the moment it was read moves
      * @throws SourceNotFoundException if the account holds no source with that identifier
      */
     @Transactional
@@ -285,11 +288,13 @@ public class SourceDocumentService {
                                  final UUID sourceId,
                                  final String displayName,
                                  final int tokenCount,
-                                 final String extractedText) {
+                                 final String extractedText,
+                                 final boolean wasRead) {
         final SourceDocumentEntity entity = requireSource(userId, sourceId);
         final DocumentPayload payload = this.sourceDocumentMapper.readPayload(entity);
         entity.setExtractedText(extractedText);
-        store(entity, payload.withIndexingResult(displayName, tokenCount));
+        store(entity, payload.withIndexingResult(
+                displayName, tokenCount, wasRead ? now() : payload.indexedAt()));
     }
 
     /**
@@ -350,7 +355,7 @@ public class SourceDocumentService {
             throw new DuplicateSourceException(notebookId);
         }
 
-        this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, stored.getId()));
+        this.eventPublisher.publishEvent(new SourceIndexRequestedEvent(userId, stored.getId(), false));
         return this.sourceDocumentMapper.toDomain(stored, payload);
     }
 

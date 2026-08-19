@@ -1,11 +1,13 @@
 package de.pfoertner.assessment.sumbooklm.persistence.document;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 
 import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentFailure;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentStatus;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.SourceKind;
+import de.pfoertner.assessment.sumbooklm.persistence.payload.PayloadCodecs;
 import de.splatgames.aether.datafixers.api.codec.Codec;
 import de.splatgames.aether.datafixers.api.codec.Codecs;
 import de.splatgames.aether.datafixers.api.codec.RecordCodecBuilder;
@@ -18,6 +20,11 @@ import de.splatgames.aether.datafixers.api.result.DataResult;
  * The record holds what the ingestion pipeline knows about a source. All of it is derived rather than
  * relational, so a change to the pipeline changes this record and is carried into stored data by a
  * data fixer instead of by a schema migration.
+ *
+ * <h2>When It Was Read</h2>
+ * The moment a source was last read successfully is stored because a source can be read again and a
+ * page can say something different the second time. {@link Instant#EPOCH} stands for a source that
+ * has never been read, which is the one value that cannot be a real reading.
  *
  * <h2>Failure Next to Status</h2>
  * The stage says that a source could not be indexed and the failure says why. The two are kept apart
@@ -37,6 +44,8 @@ import de.splatgames.aether.datafixers.api.result.DataResult;
  * @param tokenCount   number of tokens the indexed text was counted as, zero while unknown
  * @param failure      reason the source could not be indexed, {@link DocumentFailure#NONE} unless it
  *                     failed
+ * @param indexedAt    point in time the source was last read successfully, {@link Instant#EPOCH}
+ *                     while it never was
  * @author Erik Pförtner
  * @since 0.1.0
  */
@@ -45,7 +54,8 @@ public record DocumentPayload(String displayName,
                               String origin,
                               DocumentStatus status,
                               int tokenCount,
-                              DocumentFailure failure) {
+                              DocumentFailure failure,
+                              Instant indexedAt) {
 
     /**
      * Codec of the processing stage. The stage is written by name, so that inserting a constant into
@@ -78,7 +88,8 @@ public record DocumentPayload(String displayName,
                     Codecs.STRING.fieldOf("origin").forGetter(DocumentPayload::origin),
                     STATUS_CODEC.fieldOf("status").forGetter(DocumentPayload::status),
                     Codecs.INT.fieldOf("tokenCount").forGetter(DocumentPayload::tokenCount),
-                    FAILURE_CODEC.fieldOf("failure").forGetter(DocumentPayload::failure)
+                    FAILURE_CODEC.fieldOf("failure").forGetter(DocumentPayload::failure),
+                    PayloadCodecs.INSTANT.fieldOf("indexedAt").forGetter(DocumentPayload::indexedAt)
             ).apply(instance, DocumentPayload::new));
 
     /**
@@ -90,6 +101,7 @@ public record DocumentPayload(String displayName,
      * @param status       stage the source has reached on its way into the retrieval index
      * @param tokenCount   number of tokens the indexed text was counted as, zero while unknown
      * @param failure      reason the source could not be indexed
+     * @param indexedAt    point in time the source was last read successfully
      * @throws NullPointerException     if any reference argument is {@code null}
      * @throws IllegalArgumentException if {@code tokenCount} is negative
      */
@@ -99,6 +111,7 @@ public record DocumentPayload(String displayName,
         Objects.requireNonNull(origin, "origin must not be null");
         Objects.requireNonNull(status, "status must not be null");
         Objects.requireNonNull(failure, "failure must not be null");
+        Objects.requireNonNull(indexedAt, "indexedAt must not be null");
         if (tokenCount < 0) {
             throw new IllegalArgumentException("tokenCount must not be negative");
         }
@@ -115,8 +128,8 @@ public record DocumentPayload(String displayName,
      * @return a payload equal to this one except for its stage and its failure
      */
     public DocumentPayload withStatus(final DocumentStatus newStatus) {
-        return new DocumentPayload(
-                this.displayName, this.kind, this.origin, newStatus, this.tokenCount, DocumentFailure.NONE);
+        return new DocumentPayload(this.displayName, this.kind, this.origin, newStatus,
+                this.tokenCount, DocumentFailure.NONE, this.indexedAt);
     }
 
     /**
@@ -127,8 +140,8 @@ public record DocumentPayload(String displayName,
      *         {@link DocumentStatus#ERROR}, and its failure
      */
     public DocumentPayload withFailure(final DocumentFailure cause) {
-        return new DocumentPayload(
-                this.displayName, this.kind, this.origin, DocumentStatus.ERROR, this.tokenCount, cause);
+        return new DocumentPayload(this.displayName, this.kind, this.origin, DocumentStatus.ERROR,
+                this.tokenCount, cause, this.indexedAt);
     }
 
     /**
@@ -136,12 +149,15 @@ public record DocumentPayload(String displayName,
      *
      * @param newDisplayName name the source is listed under from now on
      * @param newTokenCount  number of tokens the indexed text was counted as
-     * @return a payload equal to this one except for its name, its token count and its stage, which
-     *         becomes {@link DocumentStatus#READY}
+     * @param readAt         point in time the source was read
+     * @return a payload equal to this one except for its name, its token count, the moment it was
+     *         read and its stage, which becomes {@link DocumentStatus#READY}
      */
-    public DocumentPayload withIndexingResult(final String newDisplayName, final int newTokenCount) {
+    public DocumentPayload withIndexingResult(final String newDisplayName,
+                                              final int newTokenCount,
+                                              final Instant readAt) {
         return new DocumentPayload(newDisplayName, this.kind, this.origin, DocumentStatus.READY,
-                newTokenCount, DocumentFailure.NONE);
+                newTokenCount, DocumentFailure.NONE, readAt);
     }
 
     /**

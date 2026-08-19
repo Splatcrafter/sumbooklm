@@ -35,6 +35,11 @@ import org.springframework.stereotype.Component;
  * parts that keep arriving afterwards are read and discarded: the provider is not told, and cannot
  * be, so the only thing left to decide is whether they reach the reader.
  *
+ * <h2>What Fits</h2>
+ * The request is assembled here, so this is where it is kept to a size. The instructions, the
+ * passages and the question are sent whole and the conversation is shortened to what is left; see
+ * {@link PromptBudget}.
+ *
  * <h2>Threading</h2>
  * The parts of one response may be delivered by more than one thread, so the fallback buffer is a
  * synchronised one. Nothing else in a run is shared.
@@ -150,14 +155,18 @@ public class GroundedChatEngine {
      * @param passages passages the answer may be based on
      * @param history  earlier messages of the conversation, oldest first
      * @param question question that was asked
-     * @return the instructions, the earlier messages and the question, in that order
+     * @return the instructions, as many of the earlier messages as fit, and the question, in that
+     *         order
      */
     private static List<ChatMessage> messages(final List<ContextPassage> passages,
                                               final List<ChatTurn> history,
                                               final String question) {
-        final List<ChatMessage> messages = new ArrayList<>(history.size() + 2);
-        messages.add(SystemMessage.from(GroundedPrompt.of(passages)));
-        for (final ChatTurn turn : history) {
+        final String instructions = GroundedPrompt.of(passages);
+        final List<ChatTurn> remembered = PromptBudget.fit(instructions, question, history);
+
+        final List<ChatMessage> messages = new ArrayList<>(remembered.size() + 2);
+        messages.add(SystemMessage.from(instructions));
+        for (final ChatTurn turn : remembered) {
             messages.add(switch (turn.role()) {
                 case USER -> UserMessage.from(turn.text());
                 case ASSISTANT -> AiMessage.from(turn.text());

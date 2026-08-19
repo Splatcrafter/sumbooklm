@@ -42,6 +42,8 @@ export interface Source {
   tokenCount: number;
   /** Reason the source could not be indexed, `NONE` unless the status is `ERROR`. */
   failure: SourceFailure;
+  /** Point in time the source was last read, absent while it never was. */
+  indexedAt: string | null;
   createdAt: string;
 }
 
@@ -90,6 +92,7 @@ export function toSource(source: components['schemas']['SourceResponse'] | undef
     status: status as SourceStatus,
     tokenCount: requireNumber(source.tokenCount, 'source.tokenCount'),
     failure: FAILURES.includes(source.failure ?? '') ? (source.failure as SourceFailure) : 'UNEXPECTED',
+    indexedAt: source.indexedAt ?? null,
     createdAt: requireString(source.createdAt, 'source.createdAt'),
   };
 }

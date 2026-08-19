@@ -1,5 +1,7 @@
 package de.pfoertner.assessment.sumbooklm.persistence.document;
 
+import java.time.Instant;
+
 import de.pfoertner.assessment.sumbooklm.domain.workspace.SourceDocument;
 import de.pfoertner.assessment.sumbooklm.persistence.payload.PayloadCodec;
 import de.pfoertner.assessment.sumbooklm.persistence.payload.PayloadTypes;
@@ -7,6 +9,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Assembles domain sources from rows and payload bytes, and payload bytes from payload objects.
+ *
+ * <h2>Never Read</h2>
+ * The payload stores the moment a source was read as {@link Instant#EPOCH} while it never was, since
+ * a codec has a value for every field. The domain says that with an absent value instead, and this is
+ * where the two meet.
  *
  * <h2>Why This Exists</h2>
  * A source is stored in two places at once: the columns of its row and the CBOR payload of that row.
@@ -82,6 +89,7 @@ public class SourceDocumentMapper {
                 payload.status(),
                 payload.tokenCount(),
                 payload.failure(),
+                Instant.EPOCH.equals(payload.indexedAt()) ? null : payload.indexedAt(),
                 entity.getCreatedAt());
     }
 }

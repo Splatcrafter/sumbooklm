@@ -17,6 +17,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * any other field rather than through a separate endpoint. The token count is zero until the stage
  * reaches {@code READY}, which is what tells the client that the value is not merely small.
  *
+ * <h2>When It Was Read</h2>
+ * A source carries the moment it was last read, which is absent until it has been. It is what tells a
+ * reader how old the material behind an answer is, and it is the reason a page can be read again.
+ *
  * <h2>Failure Is a Cause, Not a Message</h2>
  * A source that could not be indexed reports which of a small set of causes stopped it, and the
  * client turns that into a sentence in the language of its user. The text the parser or the HTTP
@@ -30,6 +34,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param status      stage the source has reached on its way into the retrieval index
  * @param tokenCount  number of tokens the indexed text was counted as, zero while unknown
  * @param failure     reason the source could not be indexed, {@code NONE} unless it failed
+ * @param indexedAt   point in time the source was last read, absent while it never was
  * @param createdAt   point in time the source was added to its notebook
  * @author Erik Pförtner
  * @since 0.1.0
@@ -60,6 +65,9 @@ public record SourceResponse(
         @Schema(description = "Reason the source could not be indexed, NONE unless it failed.")
         DocumentFailure failure,
 
+        @Schema(description = "Point in time the source was last read, absent while it never was.")
+        Instant indexedAt,
+
         @Schema(description = "Point in time the source was added to its notebook.")
         Instant createdAt) {
 
@@ -79,6 +87,7 @@ public record SourceResponse(
                 source.status(),
                 source.tokenCount(),
                 source.failure(),
+                source.indexedAt(),
                 source.createdAt());
     }
 }

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { AlertCircle, Check, FileText, Globe, Loader2, RotateCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,21 +12,31 @@ import type { Source } from '@/sources/source';
  * narrow and the four stages are distinguishable by shape alone. Each icon still carries its label
  * for anyone who is not reading the shape.
  *
- * A source that could not be read is the only one offered a retry. Every other stage either has
- * nothing to retry or is still running, and a control that is always there would suggest that reading
- * a source again is something a user normally has to do.
+ * Reading a source again is offered on a web page and on anything that failed. A page can say
+ * something different tomorrow, so its reading is the thing that goes stale; an uploaded file cannot,
+ * because its bytes are stored, and the only reason to read one again is that reading it did not work.
+ *
+ * An indexed page says when it was read rather than how many tokens it became. The date is what tells
+ * a reader how old the material behind an answer is, and it is the number that can change under them;
+ * the token count of a file cannot.
  */
 export function SourceListItem({
   source,
-  onReindex,
+  onRefresh,
   onRemove,
 }: {
   source: Source;
-  onReindex: () => void;
+  onRefresh: () => void;
   onRemove: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const kindLabel = t(source.kind === 'WEB' ? 'sumbook.sources.kind.web' : 'sumbook.sources.kind.file');
+  const dateFormat = useMemo(
+    () => new Intl.DateTimeFormat(i18n.language, { year: 'numeric', month: 'short', day: 'numeric' }),
+    [i18n.language],
+  );
+  const label = statusLabel(source, t, dateFormat);
+  const rereadable = source.status === 'ERROR' || source.kind === 'WEB';
 
   return (
     <li className="group/source flex items-center gap-3 rounded-jb-card bg-jb-grey-90/40 px-3 py-2.5 ring-1 ring-jb-grey-70/20 transition-colors hover:bg-jb-grey-90/70">
@@ -40,16 +51,17 @@ export function SourceListItem({
         <span className="truncate text-[0.8125rem] leading-5 text-jb-grey-10" title={source.origin}>
           {source.displayName}
         </span>
-        <span className="truncate text-xs leading-4 text-jb-grey-50">{statusLabel(source, t)}</span>
+        <span className="truncate text-xs leading-4 text-jb-grey-50">{label}</span>
       </span>
-      <StatusIcon status={source.status} label={statusLabel(source, t)} />
-      {source.status === 'ERROR' ? (
+      <StatusIcon status={source.status} label={label} />
+      {rereadable ? (
         <Button
           variant="ghost"
           size="icon-sm"
+          disabled={source.status === 'UPLOADED' || source.status === 'INDEXING'}
           aria-label={t('sumbook.sources.reindex', { name: source.displayName })}
           className="shrink-0 text-jb-grey-60 hover:bg-jb-grey-80/60 hover:text-jb-grey-5"
-          onClick={onReindex}
+          onClick={onRefresh}
         >
           <RotateCw />
         </Button>
@@ -77,8 +89,15 @@ function StatusIcon({ status, label }: { status: Source['status']; label: string
   return <Loader2 aria-label={label} className="size-4 shrink-0 animate-spin text-jb-grey-50" />;
 }
 
-function statusLabel(source: Source, t: (key: string, options?: Record<string, unknown>) => string): string {
+function statusLabel(
+  source: Source,
+  t: (key: string, options?: Record<string, unknown>) => string,
+  dateFormat: Intl.DateTimeFormat,
+): string {
   if (source.status === 'READY') {
+    if (source.kind === 'WEB' && source.indexedAt !== null) {
+      return t('sumbook.sources.status.read', { date: dateFormat.format(new Date(source.indexedAt)) });
+    }
     return t('sumbook.sources.status.ready', { count: source.tokenCount });
   }
   if (source.status === 'ERROR') {

@@ -38,10 +38,10 @@ import org.springframework.web.multipart.MultipartFile;
  * both would be described in the specification as a body that is sometimes one and sometimes the
  * other. Two endpoints keep the generated client honest about which of the two a caller is sending.
  *
- * <h2>Indexing Again Is a Separate Action</h2>
- * A source is indexed when it is added, and it can be indexed again on request. The second one is
- * its own operation rather than a repeat of the first, because the source already exists: repeating
- * the upload would create a second one, and the notebook would refuse it as a duplicate.
+ * <h2>Reading Again Is a Separate Action</h2>
+ * A source is read when it is added, and it can be read again on request. The second one is its own
+ * operation rather than a repeat of the first, because the source already exists: repeating the
+ * upload would create a second one, and the notebook would refuse it as a duplicate.
  *
  * <h2>Answering Before the Work Is Done</h2>
  * A source is returned as soon as it is stored, while it is still waiting to be indexed. The stage
@@ -174,30 +174,30 @@ public class SourceController {
     }
 
     /**
-     * Puts one source of one notebook of the authenticated account through the pipeline again.
+     * Reads one source of one notebook of the authenticated account again.
      *
      * @param notebookId  identifier of the notebook the source belongs to
-     * @param sourceId    identifier of the source to index again
+     * @param sourceId    identifier of the source to read again
      * @param accessToken access token of the caller, injected from the security context
-     * @return the source as it now is, waiting to be indexed
+     * @return the source as it now is, waiting to be read
      */
-    @Operation(summary = "Index a source again",
-            description = "Puts a source that is already stored back at the start of the indexing "
-                    + "pipeline. A source that was read successfully before is indexed from the text "
-                    + "that reading produced; one that was not is read again, which is what makes this "
-                    + "the way to retry a source that failed.")
+    @Operation(summary = "Read a source again",
+            description = "Reads the source again from where it came from and indexes what it says "
+                    + "now, which is how a page that has changed is brought up to date and how a "
+                    + "source that could not be read is retried. Answers that cited the earlier "
+                    + "version are left as they were.")
     @ApiResponses({
-            @ApiResponse(responseCode = "202", description = "The source is waiting to be indexed."),
+            @ApiResponse(responseCode = "202", description = "The source is waiting to be read."),
             @ApiResponse(responseCode = "401", description = "No valid access token was presented.",
                     content = @Content),
             @ApiResponse(responseCode = "404", description = "The notebook holds no such source.",
                     content = @Content)
     })
-    @PostMapping(ApiPaths.V1_NOTEBOOK_SOURCE_REINDEX)
-    public ResponseEntity<SourceResponse> reindex(@PathVariable("notebookId") final UUID notebookId,
+    @PostMapping(ApiPaths.V1_NOTEBOOK_SOURCE_REFRESH)
+    public ResponseEntity<SourceResponse> refresh(@PathVariable("notebookId") final UUID notebookId,
                                                   @PathVariable("sourceId") final UUID sourceId,
                                                   @AuthenticationPrincipal final Jwt accessToken) {
-        final SourceDocument source = this.sourceDocumentService.requestIndexing(
+        final SourceDocument source = this.sourceDocumentService.requestRefresh(
                 this.authenticatedUserResolver.requireUserId(accessToken), notebookId, sourceId);
         return ResponseEntity.accepted().body(SourceResponse.from(source));
     }

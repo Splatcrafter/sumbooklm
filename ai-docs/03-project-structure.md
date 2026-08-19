@@ -88,7 +88,8 @@ de.pfoertner.assessment.sumbooklm
 │                                                ChatMessage, ChatRole
 ├── persistence
 │   ├── schema.PayloadSchemaVersion
-│   ├── payload                                 PayloadTypes, PayloadCodec, PayloadDataFixerBootstrap
+│   ├── payload                                 PayloadTypes, PayloadCodec, PayloadCodecs,
+│   │                                            PayloadDataFixerBootstrap
 │   ├── user                                    entity, repository, payload record and codec, mapper
 │   ├── notebook                                entity, repository, payload record and codec, mapper
 │   ├── document                                entity, repository, payload record and codec, the count
@@ -118,8 +119,8 @@ de.pfoertner.assessment.sumbooklm
 ├── ai
 │   ├── embedding                               model and store beans, NotebookIndex, metadata keys
 │   └── chat                                    ChatProvider, ModelSelection, ChatModelFactory,
-│                                                GroundedPrompt, GroundedChatEngine, its handler and
-│                                                the cancellation it watches
+│                                                GroundedPrompt, PromptBudget, GroundedChatEngine,
+│                                                its handler and the cancellation it watches
 └── api
     ├── ApiPaths
     ├── config                                  OpenApiConfiguration, SecurityConfiguration,
@@ -296,19 +297,24 @@ even though the access token itself is verified by signature alone.
 
 1. Adding a source hashes its content, refuses it if the notebook already holds that hash, stores it
    as `UPLOADED` and publishes an event that is delivered after the storing transaction commits, on
-   the indexing executor. `POST .../sources/{id}/reindex` puts an existing source back in the same
-   state and publishes the same event.
+   the indexing executor. `POST .../sources/{id}/refresh` puts an existing source back in the same
+   state and publishes the same event, asking for the source to be read rather than taken from what
+   is stored (ADR-054).
 2. The run marks the source `INDEXING` and reads what it needs in one short transaction, including
    the text an earlier run extracted.
-3. If that text is there it is used as it is. If it is not, the source is read: Apache Tika for the
-   stored bytes of an upload, and for a page an HTTP request whose every hop resolves through the rule
-   that refuses addresses inside this server's networks (ADR-044), parsed by jsoup. A source is
-   therefore read exactly once for as long as reading it succeeded (ADR-041).
+3. If that text is there and the run was not asked to read again, it is used as it is. Otherwise the
+   source is read: Apache Tika for the stored bytes of an upload, and for a page an HTTP request whose
+   every hop resolves through the rule that refuses addresses inside this server's networks (ADR-044),
+   parsed by jsoup. A source is therefore read once for as long as reading it succeeded, and again
+   when a user asks (ADR-041, ADR-054).
 4. The text is cut into overlapping segments, and `NotebookIndex` embeds them under the notebook and
    the source, replacing whatever was stored for that source before (ADR-043).
-5. The run stores the token count the model reported, the extracted text, and the stage `READY`. If
-   anything above threw, it stores `ERROR` together with the cause the extractor named, which is one
-   of seven constants rather than the message the library failed with (ADR-045).
+5. The run stores the token count the model reported, the extracted text, and the stage `READY`. A run
+   that read the source also records the moment it did; a run that indexed from the stored text leaves
+   that moment where it was, because a rebuild is not a reading. If anything above threw, it stores
+   `ERROR` together with the cause the extractor named, which is one of seven constants rather than
+   the message the library failed with (ADR-045). The stored text is left in place either way, so a
+   reading that fails leaves the source answering with what it said before.
 
 Once the application is ready, `IndexRestoreJob` puts every source of every account through that
 sequence again, because the store it writes to did not survive the process while the sources did
@@ -329,8 +335,8 @@ that never succeeded.
    metadata matches, above the relevance floor (ADR-035). Their sources are named from the source
    table, numbered per document, and sent as the `sources` event.
 4. A client is built for the presented provider, and the model is asked with the rules, the numbered
-   passages, the last messages of the conversation and the question. Each part it generates is
-   written to the stream as a `token` event.
+   passages, as many of the last messages of the conversation as fit under the character budget
+   (ADR-053), and the question. Each part it generates is written to the stream as a `token` event.
 5. The finished answer is handed to the asynchronous recorder, which appends it under a lock on the
    session row, and is sent as the `done` event, after which the stream is closed. A failure at any
    point after step 2 becomes an `error` event instead, and the question stays in the transcript
@@ -363,8 +369,8 @@ token is usable), `issued_to_ip`.
 `document_hash` (unique together with `notebook_id`, see ADR-046), `content` (the uploaded bytes, null
 for a web source, see ADR-032), `extracted_text` (the text the last successful run read, null while
 there was none, see ADR-041), `payload`, `payload_version`, `record_version`. Name, kind, origin,
-stage, failure cause and token count live in `payload`; the hash does not, because it is the one field
-that is queried rather than displayed.
+stage, failure cause, token count and the moment the source was last read live in `payload`; the hash
+does not, because it is the one field that is queried rather than displayed.
 
 `chat_session` — `id` (UUID, primary key), `user_id` and `notebook_id` (both indexed), `created_at`,
 `last_message_at`, `payload`, `payload_version`, `record_version`. The title and the whole transcript

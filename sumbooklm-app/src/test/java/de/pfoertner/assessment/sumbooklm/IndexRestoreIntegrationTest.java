@@ -184,25 +184,31 @@ class IndexRestoreIntegrationTest {
         assertThat(rebuilt.get("status")).isEqualTo("READY");
         assertThat(rebuilt.get("tokenCount")).isEqualTo(indexed.get("tokenCount"));
         assertThat(rebuilt.get("displayName")).isEqualTo("thermodynamics.txt");
+        assertThat(rebuilt.get("indexedAt"))
+                .describedAs("a rebuild is not a reading, so the moment it was read stays")
+                .isEqualTo(indexed.get("indexedAt"));
     }
 
     /**
-     * Verifies that indexing a source that is already indexed replaces its segments instead of adding
-     * a second copy of every paragraph.
+     * Verifies that reading a source that is already indexed replaces its segments instead of adding
+     * a second copy of every paragraph, and that the moment it was read moves with the reading.
      */
     @Test
-    void indexingASourceAgainReplacesItsSegments() {
+    void readingASourceAgainReplacesItsSegments() {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
         final String sourceId = idOf(uploadFile(accessToken, notebookId, "physics.txt", DOCUMENT_TEXT));
-        awaitSettled(accessToken, notebookId, sourceId);
+        final Object readAt = awaitSettled(accessToken, notebookId, sourceId).get("indexedAt");
         final int segments = segmentsOf(sourceId);
+        assertThat(readAt).isNotNull();
 
-        final ResponseEntity<Map<String, Object>> response = reindex(accessToken, notebookId, sourceId);
+        final ResponseEntity<Map<String, Object>> response = refresh(accessToken, notebookId, sourceId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(requireBody(response).get("status")).isEqualTo("UPLOADED");
-        assertThat(awaitSettled(accessToken, notebookId, sourceId).get("status")).isEqualTo("READY");
+        final Map<String, Object> reread = awaitSettled(accessToken, notebookId, sourceId);
+        assertThat(reread.get("status")).isEqualTo("READY");
+        assertThat(reread.get("indexedAt")).isNotEqualTo(readAt);
         assertThat(segmentsOf(sourceId)).isEqualTo(segments);
     }
 
@@ -211,13 +217,13 @@ class IndexRestoreIntegrationTest {
      * ends in the failed stage once more while the address stays unreachable.
      */
     @Test
-    void aFailedSourceIsReadAgainWhenItIsIndexedAgain() {
+    void aFailedSourceIsReadAgainWhenItIsRefreshed() {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
         final String sourceId = idOf(addWebPage(accessToken, notebookId, "http://127.0.0.1:9/unreachable"));
         assertThat(awaitSettled(accessToken, notebookId, sourceId).get("status")).isEqualTo("ERROR");
 
-        assertThat(reindex(accessToken, notebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(refresh(accessToken, notebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
 
         final Map<String, Object> failed = awaitSettled(accessToken, notebookId, sourceId);
         assertThat(failed.get("status")).isEqualTo("ERROR");
@@ -230,16 +236,16 @@ class IndexRestoreIntegrationTest {
      * notebook of the same account cannot either.
      */
     @Test
-    void sourcesOfAnotherAccountCannotBeIndexedAgain() {
+    void sourcesOfAnotherAccountCannotBeReadAgain() {
         final String owner = registerAccount();
         final String stranger = registerAccount();
         final String notebookId = createNotebook(owner);
         final String otherNotebookId = createNotebook(owner);
         final String sourceId = idOf(uploadFile(owner, notebookId, "owned.txt", DOCUMENT_TEXT));
 
-        assertThat(reindex(stranger, notebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(reindex(owner, otherNotebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(reindex(owner, notebookId, UUID.randomUUID().toString()).getStatusCode())
+        assertThat(refresh(stranger, notebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(refresh(owner, otherNotebookId, sourceId).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(refresh(owner, notebookId, UUID.randomUUID().toString()).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -305,18 +311,18 @@ class IndexRestoreIntegrationTest {
     }
 
     /**
-     * Asks for one source to be indexed again.
+     * Asks for one source to be read again.
      *
      * @param accessToken access token to present
      * @param notebookId  identifier of the notebook the source belongs to
-     * @param sourceId    identifier of the source to index again
+     * @param sourceId    identifier of the source to read again
      * @return the response of the endpoint
      */
-    private ResponseEntity<Map<String, Object>> reindex(final String accessToken,
+    private ResponseEntity<Map<String, Object>> refresh(final String accessToken,
                                                         final String notebookId,
                                                         final String sourceId) {
         return this.client.post()
-                .uri("/api/v1/notebooks/" + notebookId + "/sources/" + sourceId + "/reindex")
+                .uri("/api/v1/notebooks/" + notebookId + "/sources/" + sourceId + "/refresh")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
                 .toEntity(JSON_OBJECT);

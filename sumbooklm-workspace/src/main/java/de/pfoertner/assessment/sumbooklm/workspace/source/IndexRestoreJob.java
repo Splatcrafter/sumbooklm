@@ -19,6 +19,11 @@ import org.springframework.stereotype.Component;
  * application reports every source as indexed and answers every question from nothing, which is the
  * worst of the possible failures: it looks like it worked.
  *
+ * <h2>A Rebuild Is Not a Reading</h2>
+ * The rebuild indexes from the text each source was read as, and asks for no source to be read again.
+ * A restart is not a reason to believe a page has changed, and reading every source of every account
+ * at every start would make a restart an event on every host a user ever named.
+ *
  * <h2>Every Source, Not Only the Unfinished Ones</h2>
  * A source that finished successfully is rebuilt just as one that never did. After a restart the two
  * are in the same position, because what distinguished them lived in the store that is gone. The
@@ -92,7 +97,7 @@ public class IndexRestoreJob {
         LOG.info("Rebuilding the retrieval index for {} sources", references.size());
         int restored = 0;
         for (final SourceReference reference : references) {
-            if (this.sourceIngestionPipeline.index(reference.getUserId(), reference.getId())) {
+            if (this.sourceIngestionPipeline.index(reference.getUserId(), reference.getId(), false)) {
                 restored += 1;
             }
         }

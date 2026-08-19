@@ -568,3 +568,33 @@ carries the ticks, does not carry the ending, and the transcript holds it.
 The interface harness gained the stop control and the switcher: an answer being written offers a stop
 instead of a send, pressing it reports the stop, a Sumbook without conversations shows no switcher, and
 one with two names the open conversation. All translated keys are present in all three languages.
+
+## Verification of the request budget and of reading a source again on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 86 tests. `sumbooklm-ai` has tests for the first time.
+
+`PromptBudgetTest` states what fits at the edges rather than in the middle: a short conversation is
+kept whole and in order, a long one keeps its most recent messages and loses the oldest, a single
+message beyond the budget takes the conversation with it, instructions that fill the budget on their
+own leave nothing, and an empty conversation needs no case of its own. Driving those through a model
+would have meant choosing texts by their length and asserting on what a provider received.
+
+Reading a source again is asserted where its effects are visible. Reading an indexed file again keeps
+the number of segments the same rather than doubling it, and moves the moment it was read. A rebuild
+after the store has lost its segments leaves that moment where it was, because a rebuild is not a
+reading. A source that failed is read again and fails again while its address stays unreachable. A
+source of another account, of another notebook, or one that does not exist answers `404`.
+
+An uploaded source reports no moment before it has been read and one afterwards, which is the pair
+that makes the field mean what it says.
+
+What could not be verified here is a page that changed between two readings. The rule that refuses
+internal addresses makes a server started inside the build unreachable, and no other host is reachable
+from the container, so the branch is covered by the file path and by the failing address rather than
+by a page whose content moved.
+
+The generated client harness drives the reading again through the real browser code: a file that is
+indexed is read again, ends indexed, and carries a later moment than before. The interface harness
+covers what a reader sees: an indexed page says when it was read and offers to read it again, an
+indexed file says how much it became and does not, a failed source of either kind offers it, and a
+source that is running has the control disabled.

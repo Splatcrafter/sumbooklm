@@ -27,12 +27,15 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * executor. Both matter: before the commit the row would not be visible, and on the request thread
  * the user would wait for a neural network to finish before learning that their upload arrived.
  *
- * <h2>Reading Once</h2>
- * A source that was read successfully before is not read again. The text of that reading is stored
- * with the source, and a run that finds it there goes straight to splitting and embedding, which is
- * what lets the whole index be rebuilt without a parser and without reaching a single foreign host.
- * Only a source that has never been read successfully is read, which is also what makes a repeated
- * run of a failed source a retry rather than a repetition.
+ * <h2>Reading Once, Unless Asked</h2>
+ * A source that was read successfully before is not read again by itself. The text of that reading is
+ * stored with the source, and a run that finds it there goes straight to splitting and embedding,
+ * which is what lets the whole index be rebuilt without a parser and without reaching a single
+ * foreign host.
+ *
+ * A run may be asked to read anyway, which is what a user asks for when a page has changed or when a
+ * source failed. The stored text is then ignored rather than deleted, so a reading that fails leaves
+ * the source answering with what it said before.
  *
  * <h2>Order of Work</h2>
  * The source is marked as being indexed, its text is extracted, the text is cut into segments, the
@@ -122,7 +125,7 @@ public class SourceIngestionPipeline {
     @Async(INGESTION_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIndexRequested(final SourceIndexRequestedEvent event) {
-        index(event.userId(), event.sourceId());
+        index(event.userId(), event.sourceId(), event.reread());
     }
 
     /**
@@ -130,10 +133,12 @@ public class SourceIngestionPipeline {
      *
      * @param userId   identifier of the account the source belongs to
      * @param sourceId identifier of the source to index
+     * @param reread   whether the source is to be read again rather than indexed from the text an
+     *                 earlier run extracted
      * @return {@code true} if the source is now part of the retrieval index, {@code false} if it was
      *         removed in the meantime or could not be read
      */
-    public boolean index(final UUID userId, final UUID sourceId) {
+    public boolean index(final UUID userId, final UUID sourceId, final boolean reread) {
         final IngestionInput input;
         try {
             input = this.sourceDocumentService.beginIndexing(userId, sourceId);
@@ -142,12 +147,15 @@ public class SourceIngestionPipeline {
             return false;
         }
 
+        final String stored = input.extractedText();
+        final boolean fromStore = !reread && stored != null && !stored.isBlank();
         try {
-            final ExtractedContent content = read(input);
+            final ExtractedContent content =
+                    fromStore ? new ExtractedContent("", stored) : extract(input);
             final List<TextSegment> segments = this.textChunker.chunk(content.text());
             final int tokenCount = this.notebookIndex.index(input.notebookId(), sourceId, segments);
-            this.sourceDocumentService.completeIndexing(
-                    userId, sourceId, displayName(input, content), tokenCount, content.text());
+            this.sourceDocumentService.completeIndexing(userId, sourceId,
+                    displayName(input, content), tokenCount, content.text(), !fromStore);
             LOG.debug("Indexed source {} as {} segments and {} tokens", sourceId, segments.size(), tokenCount);
             return true;
         } catch (final SourceNotFoundException e) {
@@ -162,21 +170,6 @@ public class SourceIngestionPipeline {
             recordFailure(userId, sourceId, DocumentFailure.UNEXPECTED);
             return false;
         }
-    }
-
-    /**
-     * Returns the text of a source, reading it only if no earlier run already did.
-     *
-     * @param input values the run works with
-     * @return the text and, for a source that had to be read, the title its content carries
-     * @throws TextExtractionException if the source has to be read and cannot be
-     */
-    private ExtractedContent read(final IngestionInput input) {
-        final String stored = input.extractedText();
-        if (stored != null && !stored.isBlank()) {
-            return new ExtractedContent("", stored);
-        }
-        return extract(input);
     }
 
     /**

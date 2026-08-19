@@ -108,6 +108,7 @@
       "status": {
         "uploaded": "Wartet auf die Indexierung",
         "indexing": "Wird indexiert ...",
+        "read": "Gelesen am {{date}}",
         "ready_one": "Indexiert, {{count}} Token",
         "ready_other": "Indexiert, {{count}} Token"
       },

@@ -146,6 +146,9 @@ class SourceApiIntegrationTest {
         assertThat(stored.get("kind")).isEqualTo("FILE");
         assertThat(stored.get("origin")).isEqualTo("thermodynamics.txt");
         assertThat(stored.get("tokenCount")).isEqualTo(0);
+        assertThat(stored.get("indexedAt"))
+                .describedAs("a source that has not been read yet says so by carrying no moment")
+                .isNull();
         assertThat(stored.get("status")).isIn("UPLOADED", "INDEXING", "READY");
         assertThat(response.getHeaders().getLocation())
                 .hasToString("/api/v1/notebooks/" + notebookId + "/sources/" + stored.get("id"));
@@ -314,6 +317,9 @@ class SourceApiIntegrationTest {
         final Map<String, Object> indexed = awaitSettled(accessToken, notebookId, readable);
         assertThat(indexed.get("status")).isEqualTo("READY");
         assertThat(indexed.get("failure")).isEqualTo("NONE");
+        assertThat(indexed.get("indexedAt"))
+                .describedAs("a source that was read says when it was")
+                .isNotNull();
     }
 
     /**

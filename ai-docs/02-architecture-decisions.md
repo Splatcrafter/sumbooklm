@@ -989,3 +989,53 @@ something they had already been shown.
 
 **Cost.** The tokens for whatever the provider generates after the stop are still spent, and a thread
 still reads them to the end. Both are recorded as open questions rather than hidden.
+
+## ADR-053: The request is bounded by characters, and only the conversation is shortened
+
+**Decision.** The engine keeps the whole prompt under a character budget. The instructions, the
+retrieved passages and the question are sent whole; the conversation is shortened from the oldest
+message forwards until the rest fits.
+
+**Reason.** A rule that counts messages says ten short exchanges and ten long ones are the same
+request. They are not, and the long ones are what exceeds a context while the count still reports
+room.
+
+Characters rather than tokens, because counting tokens needs the tokenizer of the model the request
+goes to. This application does not know which model that is until the request is made and never
+learns its context length, which is the price of the key belonging to the user. The budget is set low
+enough that the approximation being wrong by a factor of two still leaves room.
+
+Only the conversation is shortened because it is the only part that is context rather than content.
+Dropping a passage would change what the answer may be based on, and dropping part of the question
+would change the question.
+
+The count bound stays alongside it. The two answer different things: ten messages is how far back the
+conversation is still relevant, and the budget is what fits.
+
+**Cost.** A single message longer than the budget takes the whole conversation with it, because what
+is sent is a run of the most recent messages rather than a selection. A model that writes a very long
+answer therefore costs the next question its context.
+
+## ADR-054: A source is read again when a user asks, and old answers are left alone
+
+**Decision.** `POST /sources/{id}/refresh` reads a source again from where it came from. Nothing reads
+on a schedule. The transcripts that cited an earlier version are not touched, and a source carries the
+moment it was last read.
+
+**Reason.** Storing the extracted text made a page a snapshot, which is what makes rebuilding free of
+the network and what makes a page that changes keep answering with what it said that day.
+
+Reading on an interval would fetch pages nobody is looking at, spend the network of the operator on
+behalf of the user, and change what a Sumbook says without anyone asking. A refresh is a deliberate
+act, like adding the source was.
+
+Old answers stay because a transcript is a record of what was said. Rewriting them to match a new
+version would make the conversation claim something it never claimed. What was missing instead is the
+date, and that is now on the source: a reader can see how old the material behind an answer is.
+
+The stored text is ignored for that run rather than deleted, so a reading that fails leaves the source
+answering with what it said before. And a rebuild at startup is not a reading: it indexes from the
+stored text and moves no date, because a restart is not a reason to believe a page has changed.
+
+**Cost.** Nothing notices that a page has changed. A user has to suspect it and ask, which is the
+trade an interval would reverse.

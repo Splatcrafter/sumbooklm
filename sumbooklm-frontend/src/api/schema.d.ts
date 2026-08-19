@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/notebooks/{notebookId}/sources/{sourceId}/reindex": {
+    "/api/v1/notebooks/{notebookId}/sources/{sourceId}/refresh": {
         parameters: {
             query?: never;
             header?: never;
@@ -78,10 +78,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Index a source again
-         * @description Puts a source that is already stored back at the start of the indexing pipeline. A source that was read successfully before is indexed from the text that reading produced; one that was not is read again, which is what makes this the way to retry a source that failed.
+         * Read a source again
+         * @description Reads the source again from where it came from and indexes what it says now, which is how a page that has changed is brought up to date and how a source that could not be read is retried. Answers that cited the earlier version are left as they were.
          */
-        post: operations["reindex"];
+        post: operations["refresh_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -516,6 +516,11 @@ export interface components {
             failure?: "NONE" | "BLOCKED" | "UNREACHABLE" | "UNREADABLE" | "EMPTY" | "TOO_LARGE" | "UNEXPECTED";
             /**
              * Format: date-time
+             * @description Point in time the source was last read, absent while it never was.
+             */
+            indexedAt?: string;
+            /**
+             * Format: date-time
              * @description Point in time the source was added to its notebook.
              */
             createdAt?: string;
@@ -796,7 +801,7 @@ export interface operations {
             };
         };
     };
-    reindex: {
+    refresh_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -808,7 +813,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The source is waiting to be indexed. */
+            /** @description The source is waiting to be read. */
             202: {
                 headers: {
                     [name: string]: unknown;

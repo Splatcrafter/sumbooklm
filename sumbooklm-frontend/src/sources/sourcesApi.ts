@@ -84,18 +84,18 @@ export async function addSourceLink(
 }
 
 /**
- * Puts one source back at the start of the indexing pipeline and returns it as it now is.
+ * Reads one source again from where it came from and returns it as it now is.
  *
- * A source that was read successfully before is indexed from the text that reading produced; one
- * that was not is read again, which is what makes this the way to retry a source that failed.
+ * This is how a page that has changed is brought up to date and how a source that could not be read
+ * is retried. Answers that cited the earlier version stay as they were.
  */
-export async function reindexSource(
+export async function refreshSource(
   accessToken: string,
   notebookId: string,
   sourceId: string,
 ): Promise<Source> {
   const { data, response } = await apiClient.POST(
-    '/api/v1/notebooks/{notebookId}/sources/{sourceId}/reindex',
+    '/api/v1/notebooks/{notebookId}/sources/{sourceId}/refresh',
     {
       headers: authorization(accessToken),
       params: { path: { notebookId, sourceId } },

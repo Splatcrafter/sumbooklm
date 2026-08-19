@@ -28,7 +28,7 @@ export function SumbookPage() {
   const id = notebookId ?? '';
 
   const { status: notebookStatus, notebook, reload: reloadNotebook } = useNotebook(id);
-  const { status: sourcesStatus, sources, reload, addFile, addLink, reindex, remove } = useSources(id);
+  const { status: sourcesStatus, sources, reload, addFile, addLink, refresh, remove } = useSources(id);
   const [adding, setAdding] = useState(false);
 
   if (notebookStatus === 'loading') {
@@ -69,7 +69,7 @@ export function SumbookPage() {
           status={sourcesStatus}
           sources={sources}
           onAdd={() => setAdding(true)}
-          onReindex={(sourceId) => void reindex(sourceId)}
+          onRefresh={(sourceId) => void refresh(sourceId)}
           onRemove={(sourceId) => void remove(sourceId)}
           onRetry={() => void reload()}
         />

@@ -17,14 +17,14 @@ export function SourcesPanel({
   status,
   sources,
   onAdd,
-  onReindex,
+  onRefresh,
   onRemove,
   onRetry,
 }: {
   status: SourcesStatus;
   sources: Source[];
   onAdd: () => void;
-  onReindex: (sourceId: string) => void;
+  onRefresh: (sourceId: string) => void;
   onRemove: (sourceId: string) => void;
   onRetry: () => void;
 }) {
@@ -81,7 +81,7 @@ export function SourcesPanel({
             <SourceListItem
               key={source.id}
               source={source}
-              onReindex={() => onReindex(source.id)}
+              onRefresh={() => onRefresh(source.id)}
               onRemove={() => onRemove(source.id)}
             />
           ))}

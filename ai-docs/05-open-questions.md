@@ -284,26 +284,33 @@ needs it, and a reader works in one conversation at a time.
 What is left over is that listing them decodes every transcript in order to count its messages, which
 is question 37.
 
-## 28. History is trimmed by count, not by size
+## 28. Resolved: the request is bounded by characters as well
 
-A question is asked with the last ten messages. Ten short exchanges and ten long ones are not the same
-request, and the long ones can exceed the context of a small local model while the count still says
-they fit.
+The engine keeps the whole prompt under a character budget and shortens the conversation from the
+oldest message forwards until it fits. The instructions, the passages and the question are sent whole,
+because they are what the answer has to be based on.
 
-Counting tokens instead needs a tokenizer per provider, which is the thing this application deliberately
-does not have. Counting characters is the approximation to make, once there is a reason to believe the
-count is what breaks first.
+Characters rather than tokens, as the question expected: counting tokens needs the tokenizer of the
+model the request goes to, and this application does not learn which model that is until the request
+is made. The budget is low enough that the approximation being wrong by a factor of two still leaves
+room.
 
-## 29. A web page is never fetched again
+The count bound stayed. Ten messages is how far back a conversation is still relevant, and the budget
+is what fits; the two answer different questions. What the budget does not handle is question 38.
 
-Storing the extracted text made rebuilding free of the network, and it also means a page is read
-exactly once, when it is added. A page that changes afterwards keeps answering with what it said that
-day, and nothing tells the user how old that is.
+## 29. Resolved: a source is read again when a user asks
 
-Refreshing it is the same call as indexing it again, minus the stored text, so the mechanism is
-already there. What is missing is the decision: whether a refresh is something the user asks for, or
-something that happens on an interval, and what should happen to an answer that cited the version that
-is being replaced.
+`POST /sources/{id}/refresh` reads a source again from where it came from, and the interface offers it
+on every web page and on anything that failed. A source now carries the moment it was last read, which
+is what tells a reader how old the material behind an answer is.
+
+Both halves of the decision the question left open were made deliberately. Nothing reads on a
+schedule: that would fetch pages nobody is looking at and change what a Sumbook says without anyone
+asking. And the answers that cited an earlier version are left alone, because a transcript is a record
+of what was said, and rewriting it would make the conversation claim something it never did.
+
+A reading that fails leaves the previous text in place, so a page that has gone away keeps answering
+with what it last said rather than becoming an empty source. What is left over is question 39.
 
 ## 30. The rebuild has no bound and no back pressure
 
@@ -391,3 +398,24 @@ before it became a column, and the same answer would apply.
 It is cheap for the number of conversations a person keeps, and it stops being cheap at the point
 where somebody keeps hundreds. What makes it worth leaving is that the count is the only thing being
 decoded for, and dropping it from the list would remove the problem without a schema change.
+
+## 38. One long message costs the conversation its context
+
+The conversation is sent as a run of its most recent messages, so a single message that does not fit
+the budget takes everything before it as well. A model that answers at great length therefore costs
+the next question the context it would have referred to.
+
+Truncating that message instead would keep the run, at the price of sending half a sentence and
+letting the model treat it as the whole of what was said. Summarising it is the real answer and is a
+second request to a model the user pays for, which is a feature rather than a fix.
+
+## 39. Nothing notices that a page has changed
+
+A page is read when it is added and when a user asks for it again. Nothing compares it against what it
+said before, so a Sumbook can answer from a version that no longer exists and only the date on the
+source hints at it.
+
+Noticing needs either a schedule, which was deliberately not taken, or a conditional request per page
+using the validators a server offers. The second is cheap for the server being asked and would turn
+the date into something the application could keep current on its own, at the cost of storing what the
+server said last time.

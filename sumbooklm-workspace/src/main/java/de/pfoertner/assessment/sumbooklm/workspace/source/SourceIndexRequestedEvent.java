@@ -13,9 +13,9 @@ import java.util.UUID;
  * nothing to index.
  *
  * <h2>Two Reasons, One Event</h2>
- * The event is published when a source is added and when indexing it is requested again. Both mean
- * the same thing to the listener, which reads the source and works through it, so distinguishing
- * them would only give the listener a fact it has no use for.
+ * The event is published when a source is added and when reading it again is asked for. What differs
+ * between them is one thing, and it is the one thing the listener needs: whether the text an earlier
+ * run extracted may be used, or whether the source is to be read from where it came from.
  *
  * <h2>Identifiers Only</h2>
  * The event carries identifiers rather than the source itself, because everything it describes may
@@ -24,17 +24,20 @@ import java.util.UUID;
  *
  * @param userId   identifier of the account the source belongs to
  * @param sourceId identifier of the source to index
+ * @param reread   whether the source is to be read again rather than indexed from the text an
+ *                 earlier run extracted
  * @author Erik Pförtner
  * @since 0.1.0
  */
-public record SourceIndexRequestedEvent(UUID userId, UUID sourceId) {
+public record SourceIndexRequestedEvent(UUID userId, UUID sourceId, boolean reread) {
 
     /**
      * Creates the event.
      *
      * @param userId   identifier of the account the source belongs to
      * @param sourceId identifier of the source to index
-     * @throws NullPointerException if any argument is {@code null}
+     * @param reread   whether the source is to be read again
+     * @throws NullPointerException if {@code userId} or {@code sourceId} is {@code null}
      */
     public SourceIndexRequestedEvent {
         Objects.requireNonNull(userId, "userId must not be null");

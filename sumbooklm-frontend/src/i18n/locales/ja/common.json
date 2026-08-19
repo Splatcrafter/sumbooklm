@@ -105,6 +105,7 @@
       "status": {
         "uploaded": "インデックス作成を待機中",
         "indexing": "インデックスを作成しています ...",
+        "read": "{{date}} に取得",
         "ready_other": "インデックス済み、{{count}} トークン"
       },
       "failure": {

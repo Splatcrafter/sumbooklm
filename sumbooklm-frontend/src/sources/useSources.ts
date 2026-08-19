@@ -6,7 +6,7 @@ import {
   addSourceLink,
   deleteSource,
   listSources,
-  reindexSource,
+  refreshSource,
   SourceRequestError,
   uploadSourceFile,
 } from '@/sources/sourcesApi';
@@ -32,7 +32,7 @@ export interface SourcesValue {
   reload: () => Promise<void>;
   addFile: (file: File) => Promise<void>;
   addLink: (url: string) => Promise<void>;
-  reindex: (sourceId: string) => Promise<void>;
+  refresh: (sourceId: string) => Promise<void>;
   remove: (sourceId: string) => Promise<void>;
 }
 
@@ -119,9 +119,9 @@ export function useSources(notebookId: string): SourcesValue {
     [notebookId, requireAccessToken],
   );
 
-  const reindex = useCallback(
+  const refresh = useCallback(
     async (sourceId: string) => {
-      const queued = await reindexSource(await requireAccessToken(), notebookId, sourceId);
+      const queued = await refreshSource(await requireAccessToken(), notebookId, sourceId);
       setSources((current) => current.map((source) => (source.id === sourceId ? queued : source)));
     },
     [notebookId, requireAccessToken],
@@ -143,5 +143,5 @@ export function useSources(notebookId: string): SourcesValue {
     [notebookId, requireAccessToken],
   );
 
-  return { status, sources, indexing, reload, addFile, addLink, reindex, remove };
+  return { status, sources, indexing, reload, addFile, addLink, refresh, remove };
 }

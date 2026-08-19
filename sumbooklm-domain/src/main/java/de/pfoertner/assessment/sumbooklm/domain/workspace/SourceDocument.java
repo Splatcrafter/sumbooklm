@@ -21,6 +21,12 @@ import java.util.UUID;
  * The count is what the embedding model reported for the segments of this source and is therefore
  * zero until indexing has finished. It describes the indexed text, not the uploaded bytes.
  *
+ * <h2>When It Was Read</h2>
+ * The moment a source was last read is {@code null} until it has been read successfully, and it
+ * changes when it is read again. It is the one field of this record that may be absent, which the
+ * module states in prose rather than with an annotation, because it carries no dependencies. For a page it is what says how old the answer material is, since a page can
+ * say something different tomorrow; for an uploaded file it says which parser produced the text.
+ *
  * <h2>Failure</h2>
  * The failure says why a source in {@link DocumentStatus#ERROR} could not be indexed and is
  * {@link DocumentFailure#NONE} in every other stage. It is a cause rather than a message, because it
@@ -36,6 +42,8 @@ import java.util.UUID;
  *                    {@code null}
  * @param tokenCount  number of tokens the indexed text was counted as, zero while unknown
  * @param failure     reason the source could not be indexed, never {@code null}
+ * @param indexedAt   point in time the source was last read successfully, {@code null} while it
+ *                    never was
  * @param createdAt   point in time the source was added to its notebook, never {@code null}
  * @author Erik Pförtner
  * @since 0.1.0
@@ -49,6 +57,7 @@ public record SourceDocument(UUID id,
                              DocumentStatus status,
                              int tokenCount,
                              DocumentFailure failure,
+                             Instant indexedAt,
                              Instant createdAt) {
 
     /**
@@ -63,8 +72,10 @@ public record SourceDocument(UUID id,
      * @param status      stage the source has reached on its way into the retrieval index
      * @param tokenCount  number of tokens the indexed text was counted as, zero while unknown
      * @param failure     reason the source could not be indexed
+     * @param indexedAt   point in time the source was last read successfully, or {@code null}
      * @param createdAt   point in time the source was added to its notebook
-     * @throws NullPointerException     if any reference argument is {@code null}
+     * @throws NullPointerException     if any reference argument other than {@code indexedAt} is
+     *                                  {@code null}
      * @throws IllegalArgumentException if {@code tokenCount} is negative
      */
     public SourceDocument {

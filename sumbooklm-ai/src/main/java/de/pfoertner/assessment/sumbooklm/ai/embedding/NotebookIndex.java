@@ -53,10 +53,11 @@ import org.springframework.stereotype.Component;
  * behind it, so the list the pass then reads contains it. The cost is that indexing waits for one
  * query, and what it buys is that the pass cannot delete a source it simply had not heard of yet.
  *
- * <h2>Token Count</h2>
- * The count returned by indexing is what the model itself reported for the text it embedded, not an
- * estimate made next to it. It therefore describes the text that actually entered the index,
- * including the overlap the segments share.
+ * <h2>The Token Count Is Not a Size</h2>
+ * Indexing returns what the embedding model reports as its token usage, and that model reports the
+ * same number for every input: four hundred characters and ten thousand characters both come back as
+ * one hundred and twenty six. The value is therefore kept because it is what the model said, and it is
+ * shown to nobody, because a number that does not vary with what it counts is not a measurement.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -72,12 +73,21 @@ public class NotebookIndex {
     private static final int MAX_RESULTS = 8;
 
     /**
-     * Similarity a segment has to reach in order to be shown to the model at all. Retrieval always
-     * returns the nearest segments, however far away they are, and without a floor a question the
-     * notebook says nothing about would be answered from its least unrelated paragraph. The scale is
-     * the cosine similarity mapped onto zero to one, so the value below is a cosine of about a third.
+     * Similarity a segment has to reach in order to be shown to the model at all, on the scale of the
+     * cosine similarity mapped onto zero to one.
+     *
+     * <p>The value is low because measurement showed that a floor cannot do the job it looks like it
+     * does. Against the segments of a German document, this model scores an unrelated question about
+     * baking bread at 0.64 and the request to summarise the document itself at 0.62: the two
+     * distributions overlap completely, so no threshold separates them. A floor set where it looked
+     * safe therefore discarded every passage of exactly the questions a reader asks first, and a
+     * question with no passages is the one case where a model invents an answer with confidence.
+     *
+     * <p>What the floor still does is keep a search from returning segments that point the other way.
+     * What decides whether a question is answered from the sources is that the passages are given to
+     * the model at all, and that a question without any is not asked.
      */
-    private static final double MIN_SCORE = 0.65;
+    private static final double MIN_SCORE = 0.5;
 
     /**
      * Lock that separates writing segments from collecting the ones whose source is gone. Writing

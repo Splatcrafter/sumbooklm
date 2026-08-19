@@ -124,7 +124,7 @@ class ChatModelFactoryTest {
         final AtomicReference<Throwable> failure = new AtomicReference<>();
         final CountDownLatch firstPart = new CountDownLatch(1);
 
-        this.groundedChatEngine.answer(selection(), List.of(), List.of(), "Explain entropy.",
+        this.groundedChatEngine.answer(selection(), passages(), List.of(), "Explain entropy.",
                 new AnswerStreamHandler() {
 
                     @Override
@@ -174,7 +174,7 @@ class ChatModelFactoryTest {
 
         this.groundedChatEngine.answer(
                 ModelSelection.of("OLLAMA", "unreachable", null, "http://127.0.0.1:9"),
-                List.of(), List.of(), "Explain entropy.",
+                passages(), List.of(), "Explain entropy.",
                 new AnswerStreamHandler() {
 
                     @Override
@@ -210,6 +210,15 @@ class ChatModelFactoryTest {
             Thread.sleep(100);
         }
         return this.cutOff.get();
+    }
+
+    /**
+     * Builds the passages a question is grounded in, since a question without any is never asked.
+     *
+     * @return one passage, which is enough for a case about the connection
+     */
+    private static List<ContextPassage> passages() {
+        return List.of(new ContextPassage(1, "thermodynamics.txt", "Entropy never decreases."));
     }
 
     /**

@@ -254,6 +254,7 @@ class ChatApiIntegrationTest {
     void aQuestionIsRecordedEvenWhenTheProviderFails() {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
+        indexDocument(accessToken, notebookId, "thermodynamics.txt", THERMODYNAMICS);
         final String sessionId = startConversation(accessToken, notebookId);
 
         final ResponseEntity<String> response =
@@ -290,24 +291,48 @@ class ChatApiIntegrationTest {
                 "What does the second law say about entropy?", "OLLAMA", "llama3"));
 
         assertThat(fromPhysics).containsExactly("thermodynamics.txt");
-        assertThat(fromBaking).isEmpty();
+        assertThat(fromBaking)
+                .describedAs("a notebook answers from its own sources and from no others")
+                .doesNotContain("thermodynamics.txt");
     }
 
     /**
-     * Verifies that a notebook that has nothing indexed still answers through the same stream, so
-     * that a client renders one case rather than two.
+     * Verifies that a question a notebook has no passages for is never put to a provider, and that the
+     * stream still ends as finished with an empty answer, which is what the interface turns into a
+     * sentence of its own.
+     *
+     * <p>The provider of this case would answer if it were asked, so the assertion that it was not
+     * asked is the whole point. Telling a model that it has no sources and trusting it to say so
+     * produced a complete answer about a document that does not exist.
+     *
+     * @throws Exception if the provider cannot be started
      */
     @Test
-    void aNotebookWithoutSourcesReportsNoSourcesAndStillStreams() {
+    void aQuestionWithoutPassagesIsNeverPutToAProvider() throws Exception {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
         final String sessionId = startConversation(accessToken, notebookId);
 
-        final ResponseEntity<String> response =
-                ask(accessToken, notebookId, sessionId, "What is entropy?", "OLLAMA", "llama3");
+        final CountDownLatch release = new CountDownLatch(1);
+        final AtomicInteger arrived = new AtomicInteger();
+        final HttpServer provider = writingProvider(arrived, release, new AtomicBoolean());
+        final String address = "http://127.0.0.1:" + provider.getAddress().getPort();
+        try {
+            final ResponseEntity<String> response = ask(accessToken, notebookId, sessionId,
+                    "Summarise everything.", "OLLAMA", "writing", address);
 
-        assertThat(sourceNamesOf(response)).isEmpty();
-        assertThat(eventNames(response)).containsExactly("sources", "error");
+            assertThat(sourceNamesOf(response)).isEmpty();
+            assertThat(eventNames(response)).containsExactly("sources", "done");
+            assertThat(bodyOf(response))
+                    .describedAs("nothing may be generated for a question with nothing to ground it")
+                    .doesNotContain("tick");
+            assertThat(arrived.get())
+                    .describedAs("the provider must not be asked at all")
+                    .isZero();
+        } finally {
+            release.countDown();
+            provider.stop(0);
+        }
     }
 
     /**
@@ -339,6 +364,7 @@ class ChatApiIntegrationTest {
     void anAccountIsRefusedBeyondTheAnswersItMayHaveInFlight() throws Exception {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
+        indexDocument(accessToken, notebookId, "thermodynamics.txt", THERMODYNAMICS);
         final List<String> sessions = List.of(
                 startConversation(accessToken, notebookId),
                 startConversation(accessToken, notebookId),
@@ -487,6 +513,7 @@ class ChatApiIntegrationTest {
     void anAnswerCanBeStoppedAndWhatArrivedIsKept() throws Exception {
         final String accessToken = registerAccount();
         final String notebookId = createNotebook(accessToken);
+        indexDocument(accessToken, notebookId, "thermodynamics.txt", THERMODYNAMICS);
         final String sessionId = startConversation(accessToken, notebookId);
 
         final CountDownLatch release = new CountDownLatch(1);

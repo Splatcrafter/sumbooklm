@@ -95,10 +95,10 @@ function statusLabel(
   dateFormat: Intl.DateTimeFormat,
 ): string {
   if (source.status === 'READY') {
-    if (source.kind === 'WEB' && source.indexedAt !== null) {
+    if (source.indexedAt !== null) {
       return t('sumbook.sources.status.read', { date: dateFormat.format(new Date(source.indexedAt)) });
     }
-    return t('sumbook.sources.status.ready', { count: source.tokenCount });
+    return t('sumbook.sources.status.ready');
   }
   if (source.status === 'ERROR') {
     return t(`sumbook.sources.failure.${source.failure}`);

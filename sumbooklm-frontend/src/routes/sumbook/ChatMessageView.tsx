@@ -161,6 +161,12 @@ export function ChatMessageView({ message }: { message: ChatMessage }) {
           </ul>
         ) : null}
 
+        {message.unanswered ? (
+          <p className="mt-2 text-xs text-jb-grey-40" role="status">
+            {t('sumbook.chat.noSources')}
+          </p>
+        ) : null}
+
         {message.limited ? (
           <p className="mt-2 text-xs text-jb-grey-40" role="status">
             {message.limitedForMinutes === undefined

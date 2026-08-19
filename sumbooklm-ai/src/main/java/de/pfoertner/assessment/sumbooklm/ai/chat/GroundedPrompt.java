@@ -52,11 +52,6 @@ public final class GroundedPrompt {
     private static final String SOURCES_HEADING = "Sources:";
 
     /**
-     * Block used when retrieval returned nothing.
-     */
-    private static final String NO_SOURCES = "Sources:\nThere are no sources for this question.";
-
-    /**
      * Prevents instantiation of this prompt builder.
      */
     private GroundedPrompt() {
@@ -66,12 +61,14 @@ public final class GroundedPrompt {
     /**
      * Builds the instructions for one question.
      *
-     * @param passages passages retrieved for the question, in the order they are numbered
+     * @param passages passages retrieved for the question, in the order they are numbered, never empty
      * @return the text of the system message the model is given
+     * @throws IllegalArgumentException if there are no passages, because such a question is answered
+     *                                  without a model rather than by telling one that it has nothing
      */
     public static String of(final List<ContextPassage> passages) {
         if (passages.isEmpty()) {
-            return RULES + "\n\n" + NO_SOURCES;
+            throw new IllegalArgumentException("A question without passages must not be asked at all");
         }
 
         final StringBuilder prompt = new StringBuilder(RULES).append("\n\n").append(SOURCES_HEADING);

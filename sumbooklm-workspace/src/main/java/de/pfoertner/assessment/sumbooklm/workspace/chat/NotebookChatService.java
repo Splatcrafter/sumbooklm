@@ -55,10 +55,19 @@ import org.springframework.stereotype.Service;
  * protects belongs to the installation rather than to one process. Both are checked before anything is
  * written, which is what keeps a refused question out of the transcript.
  *
- * <h2>Asking Anyway</h2>
- * A question that retrieves nothing still reaches the model. The refusal then arrives in the language
- * of the question and in the flow of the conversation, and it arrives through the same channel as
- * every other answer, so the client has one case to render rather than two.
+ * <h2>Not Asking Without Passages</h2>
+ * A question that retrieves nothing is not put to the model at all. The earlier design did put it,
+ * with instructions saying that there were no sources and that it must then say so, on the assumption
+ * that a model told it has nothing will report that. Measured against a real notebook it does the
+ * opposite: asked to summarise a document whose passages had all been discarded, a model produced a
+ * complete summary of a document that does not exist, with invented dates, an invented employer and an
+ * invented telephone number, and marked every line of it with a citation to a source it had never been
+ * given.
+ *
+ * <p>So the answer for that case is produced here rather than by a model: the run ends with an empty
+ * answer, which the interface renders as the sentence that the sources say nothing about the question,
+ * in the language of its reader. Nothing that cannot be grounded is generated, because nothing is
+ * generated at all.
  *
  * @author Erik Pförtner
  * @since 0.1.0
@@ -280,7 +289,7 @@ public class NotebookChatService {
             ending.onFailed(e);
             return;
         }
-        if (cancellation.isRequested()) {
+        if (cancellation.isRequested() || passages.isEmpty()) {
             ending.onCompleted("");
             return;
         }

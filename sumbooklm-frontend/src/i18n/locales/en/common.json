@@ -109,8 +109,7 @@
         "uploaded": "Waiting to be indexed",
         "indexing": "Indexing...",
         "read": "Read {{date}}",
-        "ready_one": "Indexed, {{count}} token",
-        "ready_other": "Indexed, {{count}} tokens"
+        "ready": "Indexed"
       },
       "failure": {
         "NONE": "Could not be read",
@@ -149,6 +148,7 @@
       "send": "Send question",
       "thinking": "Reading your sources...",
       "failed": "The answer could not be generated.",
+      "noSources": "The sources of this Sumbook say nothing about that. Add a source, or ask about something they cover.",
       "tooMany": "Too many answers are being written at once. Ask again when one of them has arrived.",
       "tooOften_one": "You have asked as many questions as this installation allows for now. Ask again in about a minute.",
       "tooOften_other": "You have asked as many questions as this installation allows for now. Ask again in about {{count}} minutes.",

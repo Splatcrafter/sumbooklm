@@ -677,3 +677,52 @@ The plural sentences of the refusal were checked through the real i18n setup in 
 one minute and for many, since a plural key that resolves to itself is the usual way such a message is
 shipped broken. The interface harness has a case for the new sentence as well; it could not be run here,
 because the development dependency it drives a DOM with is no longer installed in this container.
+
+## Verification of the grounding failure on 2026-08-19
+
+This one started from a real answer, not from a test. Asked to summarise an uploaded CV, the assistant
+produced a complete profile of a person who does not exist: an invented employer, invented dates, an
+invented telephone number and an invented address, with a citation behind every line. Everything except
+the name, the city and the languages was made up.
+
+Three measurements found the cause, run against the actual file through the application's own extractor,
+splitter and embedding model.
+
+The extraction is not the problem. The document yields 5272 characters and six segments, and the real
+address, telephone number and employers are all in them.
+
+The retrieval was the problem. With the floor at 0.65, the question "Fasse den Lebenslauf zusammen"
+scored 0.617 at best, so **none** of the six segments reached the model. The model was then told that
+there were no sources and asked anyway, which is the case it invents in.
+
+The floor cannot do what it looked like it did. Measured over the same six segments, an unrelated
+question about baking bread scores 0.641 and the request to summarise the document itself scores 0.617:
+the unrelated question scores higher than the relevant one. The distributions overlap completely, so no
+threshold separates them, and the value only decided how much real material was thrown away.
+
+| question | best score | at 0.50 | at 0.55 | at 0.60 | at 0.65 |
+| --- | --- | --- | --- | --- | --- |
+| Fasse den Lebenslauf zusammen. | 0.617 | 6 | 4 | 2 | 0 |
+| Wo wohnt Erik? | 0.719 | 6 | 4 | 1 | 1 |
+| Welche Sprachen spricht er? | 0.700 | 6 | 4 | 1 | 1 |
+| Wie backe ich Brot? | 0.619 | 6 | 2 | 1 | 0 |
+| Wie repariere ich ein Fahrrad? | 0.619 | 6 | 2 | 1 | 0 |
+
+The deeper reason is the embedding model. `AllMiniLmL6V2` is trained on English, and against German text
+its scores compress into a band between about 0.57 and 0.72 whatever the question, which is why nothing
+separates. A multilingual model would spread them again, and it is the change that would improve
+retrieval most; it needs an ONNX artifact this repository does not have.
+
+The token count went the same way. The same model reports **126 tokens for every input it is given**:
+414 characters, 964 characters, the whole 5272-character document and 9600 characters of generated German
+all come back as 126. The "756 tokens" the interface showed for the CV was six segments times a constant.
+The number is no longer shown; a source now reports when it was read.
+
+What the build now states: `ChatApiIntegrationTest` asserts that a question a notebook has no passages
+for never reaches a provider that would have answered, and that the stream still ends as finished with
+nothing generated. The isolation case no longer asserts that an unrelated notebook returns no sources,
+because the floor cannot promise that; it asserts what is true and matters, that a notebook never returns
+the sources of another.
+
+Three cases had to be given a source to keep testing what they test. They asked in empty notebooks and
+relied on the provider being contacted anyway, which is exactly the behaviour that was removed.

@@ -41,6 +41,10 @@ export interface ChatSource {
  *
  * A turn refused because the account has asked too often carries how long that lasts, in minutes, so
  * that the reader is told when to come back instead of being invited to try again immediately.
+ *
+ * A turn that ended without an answer and without a single source is marked as unanswered, because the
+ * backend deliberately asks no model when its notebook has nothing to answer from. The sentence for
+ * that is written here rather than generated, which is the whole point of it.
  */
 export interface ChatMessage {
   key: string;
@@ -52,6 +56,7 @@ export interface ChatMessage {
   failure?: string;
   limited?: boolean;
   limitedForMinutes?: number;
+  unanswered?: boolean;
 }
 
 /**

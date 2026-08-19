@@ -202,7 +202,12 @@ export function useChat(notebookId: string): ChatValue {
             onToken: (text: string) =>
               update(answerKey, (message) => ({ ...message, text: message.text + text })),
             onDone: (answer: string) =>
-              update(answerKey, (message) => ({ ...message, text: answer, streaming: false })),
+              update(answerKey, (message) => ({
+                ...message,
+                text: answer,
+                streaming: false,
+                unanswered: answer === '' && (message.sources ?? []).length === 0,
+              })),
             onError: (reason: string) =>
               update(answerKey, (message) => ({ ...message, streaming: false, failure: reason })),
           },

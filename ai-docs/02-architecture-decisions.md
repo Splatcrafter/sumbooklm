@@ -1184,3 +1184,37 @@ apply once the response exists.
 generating, and what it charges for what it generated, is the provider's business and differs between
 them. What is certain is only that nothing is being read and nothing more is being paid for on this
 side.
+
+## ADR-060: A question with no passages is answered without a model
+
+**Decision.** Retrieval decides whether a model is asked at all. A question whose notebook returned no
+passages ends with an empty answer, which the interface renders as a written sentence in the language of
+its reader. The relevance floor is lowered to 0.5, and the token count the embedding model reports is no
+longer shown.
+
+**Reason.** This reverses the part of ADR-039 that put an unanswerable question to the model anyway, with
+instructions saying that there were no sources and that it must then say so. Measured against a real
+notebook, that assumption is simply false. Asked to summarise a document whose passages had all been
+discarded by the floor, the model produced a complete summary of a document that does not exist: an
+invented employer, invented dates, an invented telephone number and an invented address, every line
+marked with a citation to a source it had never been given. The one thing an ungrounded model will not
+do is admit that it has nothing.
+
+The floor is the other half of the same failure. It was set at 0.65 on the assumption that a threshold
+separates a question the notebook answers from one it does not. Measured against the segments of a German
+document, this embedding model scores an unrelated question about baking bread at 0.64 and the request to
+summarise the document itself at 0.62. The distributions overlap completely, so no threshold separates
+anything; a high one only discards the passages of the questions a reader asks first. It is lowered to
+where it stops throwing real material away, and what keeps an answer honest is that the passages reach
+the model and that a question without any is not asked.
+
+The token count went the same way. The embedding model reports one hundred and twenty six tokens for
+every input it is given, whatever its length, so the number in the interface was a constant multiplied by
+the number of segments. A source now says when it was read, which is true of both kinds and is what a
+reader can do something with.
+
+**Cost.** The sentence for an unanswerable question is written by this application rather than generated,
+so it is the same sentence every time and it does not address what was asked. That is the trade: a
+sentence that says less and is never invented. And the floor no longer expresses relevance, so a notebook
+will hand over its nearest passages even for a question it says nothing about, which now depends entirely
+on the model following the instruction to say that they do not answer it.

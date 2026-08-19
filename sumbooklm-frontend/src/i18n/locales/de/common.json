@@ -109,8 +109,7 @@
         "uploaded": "Wartet auf die Indexierung",
         "indexing": "Wird indexiert ...",
         "read": "Gelesen am {{date}}",
-        "ready_one": "Indexiert, {{count}} Token",
-        "ready_other": "Indexiert, {{count}} Token"
+        "ready": "Indexiert"
       },
       "failure": {
         "NONE": "Konnte nicht gelesen werden",
@@ -149,6 +148,7 @@
       "send": "Frage absenden",
       "thinking": "Deine Quellen werden gelesen ...",
       "failed": "Die Antwort konnte nicht erzeugt werden.",
+      "noSources": "Die Quellen dieses Sumbooks sagen dazu nichts. Füge eine Quelle hinzu, oder frage nach etwas, das darin steht.",
       "tooMany": "Es werden gerade zu viele Antworten gleichzeitig geschrieben. Frage erneut, sobald eine davon da ist.",
       "tooOften_one": "Du hast für den Moment so viele Fragen gestellt, wie diese Installation erlaubt. Frage in etwa einer Minute erneut.",
       "tooOften_other": "Du hast für den Moment so viele Fragen gestellt, wie diese Installation erlaubt. Frage in etwa {{count}} Minuten erneut.",

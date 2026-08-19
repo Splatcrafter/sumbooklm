@@ -1,0 +1,26 @@
+Das Document-Ingestion-UI und die Basis-Pipeline stehen. Der nächste Schritt ist: Das Chat-Interface und die Retrieval-Augmented Generation (RAG) Pipeline, inklusive der BYOK-Integration (Bring Your Own Key).
+
+Implementiere die Chat-Logik nach folgenden Vorgaben:
+
+1. Backend: LangChain4j RAG & Streaming (/api/v1/notebooks/{notebookId}/chat)
+  - Erstelle einen neuen Controller-Endpunkt für den Chat. Dieser muss als Server-Sent Events (SSE) Stream antworten (via Flux<String> oder SseEmitter).
+  - Retrieval-Filter: Stelle zwingend sicher, dass der ContentRetriever nur Chunks aus dem In-Memory Vector Store lädt, die als Metadatum die exakte notebookId der aktuellen Anfrage besitzen (Isolierung der Sumbooks).
+  - System Prompt / Grounding: Konfiguriere das LLM strikt darauf, Antworten ausschließlich auf Basis der abgerufenen Dokumenten-Chunks zu formulieren. Wenn die Information nicht in den Quellen steht, muss das LLM dies zugeben. Zitate müssen im Text mit einem Markdown-Format markiert werden.
+
+2. Backend: ChatSession Persistenz (CBOR)
+  - Die Chat-Historie muss im JPA-Wrapper ChatSession gespeichert werden.
+  - Erweitere die ChatSessionPayload (Java Record) für das CBOR-Blob, um die Liste der Nachrichten (Rolle, Text, Timestamp) abzuspeichern.
+  - Das Speichern der LLM-Antwort erfolgt asynchron nach vollständigem Abschluss des Token-Streams.
+
+3. BYOK & Dynamic Model Selection (Backend & Frontend)
+  - Backend-Logik: Der Chat-Endpunkt darf kein statisches LLM-Bean nutzen. Er muss HTTP-Header (X-AI-Provider, X-AI-Api-Key, X-AI-Model) verarbeiten. Implementiere eine dynamische Factory-Klasse, die anhand dieser Header pro Request das passende StreamingChatLanguageModel instanziiert. Unterstütze lokale Modelle (z.B. Ollama) via Base-URL-Override sowie Cloud-Provider (wie Groq oder OpenAI).
+  - Frontend-Settings: Füge im UI (z.B. in der oberen Navigation) ein ShadCN-Dropdown oder Dialog-Modal hinzu. Hier muss der Nutzer seinen AI-Provider wählen, den API-Key (falls Cloud) eintragen und das Modell spezifizieren können.
+  - State-Handling: Speichere diese BYOK-Konfiguration im lokalen Zustand (z.B. Cookie mit dem IV verschlüsselt) des Browsers und hänge sie als Header an den SSE-Request an.
+
+4. Frontend: Chat UI & Streaming
+  - Binde das Eingabefeld unten im Hauptbereich an.
+  - Implementiere die Fetch-Logik, um den SSE-Stream zu konsumieren und die Antwort live ("Typing Effect") aufzubauen.
+  - Nutze react-markdown und remark-gfm, um die Antworten des LLMs sauber im Chat-Verlauf zu rendern.
+  - Zeige den Verlauf der Chat-Nachrichten über dem Eingabefeld an (User rechtsbündig, Sumbook linksbündig).
+
+Es gelten weiterhin alle strengen Projektregeln: Zero-Emoji-Policy im Code, ausschließlich englischsprachiger Code (i18n für UI-Texte), keine Meta-Kommentare. Aktualisiere deine Architektur-Notizen separat im /ai-docs Verzeichnis.

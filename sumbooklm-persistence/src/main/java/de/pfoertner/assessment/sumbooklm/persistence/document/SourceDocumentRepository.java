@@ -52,6 +52,18 @@ public interface SourceDocumentRepository extends JpaRepository<SourceDocumentEn
     List<SourceReference> findAllReferences();
 
     /**
+     * Finds the identifier of every source there is.
+     *
+     * <p>The query deliberately spans all accounts, for the same reason as the one above: it serves the
+     * pass that compares the retrieval index against the sources that exist, and the index is one store
+     * for every account.
+     *
+     * @return the identifier of every stored source
+     */
+    @Query("select document.id from SourceDocumentEntity document")
+    List<UUID> findAllIds();
+
+    /**
      * Finds the sources of one notebook, oldest first.
      *
      * @param notebookId identifier of the notebook the sources belong to

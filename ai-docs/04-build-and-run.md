@@ -598,3 +598,49 @@ indexed is read again, ends indexed, and carries a later moment than before. The
 covers what a reader sees: an indexed page says when it was read and offers to read it again, an
 indexed file says how much it became and does not, a failed source of either kind offers it, and a
 source that is running has the control disabled.
+
+## Verification of the permitted hosts, the unexpected report and the collection pass on 2026-08-19
+
+Full `mvn clean install`: all ten modules green, 93 tests. Nothing about the API changed in this pass,
+so the generated client was not regenerated and the browser harnesses were not re-run: no endpoint, no
+field and no text moved, and a refused host already reached the reader as the one cause it shares with
+an address that points inwards.
+
+`PublicAddressResolverTest` states the permitted hosts as three cases against the same rule it already
+stated as a list of addresses. A deployment that names one host refuses a public address nothing is
+wrong with. A named host reaches the resolution step, which is visible as the failure being an unknown
+host rather than a refusal, and the names for that are under `.invalid` so that no name server is asked.
+And a named host that resolves to loopback is still refused, which is the case that states that the list
+narrows and never widens.
+
+`NotebookIndexTest` runs against the real in-memory store with a model that answers every segment with
+the same vector, because the cases are about which segments the store holds and not about how near they
+are to a question. A pass keeps the sources it was told about and removes the one it was not, a pass that
+finds no source at all empties the store, which is the case a filter over an empty list cannot express,
+and a source stored while a pass is running survives it.
+
+That last case forces the interleaving instead of hoping for it: the writer is started from inside the
+pass, and the case first asserts that it has not got through. Without the lock it would fail sometimes
+and pass often, which is the wrong way round for a test about an ordering.
+
+`IndexRestoreIntegrationTest` gained the end of it. A row removed through the repository leaves its
+segments behind, exactly as a removal whose cleanup did not follow would, and it takes a pass to remove
+them. The case first runs a pass while the source still exists and asserts that nothing was removed,
+because a collector that removes everything would pass the second half on its own.
+
+Two things are stated by construction rather than by a running application. A non-empty list of permitted
+hosts is exercised through the constructor the container also uses, not through a context started with
+the property set, since the property that binds it is exercised at every start and the rule it feeds is
+the same object either way. And the hourly schedule is not waited for: the pass is invoked directly, and
+what the annotation adds is a clock.
+
+### A defect found while switching the scheduler on
+
+`RefreshTokenCleanupJob` has carried `@Scheduled(cron = "0 0 0 * * SUN")` since the security module was
+written, and its own documentation says that it runs weekly. Nothing had ever switched scheduling on, so
+it never ran: the annotation was inert, the table it keeps proportional grew without a bound, and no test
+noticed because every test that touches it calls the method itself.
+
+Enabling the scheduler for the collection pass fixes that as a side effect. Both jobs now run, and the
+lesson is the one the case above is also about: an annotation that describes when something happens says
+nothing about whether anything is listening.

@@ -106,15 +106,17 @@ de.pfoertner.assessment.sumbooklm
 │   ├── notebook                                NotebookService, update command, removal event,
 │   │                                            failure
 │   ├── source                                  SourceDocumentService, the pipeline, its events, the
-│   │                                            startup rebuild, the index cleanup listener,
-│   │                                            fingerprints and failures
+│   │                                            startup rebuild, the index cleanup listener, the
+│   │                                            collector of orphaned segments, fingerprints and
+│   │                                            failures
 │   └── chat                                    NotebookChatService, ChatSessionService, the recorder,
 │                                                the turn context, the stream handler, the bound on
 │                                                answers in flight, the registry of running answers,
 │                                                failures
 ├── ingestion
 │   ├── extraction                              file and web extractors, the address resolver every
-│   │                                            fetch connects through, their result and failures
+│   │                                            fetch connects through, its settings, their result
+│   │                                            and failures
 │   └── chunking                                TextChunker
 ├── ai
 │   ├── embedding                               model and store beans, NotebookIndex, metadata keys
@@ -304,22 +306,29 @@ even though the access token itself is verified by signature alone.
    the text an earlier run extracted.
 3. If that text is there and the run was not asked to read again, it is used as it is. Otherwise the
    source is read: Apache Tika for the stored bytes of an upload, and for a page an HTTP request whose
-   every hop resolves through the rule that refuses addresses inside this server's networks (ADR-044),
-   parsed by jsoup. A source is therefore read once for as long as reading it succeeded, and again
-   when a user asks (ADR-041, ADR-054).
+   every hop resolves through the rule that refuses addresses inside this server's networks, and hosts
+   the deployment did not name if it named any (ADR-044, ADR-055), parsed by jsoup. A source is
+   therefore read once for as long as reading it succeeded, and again when a user asks (ADR-041,
+   ADR-054).
 4. The text is cut into overlapping segments, and `NotebookIndex` embeds them under the notebook and
    the source, replacing whatever was stored for that source before (ADR-043).
 5. The run stores the token count the model reported, the extracted text, and the stage `READY`. A run
    that read the source also records the moment it did; a run that indexed from the stored text leaves
    that moment where it was, because a rebuild is not a reading. If anything above threw, it stores
    `ERROR` together with the cause the extractor named, which is one of seven constants rather than
-   the message the library failed with (ADR-045). The stored text is left in place either way, so a
-   reading that fails leaves the source answering with what it said before.
+   the message the library failed with (ADR-045). A failure no extractor named is recorded as the
+   unexpected one and reported at error level with a count of how often this instance has had to do so
+   (ADR-056). The stored text is left in place either way, so a reading that fails leaves the source
+   answering with what it said before.
 
 Once the application is ready, `IndexRestoreJob` puts every source of every account through that
 sequence again, because the store it writes to did not survive the process while the sources did
 (ADR-042). Steps 3 and 5 are what make that affordable and what turn it into a retry for the sources
 that never succeeded.
+
+While the application runs, `OrphanSegmentCollector` asks the index once an hour to keep only the
+sources the database still holds, which is the only thing that removes the segments of a source whose
+deletion committed but whose cleanup did not (ADR-057).
 
 ## Answering a question
 

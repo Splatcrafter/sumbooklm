@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import de.pfoertner.assessment.sumbooklm.ai.embedding.SegmentMetadata;
+import de.pfoertner.assessment.sumbooklm.persistence.document.SourceDocumentRepository;
 import de.pfoertner.assessment.sumbooklm.workspace.source.IndexRestoreJob;
+import de.pfoertner.assessment.sumbooklm.workspace.source.OrphanSegmentCollector;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
@@ -50,6 +52,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The assertions count the segments stored for one source rather than asking a question about it.
  * That is the state these mechanisms are responsible for; whether an answer can be produced from it
  * is what the chat suite already covers.
+ *
+ * <h2>A Row That Went Without Its Segments</h2>
+ * The pass that collects segments whose source is gone is exercised by removing a row through the
+ * repository rather than through the interface. That is precisely the situation it exists for: the
+ * removal of the segments is what follows a deletion through the service, so a deletion that never
+ * went through it leaves exactly the state nothing else would clean up.
  *
  * <h2>Deletions Belong Here Too</h2>
  * Removing the segments of a deleted source happens after the transaction that deleted it has
@@ -132,17 +140,32 @@ class IndexRestoreIntegrationTest {
     private final IndexRestoreJob indexRestoreJob;
 
     /**
+     * Pass over the store the tests ask to run.
+     */
+    private final OrphanSegmentCollector orphanSegmentCollector;
+
+    /**
+     * Data access used to remove a row the way nothing in the application does.
+     */
+    private final SourceDocumentRepository sourceDocumentRepository;
+
+    /**
      * Creates the test class and binds the client to the port the server was started on.
      *
-     * @param port            port the embedded server listens on
-     * @param embeddingStore  store the segments of every source live in
-     * @param embeddingModel  model the search embedding is computed with
-     * @param indexRestoreJob rebuild the tests ask to run
+     * @param port                     port the embedded server listens on
+     * @param embeddingStore           store the segments of every source live in
+     * @param embeddingModel           model the search embedding is computed with
+     * @param indexRestoreJob          rebuild the tests ask to run
+     * @param orphanSegmentCollector   pass over the store the tests ask to run
+     * @param sourceDocumentRepository data access used to remove a row the way nothing in the
+     *                                 application does
      */
     IndexRestoreIntegrationTest(@Autowired @LocalServerPort final int port,
                                 @Autowired final EmbeddingStore<TextSegment> embeddingStore,
                                 @Autowired final EmbeddingModel embeddingModel,
-                                @Autowired final IndexRestoreJob indexRestoreJob) {
+                                @Autowired final IndexRestoreJob indexRestoreJob,
+                                @Autowired final OrphanSegmentCollector orphanSegmentCollector,
+                                @Autowired final SourceDocumentRepository sourceDocumentRepository) {
         this.client = RestClient.builder()
                 .baseUrl("http://localhost:" + port)
                 .defaultStatusHandler(status -> true, (request, response) -> {
@@ -151,6 +174,8 @@ class IndexRestoreIntegrationTest {
         this.embeddingStore = embeddingStore;
         this.embeddingModel = embeddingModel;
         this.indexRestoreJob = indexRestoreJob;
+        this.orphanSegmentCollector = orphanSegmentCollector;
+        this.sourceDocumentRepository = sourceDocumentRepository;
     }
 
     /**
@@ -289,6 +314,33 @@ class IndexRestoreIntegrationTest {
                 .toBodilessEntity();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(segmentsOf(sourceId)).isZero();
+    }
+
+    /**
+     * Verifies that a pass leaves the segments of a source that exists alone, and removes the segments
+     * of one whose row is gone without anything having removed them.
+     */
+    @Test
+    void segmentsOfARowThatIsGoneAreCollected() {
+        final String accessToken = registerAccount();
+        final String notebookId = createNotebook(accessToken);
+        final String sourceId = idOf(uploadFile(accessToken, notebookId, "orphans.txt", DOCUMENT_TEXT));
+        awaitSettled(accessToken, notebookId, sourceId);
+        final int segments = segmentsOf(sourceId);
+        assertThat(segments).isPositive();
+
+        this.orphanSegmentCollector.collect();
+        assertThat(segmentsOf(sourceId))
+                .describedAs("a pass removes nothing as long as the source is one of those that exist")
+                .isEqualTo(segments);
+
+        this.sourceDocumentRepository.deleteById(UUID.fromString(sourceId));
+        assertThat(segmentsOf(sourceId))
+                .describedAs("a row removed this way takes nothing with it")
+                .isEqualTo(segments);
+
+        this.orphanSegmentCollector.collect();
         assertThat(segmentsOf(sourceId)).isZero();
     }
 

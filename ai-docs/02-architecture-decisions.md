@@ -1039,3 +1039,85 @@ stored text and moves no date, because a restart is not a reason to believe a pa
 
 **Cost.** Nothing notices that a page has changed. A user has to suspect it and ask, which is the
 trade an interval would reverse.
+
+## ADR-055: A deployment may name the hosts sources come from, and the list only narrows
+
+**Decision.** `sumbooklm.ingestion.web.allowed-hosts` is empty by default, which permits any host whose
+address is a public one. A deployment that fills it refuses every host it did not name, and a named host
+is still judged by its address. The rule sits in the same resolver as the address rule.
+
+**Reason.** An address can be judged. Loopback, the private ranges and the link local range are inside
+by definition, and refusing them costs nothing that anybody wanted. What cannot be judged is a public
+address that a firewall makes reachable only from this server: nothing about it says so, and a resolver
+that tried to guess would refuse ordinary hosts.
+
+The only thing that closes that is somebody stating which hosts are acceptable, and that somebody is
+whoever runs the deployment rather than whoever uses it. Empty by default is therefore the honest
+setting: for a notebook a person runs for themselves, a list would turn adding a source into asking
+themselves for permission.
+
+The list narrows and never widens. A named host that resolves inwards is still refused, so the list is
+not a way to reach the network of the server, and each rule can only take away what the other allowed.
+That is what makes the two readable as one sentence, and it costs nothing that was reachable before.
+
+Putting it in the resolver is what ADR-044 already bought: every hop of every redirect passes it, so a
+page that redirects to a host nobody named is refused by the code that refused the first hop.
+
+**Cost.** An entry is a host and not a site. A deployment whose users read a site served from several
+names has to name each of them, and a page that redirects to a name nobody thought of fails as an
+address that may not be retrieved. The user is told that much and no more, because the difference
+between the two reasons is about this server rather than about their source.
+
+## ADR-056: An unexpected failure is reported as a rate, not as a message
+
+**Decision.** `DocumentFailure.UNEXPECTED` stays as uninformative to the user as it was. What changed is
+the report: a run that reaches it logs at error level with the trace, the notebook, and the number of
+times this instance has recorded one since it started.
+
+**Reason.** The cause is honest and useless at the same time, and both halves are deliberate. It is
+useless because the alternative is showing a user what a stack trace says, and it is honest because the
+application genuinely does not know what happened, which is what distinguishes it from the seven causes
+an extractor names.
+
+So the value worth improving is not the wording but the number of occurrences, and a number needs
+somebody to be able to see it. One line per occurrence answers whether it happened; the count answers
+whether it is happening. An operator reading that the twentieth unexpected failure since the start has
+just been recorded is reading a defect report, not an incident.
+
+Error level rather than warning for the same reason: everything an extractor names is an outcome the
+application handled, and this is the only one that means the application is wrong.
+
+**Cost.** The count lives in one instance and starts again at every restart, and it is a log line rather
+than a measurement. Watching it as a rate across instances needs a metrics facility, which this
+deployment does not have and which would put an endpoint in front of the same authentication that serves
+notebooks.
+
+## ADR-057: The pass that collects orphaned segments locks out writing before it reads
+
+**Decision.** `OrphanSegmentCollector` runs hourly and asks the index to keep only the sources the
+database still holds. The index takes a shared lock while writing segments and an exclusive one for the
+pass, and it takes that lock before it reads the list of sources, which is why the list is asked for
+rather than passed in.
+
+**Reason.** Removing the segments of a deleted source happens after the commit (ADR-047), so a removal
+that fails leaves them with nothing left to remove them. They are invisible to an answer, since a passage
+whose source the notebook no longer lists is dropped, but they occupy memory and cost a comparison on
+every search. Nothing else would ever collect them.
+
+A schedule is right here for the reason it was wrong for reading pages (ADR-054): this run reaches
+nothing outside the process, and it can only remove what no source claims, so the worst a run does is
+nothing at all.
+
+The ordering is the whole of the design. The pass deletes by what it does not recognise, so a source
+stored between it reading the list and it deleting would be deleted although it exists. With the lock
+taken first, any segment in the store was written by a run that finished before the lock was granted, and
+that run had a committed row behind it, so the list the pass then reads contains it. A caller that read
+the list itself and handed over the result would be reading it too early, and nothing downstream could
+tell.
+
+Not at startup, which is where the question expected it. The store is empty after a start, so a rebuild
+cannot find an orphan; they accumulate while the application runs.
+
+**Cost.** Indexing waits for one query per pass, and the pass reads every source identifier there is into
+memory. Both are bounded by the size of the library rather than by a page, which is the same shape as the
+rebuild and is recorded with it.

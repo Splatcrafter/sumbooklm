@@ -1,7 +1,11 @@
 package de.pfoertner.assessment.sumbooklm.ai.embedding;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
@@ -34,6 +38,21 @@ import org.springframework.stereotype.Component;
  * on request and whenever the store has to be rebuilt, and appending instead would leave every
  * paragraph in the index as many times as the source was read.
  *
+ * <h2>Segments Whose Source Is Gone</h2>
+ * The segments of a removed source are removed after the transaction that removed it has committed,
+ * so a removal that fails leaves them behind with nothing left to remove them. They are invisible to
+ * an answer, because a passage whose source the notebook no longer lists is dropped, but they still
+ * occupy memory and still cost a comparison on every search. Collecting them is a pass that keeps
+ * only the sources that exist, and it is the one operation here that has to know what all of them are.
+ *
+ * <h2>Why the Collection Pass Takes a Lock</h2>
+ * That pass deletes by what it does not recognise, so a source that was stored between it reading the
+ * list and it deleting would be deleted although it exists. Writing therefore holds a shared lock and
+ * the pass an exclusive one, which it takes before it reads the list: any segment already in the store
+ * was written by a run that finished before the lock was granted, and that run had a committed row
+ * behind it, so the list the pass then reads contains it. The cost is that indexing waits for one
+ * query, and what it buys is that the pass cannot delete a source it simply had not heard of yet.
+ *
  * <h2>Token Count</h2>
  * The count returned by indexing is what the model itself reported for the text it embedded, not an
  * estimate made next to it. It therefore describes the text that actually entered the index,
@@ -59,6 +78,12 @@ public class NotebookIndex {
      * the cosine similarity mapped onto zero to one, so the value below is a cosine of about a third.
      */
     private static final double MIN_SCORE = 0.65;
+
+    /**
+     * Lock that separates writing segments from collecting the ones whose source is gone. Writing
+     * takes it in shared mode, since two runs write different sources and never the same one.
+     */
+    private final ReadWriteLock collectionLock = new ReentrantReadWriteLock();
 
     /**
      * Model that turns a segment into a vector.
@@ -93,23 +118,28 @@ public class NotebookIndex {
      * @return number of tokens the model counted for the embedded text, zero for no segments
      */
     public int index(final UUID notebookId, final UUID sourceDocumentId, final List<TextSegment> segments) {
-        removeSource(sourceDocumentId);
-        if (segments.isEmpty()) {
-            return 0;
-        }
-        for (final TextSegment segment : segments) {
-            segment.metadata().put(SegmentMetadata.NOTEBOOK_ID, notebookId);
-            segment.metadata().put(SegmentMetadata.SOURCE_DOCUMENT_ID, sourceDocumentId);
-        }
+        this.collectionLock.readLock().lock();
+        try {
+            removeSource(sourceDocumentId);
+            if (segments.isEmpty()) {
+                return 0;
+            }
+            for (final TextSegment segment : segments) {
+                segment.metadata().put(SegmentMetadata.NOTEBOOK_ID, notebookId);
+                segment.metadata().put(SegmentMetadata.SOURCE_DOCUMENT_ID, sourceDocumentId);
+            }
 
-        final Response<List<Embedding>> embeddings = this.embeddingModel.embedAll(segments);
-        this.embeddingStore.addAll(embeddings.content(), segments);
+            final Response<List<Embedding>> embeddings = this.embeddingModel.embedAll(segments);
+            this.embeddingStore.addAll(embeddings.content(), segments);
 
-        final TokenUsage usage = embeddings.tokenUsage();
-        if (usage == null || usage.inputTokenCount() == null) {
-            return 0;
+            final TokenUsage usage = embeddings.tokenUsage();
+            if (usage == null || usage.inputTokenCount() == null) {
+                return 0;
+            }
+            return usage.inputTokenCount();
+        } finally {
+            this.collectionLock.readLock().unlock();
         }
-        return usage.inputTokenCount();
     }
 
     /**
@@ -146,5 +176,29 @@ public class NotebookIndex {
     public void removeNotebook(final UUID notebookId) {
         this.embeddingStore.removeAll(
                 MetadataFilterBuilder.metadataKey(SegmentMetadata.NOTEBOOK_ID).isEqualTo(notebookId));
+    }
+
+    /**
+     * Removes every segment that does not belong to one of the sources that exist.
+     *
+     * <p>The sources are asked for rather than passed in, because the answer has to be obtained while
+     * writing is held off; see the note on the lock above. A caller that reads the list itself and
+     * hands over the result would be reading it too early, and the pass would have no way to tell.
+     *
+     * @param existingSources source identifiers that exist, read while writing is held off
+     */
+    public void collectOrphanedSegments(final Supplier<Collection<UUID>> existingSources) {
+        this.collectionLock.writeLock().lock();
+        try {
+            final Collection<UUID> existing = existingSources.get();
+            if (existing.isEmpty()) {
+                this.embeddingStore.removeAll();
+                return;
+            }
+            this.embeddingStore.removeAll(MetadataFilterBuilder
+                    .metadataKey(SegmentMetadata.SOURCE_DOCUMENT_ID).isNotIn(existing));
+        } finally {
+            this.collectionLock.writeLock().unlock();
+        }
     }
 }

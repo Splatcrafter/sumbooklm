@@ -2,6 +2,7 @@ package de.pfoertner.assessment.sumbooklm.workspace.source;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import de.pfoertner.assessment.sumbooklm.ai.embedding.NotebookIndex;
 import de.pfoertner.assessment.sumbooklm.domain.workspace.DocumentFailure;
@@ -54,6 +55,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * outside an extractor is recorded as unexpected rather than guessed at, which keeps the causes
  * meaning what they say.
  *
+ * <h2>Unexpected Is a Defect, Not an Outcome</h2>
+ * The unexpected cause tells the user that it did not work and nothing they can act on, and it is
+ * kept that way on purpose, because the alternative is showing them what a stack trace says. What
+ * can be improved about it is not the wording but how often it is reached, so a run that reaches it
+ * reports at error level, with the trace, the notebook, and how often this instance has had to do so
+ * since it started. The count is what turns a line into a rate: one occurrence says that something
+ * went wrong once, and the twentieth says that something is wrong.
+ *
  * @author Erik Pförtner
  * @since 0.1.0
  */
@@ -70,6 +79,11 @@ public class SourceIngestionPipeline {
      * Log the progress and the failures of a run are reported to.
      */
     private static final Logger LOG = LoggerFactory.getLogger(SourceIngestionPipeline.class);
+
+    /**
+     * Number of runs that failed for a reason no extractor named, counted since this instance started.
+     */
+    private final AtomicLong unexpectedFailures = new AtomicLong();
 
     /**
      * Service that records how far a source has come.
@@ -166,7 +180,9 @@ public class SourceIngestionPipeline {
             recordFailure(userId, sourceId, e.failure());
             return false;
         } catch (final RuntimeException e) {
-            LOG.warn("Indexing source {} failed", sourceId, e);
+            LOG.error("Indexing source {} of notebook {} failed for a reason no extractor named, "
+                            + "unexpected failure number {} since this instance started",
+                    sourceId, input.notebookId(), this.unexpectedFailures.incrementAndGet(), e);
             recordFailure(userId, sourceId, DocumentFailure.UNEXPECTED);
             return false;
         }

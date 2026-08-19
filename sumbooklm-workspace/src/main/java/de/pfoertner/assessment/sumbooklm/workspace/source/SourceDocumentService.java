@@ -254,6 +254,20 @@ public class SourceDocumentService {
     }
 
     /**
+     * Reads the identifier of every source there is, across all accounts.
+     *
+     * <p>Not scoped to an account either, and for the same reason: it serves the pass that removes
+     * the segments of sources that no longer exist, and the retrieval index holds the segments of
+     * every account in one store.
+     *
+     * @return the identifier of every stored source
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> sourceIds() {
+        return this.sourceDocumentRepository.findAllIds();
+    }
+
+    /**
      * Marks a source as being indexed and reads what the run needs.
      *
      * @param userId   identifier of the account the source belongs to

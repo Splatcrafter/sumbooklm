@@ -322,39 +322,57 @@ Chunking it by notebook and rebuilding the ones being opened first would fix the
 notices, which is that their own Sumbook is not answerable yet. That needs a priority the current
 executor does not have.
 
-## 31. The address guard cannot see a firewall
+## 31. Resolved: a deployment may name the hosts sources come from
 
-The rule refuses the ranges a private network is built from, which is what an address can be judged
-by. It cannot judge a public address that happens to be reachable only from this machine, because
-nothing about the address says so: a service behind a firewall that admits this server and nobody else
-is a perfectly ordinary address to everyone who looks at it.
+`sumbooklm.ingestion.web.allowed-hosts` is empty by default, which is what was there before: any host,
+provided the address it leads to is a public one. A deployment that cannot accept the gap the question
+described fills the list, and every host it did not name is then refused before it is even resolved.
 
-Closing that means an allow list of hosts a source may be fetched from, which turns adding a web
-source from something a user does into something an operator permits. That is the right trade for a
-deployment where the two are different people, and the wrong one for a notebook a person runs for
-themselves.
+The list narrows and never widens. A named host is still judged by its address, so naming an internal
+wiki does not make it reachable, and each of the two rules can only take away what the other allowed.
+That is what keeps them readable together, and it costs nothing that was reachable before.
 
-## 32. An unexpected failure is a cause without information
+Empty by default is the point of the answer rather than a detail of it. Filling the list turns adding a
+source from something a user decides into something an operator has permitted, which is right where the
+two are different people and wrong for a notebook somebody runs for themselves. The application does not
+choose between those; the deployment does.
 
-`DocumentFailure.UNEXPECTED` is what a source is recorded under when something failed outside an
-extractor. It is honest and it is useless: the user is told that it did not work and can do nothing
-with that beyond trying again.
+The rule sits in the resolver every connection passes, where question 20 put the rule about addresses, so
+a redirect to a host nobody named is refused by the code that refused the first hop. What an entry cannot
+express is a site rather than a host, which is question 40.
 
-That is deliberate, because the alternative is showing them an internal message. What would make it
-better is not another constant but fewer occurrences, so the value worth watching is how often it is
-recorded at all.
+## 32. Resolved: the unexpected cause stays uninformative and becomes countable
 
-## 33. Nothing collects segments whose source is gone
+No constant was added, because the question was right about what would make it better. What the user
+reads is unchanged, and it is unchanged on purpose: the application genuinely does not know what
+happened, which is exactly what distinguishes this cause from the seven an extractor names, and the only
+alternative on offer is a stack trace in a sentence.
 
-Removing the segments of a deleted source happens after the commit, so a removal that fails leaves
-them in the store with nothing left to remove them. The answer path ignores them, because a passage is
-dropped when the notebook does not list its source, so they are invisible rather than wrong. They
-still occupy memory and still cost a comparison on every search.
+What changed is the report. A run that reaches it logs at error level, with the trace, the notebook, and
+how many times this instance has recorded one since it started. One line answers whether it happened, and
+the count answers whether it is happening: the twentieth occurrence since a start is a defect report
+rather than an incident. Error level rather than warning, because everything an extractor names is an
+outcome that was handled, and this is the only one that means the application is wrong.
 
-Collecting them means a pass that compares the store against the sources that exist, which is what the
-rebuild at startup would be if it cleared the store first instead of replacing one source at a time.
-It does not, because a rebuild asked for at runtime would then briefly empty an index that is being
-searched.
+What was deliberately not done is adding a metrics facility for one number. That is question 41.
+
+## 33. Resolved: an hourly pass keeps only the sources that exist
+
+`OrphanSegmentCollector` asks the index to remove every segment whose source the database no longer
+holds. A schedule is right here for the reason it was wrong for reading pages: the run reaches nothing
+outside the process and can only remove what no source claims, so the worst it ever does is nothing.
+
+Not at startup, which is where the question expected it. The store is empty after a start, so a rebuild
+cannot find an orphan at all; they accumulate while the application runs, and that is when they are
+looked for. The rebuild was left as it is for the reason the question gave.
+
+The ordering is the whole of it. The pass deletes by what it does not recognise, so a source stored
+between it reading the list and it deleting would be deleted although it exists. Writing therefore takes
+a shared lock and the pass an exclusive one, taken before it reads the list: a segment that is in the
+store was written by a run that finished before the lock was granted, and that run had a committed row
+behind it, so the list contains it. That is why the index asks for the sources rather than being handed
+them; a caller that read the list itself would be reading it too early and nothing could tell. What it
+costs is question 42.
 
 ## 34. The bound on answers is per instance and per moment
 
@@ -419,3 +437,36 @@ Noticing needs either a schedule, which was deliberately not taken, or a conditi
 using the validators a server offers. The second is cheap for the server being asked and would turn
 the date into something the application could keep current on its own, at the cost of storing what the
 server said last time.
+
+## 40. A permitted host is a name, not a site
+
+An entry in the allow list is compared against the whole host, so a site served from several names has to
+be named several times, and permitting a name does not permit anything below it. That is deliberate: a
+permission that spread to every subdomain would spread to whatever anyone is able to have published
+there.
+
+The cost is carried by whoever maintains the list. A page that redirects to a name nobody thought of
+fails, and it fails as an address that may not be retrieved, which is the same sentence a user gets for
+an address that points into the network of the server. Telling the two apart is possible and was not
+done, because the difference is about this deployment rather than about their source.
+
+## 41. The rate of unexpected failures is a log line
+
+The count of unexpected failures lives in the heap of one instance and starts again at every restart, so
+it says how often this process has been there and nothing about the deployment. Reading it as a rate
+means reading the log, which is what most operators do and which no dependency was added for.
+
+Making it a measurement means a metrics facility. That is a small dependency and not a small decision:
+the endpoint would sit behind the same authentication that serves notebooks, where every account that can
+register would be able to read it, and an operator-only credential is a second authentication scheme for
+one number. Worth revisiting when anything else in the application needs to be measured.
+
+## 42. The collection pass holds off indexing while it reads the database
+
+The pass takes the lock that writing shares, then reads every source identifier there is, then deletes.
+Indexing therefore waits for one query per pass, and the list of identifiers is as large as the library.
+Neither is bounded by anything but the size of the installation, which is the same shape as question 30
+and has the same answer available: work through it a notebook at a time.
+
+It is left as one pass because it runs hourly and holds the lock for a single statement, and because
+splitting it by notebook would mean the pass no longer sees a segment whose notebook is gone as well.

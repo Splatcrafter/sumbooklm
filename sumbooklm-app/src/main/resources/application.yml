@@ -17,6 +17,9 @@ server:
     enabled: true
 
 sumbooklm:
+  ingestion:
+    web:
+      allowed-hosts: ${SUMBOOKLM_ALLOWED_SOURCE_HOSTS:}
   security:
     jwt:
       issuer: sumbooklm

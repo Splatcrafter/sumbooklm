@@ -6,6 +6,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -96,7 +97,7 @@ class WebPageTextExtractorTest {
         });
         this.server.start();
 
-        this.extractor = new WebPageTextExtractor(new PublicAddressResolver() {
+        this.extractor = new WebPageTextExtractor(new PublicAddressResolver(new WebSourceProperties(List.of())) {
             @Override
             public InetAddress[] resolve(final String host) throws UnknownHostException {
                 if (SERVER_HOST.equals(host)) {

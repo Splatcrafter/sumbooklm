@@ -8,10 +8,12 @@ import de.pfoertner.assessment.sumbooklm.workspace.source.SourceIngestionPipelin
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Enables background execution and provides the executors background work is performed on.
+ * Enables background execution, provides the executors background work is performed on, and switches
+ * on the work that runs by the clock.
  *
  * <h2>Why It Lives Here</h2>
  * Switching background execution on is a decision about the whole application rather than about one
@@ -31,6 +33,13 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * a foreign server and occupies a thread without using it. Sharing one pool would let a burst of
  * uploads delay every answer, and a slow provider block every upload.
  *
+ * <h2>Work That Nobody Asked For</h2>
+ * Housekeeping that runs on a schedule rather than on a request needs a scheduler, and it is switched
+ * on here for the same reason as the executors: what runs in the background is a property of the
+ * application. The scheduler is the one the framework provides, and the tasks it drives are the ones
+ * that only remove what nothing refers to any more, so a single thread working through them one after
+ * another is enough.
+ *
  * <h2>Separate From the Server</h2>
  * Neither pool is the one the web server serves requests from. An indexing run that takes a minute
  * and an answer that takes half of one therefore cannot occupy a thread that a request is waiting
@@ -41,6 +50,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  */
 @Configuration(proxyBeanMethods = false)
 @EnableAsync
+@EnableScheduling
 public class AsyncConfiguration {
 
     /**

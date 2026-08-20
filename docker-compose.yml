@@ -33,9 +33,13 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    # The short form, because it is the only one the 3.x schema defines: there `depends_on` is a
+    # list of names, and the long form with a condition belongs to the Compose Spec. Portainer
+    # validates against the schema the version key names and refuses the long form. Waiting for the
+    # database to be healthy is therefore not expressed here; the application exits when it cannot
+    # reach the database and `restart: unless-stopped` brings it back until the cluster answers.
     depends_on:
-      database:
-        condition: service_healthy
+      - database
     ports:
       - "${SUMBOOKLM_PORT:-8080}:8080"
     environment:

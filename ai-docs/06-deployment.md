@@ -69,9 +69,23 @@ the schema is settled. Replacing this with real migrations is the proper fix and
 read one without it. The Compose Spec key `name` was dropped in the same move rather than kept beside
 it: it is not part of the 3.x schema, and Portainer names the stack itself.
 
-The long form of `depends_on` and the `logging` block are kept as they are. Compose v2 loads every
-file through the Spec loader whatever the version says, so the key changes what Portainer accepts and
-nothing about how the stack runs.
+Declaring the version is not free, and the price was found by deploying: Portainer validates against
+the schema the version names, and in the 3.x schema `depends_on` is a list of names. The long form
+that waits for a condition belongs to v2 and to the Compose Spec, not to 3.x, so a stack carrying it
+is refused with `services.app.depends_on must be a list` before anything is pulled. The file now
+carries the short form.
+
+What that costs: nothing expresses that the application should start after the database is ready. The
+first deploy against an empty volume therefore has the application come up while the cluster is still
+initialising, fail to open its data source, and exit. `restart: unless-stopped` brings it back until
+the database answers. The failure happens while the persistence context is being built, which is
+before the sources are indexed again, so a restart of this kind costs seconds rather than the full
+start. The database keeps its health check because that is what the stack is read by, not because
+anything waits on it.
+
+The `logging` blocks are kept as they are; they are part of the 3.x schema. Compose v2 itself loads
+every file through the Spec loader whatever the version says, so the version key changes what
+Portainer accepts and nothing about how the stack runs under `docker compose`.
 
 ## Publishing is started by hand
 

@@ -199,7 +199,13 @@ docker compose up -d
 ```
 
 The stack is also deployable straight into **Portainer** — the Compose file keeps its
-`version: "3.9"` key precisely because Portainer refuses a file without one.
+`version: "3.9"` key precisely because Portainer refuses a file without one, and stays inside the 3.x
+schema for the same reason.
+
+> 🔄 On the **first** deploy the application may restart once or twice while PostgreSQL initialises
+> its volume. The 3.x schema has no way to say "start after the database is healthy", so the app
+> exits when it cannot open its data source and `restart: unless-stopped` brings it back. It fails
+> before the expensive part of the startup, so each attempt costs seconds.
 
 ### Pulling instead of building
 

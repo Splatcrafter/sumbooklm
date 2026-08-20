@@ -9,7 +9,7 @@ and a workflow that publishes the image so a server pulls instead of builds.
 | `.dockerignore` | Keeps the build context to what the build reads |
 | `docker-compose.yml` | The application and PostgreSQL, deployable as a Portainer stack |
 | `.env.example` | Every setting the stack reads, with the reasoning for the ones that have a choice |
-| `.github/workflows/docker-publish.yml` | Builds and pushes to `ghcr.io/<owner>/sumbooklm` |
+| `.github/workflows/docker-publish.yml` | Builds and pushes to `ghcr.io/<owner>/sumbooklm`, started by hand |
 
 ## Why the image is built the way it is
 
@@ -72,6 +72,16 @@ it: it is not part of the 3.x schema, and Portainer names the stack itself.
 The long form of `depends_on` and the `logging` block are kept as they are. Compose v2 loads every
 file through the Spec loader whatever the version says, so the key changes what Portainer accepts and
 nothing about how the stack runs.
+
+## Publishing is started by hand
+
+The workflow has `workflow_dispatch` as its only trigger. Publishing an image is what puts a version
+in front of whoever runs the stack, which is a moment somebody picks rather than one that follows
+from a commit landing on `master`. The tags are derived from the ref the run was started on, so
+publishing a release means starting the workflow on that tag.
+
+The consequence to know: `ghcr.io/<owner>/sumbooklm:latest` moves only when somebody moves it, so a
+stack pinned to `latest` and a `master` that has moved on are not the same thing.
 
 ## Settings that carry risk
 

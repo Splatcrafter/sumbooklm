@@ -3,12 +3,11 @@ name: Publish container image
 # Builds the image and pushes it to the container registry of this repository, so that a server
 # pulls a finished artifact instead of building one.
 
+# Started by hand, never by a push. Publishing is what puts a version in front of users, and that is
+# a moment somebody picks rather than one that follows from a commit landing on the branch. Run it
+# from the Actions tab, on the branch or tag that should be published: the tags below are derived
+# from whichever ref it was started on.
 on:
-  push:
-    branches:
-      - master
-    tags:
-      - "v*"
   workflow_dispatch:
 
 env:

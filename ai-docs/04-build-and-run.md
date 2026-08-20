@@ -785,3 +785,66 @@ What is not verified here, for the same reason as the summary before it, is how 
 panels look at each width: this container has no browser. The layout change is one grid template, from
 three columns above the extra large breakpoint to two above the large one, and the conversation already
 holds its content to a reading measure of its own, so the panel growing does not stretch the text.
+
+## Verification of the unit test expansion on 2026-08-20
+
+Full `mvn -Dfrontend.skip=true verify` on JDK 25 / Maven 3.9.15: all ten modules green, **617 tests**,
+the JavaDoc gate active over test sources as well. The number was 115 before, and the 69 cases of the
+application module are unchanged; everything added is a unit test that runs without a context, without a
+database and without a network. The whole run takes about seventy seconds, of which the application
+module is thirty-seven.
+
+Sixty-six test classes were added, distributed as the modules are: domain 9, persistence 13, security 5,
+ingestion 4, AI 10, workspace 15, API 10.
+
+### What was chosen and why
+
+The rule applied throughout was that a case has to state something no other layer can. The integration
+tests already drive the happy paths end to end, so repeating them as unit tests would only make the build
+slower. What they cannot reach are the states nobody produces on purpose, and those are the subject:
+
+- **Races.** A refresh token presented twice, two registrations of one username arriving together, two
+  uploads of the same bytes passing the duplicate check at once, a stream cancelled before the provider
+  answered, an answer that ends twice. Each of these is a state a running deployment reaches rarely and a
+  test reaches deterministically.
+- **Permits.** Every path out of `NotebookChatService#beginTurn` and `NotebookSummaryService#write` is
+  covered, because a permit that is not given back is one an account never gets back. The refusal by the
+  rate limit is the case that matters: it happens after the permit was taken.
+- **Ownership.** Every service asserts that a notebook, a source or a conversation of another account is
+  answered as absent rather than as forbidden, and that a source of another notebook cannot be reached
+  through this one.
+- **Constants that are contracts.** The names of the persisted enum constants, the payload type names,
+  the schema version numbers, the two metadata keys of a segment, the BYOK headers, the SSE event names
+  and the API paths. All of them are strings or integers agreed with something outside the compiler:
+  stored rows, a generated client, a browser. A rename compiles and then silently stops working.
+- **Validation.** `RequestValidationTest` reads the bean validation annotations directly rather than
+  through a request, which is the only way to state each rule apart, including the boundaries: a password
+  of exactly twelve characters, a login name of exactly three and of exactly sixty-four, and the
+  characters a login name may not carry.
+- **Answers that must not say too much.** `ApiExceptionHandlerTest` asserts that the identifier of a
+  notebook, a source or a conversation is *not* repeated back, and that a failing provider address does
+  not reach the caller in the detail of a problem.
+
+### What is deliberately not covered
+
+Signing and verifying a token is the framework's, so `JwtTokenIssuerTest` reads the claims handed to the
+encoder rather than a signed string. Retrieval quality is not asserted anywhere, for the reason recorded
+above: the embedding model compresses German scores into a band that no threshold separates. The
+controllers have no unit tests of their own, because they hold no logic that the exception handler, the
+resolvers and the integration tests do not already cover between them.
+
+### Surprises found while writing them
+
+`UUID.fromString` is lenient about the length of the groups: `0f9c1a2b-3d4e-5f60-7a8b-9c0d1e2f` parses
+without complaint. A case meant to state that a nearly correct subject is refused has to truncate a whole
+group instead.
+
+`MockHttpServletResponse#getContentType` returns the type together with the charset, so an equality
+assertion against `application/problem+json` fails against `application/problem+json;charset=UTF-8`.
+
+`JwtClaimsSet#getIssuer` converts the claim to a URL and throws for the plain string this application
+issues under; the claim has to be read as a string.
+
+Mockito 5.23 mocks the `final` class `AetherDataFixer` without configuration, which is what lets the
+failure paths of `PayloadCodec` be stated at all: a row whose bytes are damaged, and a row whose version
+no migration leads out of.

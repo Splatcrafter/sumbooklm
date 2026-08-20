@@ -15,8 +15,11 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
 | [06-deployment.md](06-deployment.md) | Container image, Compose stack and the settings a deployment reads |
 
-State as of 2026-08-19: build green across ten modules, 115 tests, and the JavaDoc gate active
-everywhere. The scaffold is complete and five feature areas are implemented.
+State as of 2026-08-20: build green across ten modules, 617 tests, and the JavaDoc gate active
+everywhere. The scaffold is complete and five feature areas are implemented. Of those tests, 69 drive
+the application end to end from the application module and 548 are unit tests below it, written for the
+states a running deployment reaches rarely: races, refusals, permits that have to be given back, and the
+constants that are contracts with stored rows or with a generated client.
 
 Authentication: registration, login, token rotation, logout, the weekly cleanup of invalidated
 refresh tokens, the client cookie encryption parameters, and the login and registration views bound

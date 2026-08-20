@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+
+  database:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sumbooklm}
+      POSTGRES_USER: ${POSTGRES_USER:-sumbooklm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      # Postgres 18 keeps the cluster below this path rather than at the root of the volume.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    # Both are given on purpose: a stack deployed from a registry pulls the image, a stack
+    # deployed from this repository builds it under the same name.
+    image: ${SUMBOOKLM_IMAGE:-ghcr.io/splatcrafter/sumbooklm:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "${SUMBOOKLM_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+
+      SUMBOOKLM_DATASOURCE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-sumbooklm}
+      SUMBOOKLM_DATASOURCE_USERNAME: ${POSTGRES_USER:-sumbooklm}
+      SUMBOOKLM_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+
+      # The application ships no migrations, and the production profile expects a schema that is
+      # already there. Hibernate is therefore asked to write it, which is what lets a first deploy
+      # come up against an empty database. See the note in .env.example before changing this.
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SUMBOOKLM_DDL_AUTO:-update}
+
+      SUMBOOKLM_JWT_SECRET: ${SUMBOOKLM_JWT_SECRET:?set SUMBOOKLM_JWT_SECRET}
+      SUMBOOKLM_COOKIE_SECRET: ${SUMBOOKLM_COOKIE_SECRET:?set SUMBOOKLM_COOKIE_SECRET}
+      SUMBOOKLM_REQUIRE_HTTPS: ${SUMBOOKLM_REQUIRE_HTTPS:-true}
+      SUMBOOKLM_ALLOWED_SOURCE_HOSTS: ${SUMBOOKLM_ALLOWED_SOURCE_HOSTS:-}
+
+      JAVA_TOOL_OPTIONS: ${SUMBOOKLM_JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  database:

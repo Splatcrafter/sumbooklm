@@ -13,6 +13,7 @@ none of the reasoning recorded here may leak into source comments or JavaDoc.**
 | [03-project-structure.md](03-project-structure.md) | Module graph, package layout, dependency rules |
 | [04-build-and-run.md](04-build-and-run.md) | Build lifecycle, dev workflow, verification evidence |
 | [05-open-questions.md](05-open-questions.md) | Deliberately deferred decisions and their trade-offs |
+| [06-deployment.md](06-deployment.md) | Container image, Compose stack and the settings a deployment reads |
 
 State as of 2026-08-19: build green across ten modules, 115 tests, and the JavaDoc gate active
 everywhere. The scaffold is complete and five feature areas are implemented.

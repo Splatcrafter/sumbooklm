@@ -1,0 +1,32 @@
+# Everything the build produces or the repository carries for reasons of its own. The build stage
+# copies the whole tree, so what is not excluded here is sent to the daemon on every build.
+
+.git
+.gitattributes
+.gitignore
+.dockerignore
+
+.devcontainer
+.idea
+.vscode
+
+ai-docs
+claude-prompts
+temp
+logs
+
+**/target
+**/node_modules
+
+Dockerfile
+docker-compose.yml
+.env
+.env.*
+!.env.example
+
+local-compile.bat
+local-compile.sh
+local-dev-server.bat
+local-dev-server.sh
+local-start.bat
+local-start.sh
